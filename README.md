@@ -182,9 +182,9 @@ To test your trained model on a real robot, you can use the eval_g1.py script lo
 # --policy.path Path to the trained model checkpoint
 # --repo_id     Dataset repository ID (Why use it? The first frame state of the dataset is loaded as the initial state)
 python unitree_lerobot/eval_robot/eval_g1/eval_g1.py  \
-    --policy.path=unitree_lerobot/lerobot/outputs/train/2025-03-25/22-11-16_diffusion/checkpoints/100000/pretrained_model \
-    --repo_id=unitreerobotics/G1_ToastedBread_Dataset \
-    --arm_speed 10.0 -no_gradual_speed
+    --policy.path=unitree_lerobot/lerobot/outputs/train/pour_can_2025-05-25/19-48-48_act/checkpoints/last/pretrained_model/     --repo_id=kuehnrobin/g1_pour_can_left_hand \
+    --arm_speed 10.0 \
+    --no_gradual_speed=true
 
 # If you want to evaluate the model's performance on the dataset, use the command below for testing
 python unitree_lerobot/eval_robot/eval_g1/eval_g1_dataset.py  \
