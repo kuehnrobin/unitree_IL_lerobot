@@ -17,6 +17,9 @@ class EvalRealConfig:
     # Speed control parameters
     arm_speed: float | None = None
     no_gradual_speed: bool = field(default=False)
+    
+    # Network interface for CycloneDDS
+    cyclonedx_uri: str = "enxa0cec8616f27"
 
     def __post_init__(self):
         # HACK: We parse again the cli args here to get the pretrained path if there was one.

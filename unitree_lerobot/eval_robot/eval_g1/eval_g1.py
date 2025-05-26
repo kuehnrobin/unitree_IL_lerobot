@@ -124,7 +124,7 @@ def eval_policy(
     to_idx = dataset.episode_data_index["to"][0].item()
 
     # arm
-    arm_ctrl = G1_29_ArmController()
+    arm_ctrl = G1_29_ArmController(networkInterface=cfg.cyclonedx_uri)
     
     # Apply speed control settings
     if cfg.arm_speed is not None:
@@ -140,7 +140,7 @@ def eval_policy(
         dual_hand_data_lock = Lock()
         dual_hand_state_array = Array('d', 14, lock = False)  # [output] current left, right hand state(14) data.
         dual_hand_action_array = Array('d', 14, lock = False) # [output] current left, right hand action(14) data.
-        hand_ctrl = Dex3_1_Controller(left_hand_array, right_hand_array, dual_hand_data_lock, dual_hand_state_array, dual_hand_action_array)
+        hand_ctrl = Dex3_1_Controller(left_hand_array, right_hand_array, dual_hand_data_lock, dual_hand_state_array, dual_hand_action_array, networkInterface=cfg.cyclonedx_uri)
         init_left_hand_pose = step['observation.state'][14:21].cpu().numpy()
         init_right_hand_pose = step['observation.state'][21:].cpu().numpy()
 
@@ -150,7 +150,7 @@ def eval_policy(
         dual_gripper_data_lock = Lock()
         dual_gripper_state_array = Array('d', 2, lock=False)   # current left, right gripper state(2) data.
         dual_gripper_action_array = Array('d', 2, lock=False)  # current left, right gripper action(2) data.
-        gripper_ctrl = Gripper_Controller(left_hand_array, right_hand_array, dual_gripper_data_lock, dual_gripper_state_array, dual_gripper_action_array)
+        gripper_ctrl = Gripper_Controller(left_hand_array, right_hand_array, dual_gripper_data_lock, dual_gripper_state_array, dual_gripper_action_array, networkInterface=cfg.cyclonedx_uri)
         init_left_hand_pose = step['observation.state'][14].cpu().numpy()
         init_right_hand_pose = step['observation.state'][15].cpu().numpy()
     else:
