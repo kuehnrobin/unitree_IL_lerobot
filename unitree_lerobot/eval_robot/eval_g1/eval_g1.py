@@ -77,10 +77,10 @@ def eval_policy(
         'fps': 30,
         'head_camera_type': 'opencv',
         'head_camera_image_shape': [480, 1280],  # Head camera resolution
-        'head_camera_id_numbers': [0],
+        'head_camera_id_numbers': [6],
         'wrist_camera_type': 'opencv',
         'wrist_camera_image_shape': [480, 640],  # Wrist camera resolution
-        'wrist_camera_id_numbers': [2, 4],
+        'wrist_camera_id_numbers': [8, 10],
     }
     ASPECT_RATIO_THRESHOLD = 2.0 # If the aspect ratio exceeds this value, it is considered binocular
     if len(img_config['head_camera_id_numbers']) > 1 or (img_config['head_camera_image_shape'][1] / img_config['head_camera_image_shape'][0] > ASPECT_RATIO_THRESHOLD):
@@ -124,7 +124,7 @@ def eval_policy(
     to_idx = dataset.episode_data_index["to"][0].item()
 
     # arm
-    arm_ctrl = G1_29_ArmController(networkInterface=cfg.cyclonedx_uri)
+    arm_ctrl = G1_29_ArmController(networkInterface=cfg.cyclonedds_uri)
     
     # Apply speed control settings
     if cfg.arm_speed is not None:
@@ -140,7 +140,7 @@ def eval_policy(
         dual_hand_data_lock = Lock()
         dual_hand_state_array = Array('d', 14, lock = False)  # [output] current left, right hand state(14) data.
         dual_hand_action_array = Array('d', 14, lock = False) # [output] current left, right hand action(14) data.
-        hand_ctrl = Dex3_1_Controller(left_hand_array, right_hand_array, dual_hand_data_lock, dual_hand_state_array, dual_hand_action_array, networkInterface=cfg.cyclonedx_uri)
+        hand_ctrl = Dex3_1_Controller(left_hand_array, right_hand_array, dual_hand_data_lock, dual_hand_state_array, dual_hand_action_array, networkInterface=cfg.cyclonedds_uri)
         init_left_hand_pose = step['observation.state'][14:21].cpu().numpy()
         init_right_hand_pose = step['observation.state'][21:].cpu().numpy()
 
@@ -150,7 +150,7 @@ def eval_policy(
         dual_gripper_data_lock = Lock()
         dual_gripper_state_array = Array('d', 2, lock=False)   # current left, right gripper state(2) data.
         dual_gripper_action_array = Array('d', 2, lock=False)  # current left, right gripper action(2) data.
-        gripper_ctrl = Gripper_Controller(left_hand_array, right_hand_array, dual_gripper_data_lock, dual_gripper_state_array, dual_gripper_action_array, networkInterface=cfg.cyclonedx_uri)
+        gripper_ctrl = Gripper_Controller(left_hand_array, right_hand_array, dual_gripper_data_lock, dual_gripper_state_array, dual_gripper_action_array, networkInterface=cfg.cyclonedds_uri)
         init_left_hand_pose = step['observation.state'][14].cpu().numpy()
         init_right_hand_pose = step['observation.state'][15].cpu().numpy()
     else:
