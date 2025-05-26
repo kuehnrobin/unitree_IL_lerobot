@@ -239,7 +239,7 @@ def get_all_json(data_dir: str):
 
     for task_path in glob.glob(os.path.join(data_dir, '*')):
         if os.path.isdir(task_path):
-            episodes = glob.glob(os.path.join(task_path, 'episode_*'))
+            episodes = glob.glob(os.path.join(task_path, '*'))
             if episodes:
                 task_paths.append(task_path)
                 episode_paths.extend(episodes)

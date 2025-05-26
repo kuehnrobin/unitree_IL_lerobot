@@ -1,3 +1,8 @@
+
+python unitree_lerobot/utils/convert_unitree_json_to_lerobot.py --raw-dir ~/humanoid/humanoid_ws/src/unitree_IL_lerobot/data/ --repo-id kuehnrobin/g1_pour_can_left_hand --robot_type Unitree_G1_Dex3 --task "pour_can" --push_to_hub
+
+
+
 ## 2. Training an ACT Policy on a Unitree Dataset
 LeRobot uses a unified training script that supports different policy architectures (ACT, Diffusion, Pi0, etc.) via configuration flags. To train an Action Chunking Transformer (ACT) policy on a provided Unitree dataset, run the training script with policy.type=act. For example, to train on the Toasted Bread task dataset:
 
