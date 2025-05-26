@@ -185,7 +185,7 @@ python unitree_lerobot/eval_robot/eval_g1/eval_g1.py  \
     --policy.path=unitree_lerobot/lerobot/outputs/train/pour_can_2025-05-25/19-48-48_act/checkpoints/last/pretrained_model/     --repo_id=kuehnrobin/g1_pour_can_left_hand \
     --arm_speed 10.0 \
     --no_gradual_speed=true \
-    --cyclonedx_uri enxa0cec8616f27
+    --cyclonedds_uri enxa0cec8616f27
 
 
 # If you want to evaluate the model's performance on the dataset, use the command below for testing

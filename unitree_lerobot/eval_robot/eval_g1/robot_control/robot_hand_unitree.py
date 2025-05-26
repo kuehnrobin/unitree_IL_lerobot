@@ -15,10 +15,7 @@ import sys
 import threading
 from multiprocessing import Process, shared_memory, Array, Lock
 
-parent2_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-sys.path.append(parent2_dir)
-from teleop.robot_control.hand_retargeting import HandRetargeting, HandType
-from teleop.utils.weighted_moving_filter import WeightedMovingFilter
+from unitree_lerobot.utils.weighted_moving_filter import WeightedMovingFilter
 
 
 unitree_tip_indices = [4, 9, 14] # [thumb, index, middle] in OpenXR
@@ -54,9 +51,8 @@ class Dex3_1_Controller:
         self.fps = fps
         self.Unit_Test = Unit_Test
         if not self.Unit_Test:
-            self.hand_retargeting = HandRetargeting(HandType.UNITREE_DEX3)
+            pass
         else:
-            self.hand_retargeting = HandRetargeting(HandType.UNITREE_DEX3_Unit_Test)
             ChannelFactoryInitialize(0, networkInterface)
 
         # initialize handcmd publisher and handstate subscriber
@@ -173,31 +169,20 @@ class Dex3_1_Controller:
             while self.running:
                 start_time = time.time()
                 # get dual hand state
-                left_hand_mat  = np.array(left_hand_array[:]).reshape(25, 3).copy()
-                right_hand_mat = np.array(right_hand_array[:]).reshape(25, 3).copy()
-
+                left_hand_mat  = np.array(left_hand_array[:]).copy()
+                right_hand_mat = np.array(right_hand_array[:]).copy()
                 # Read left and right q_state from shared arrays
                 state_data = np.concatenate((np.array(left_hand_state_array[:]), np.array(right_hand_state_array[:])))
 
-                if not np.all(right_hand_mat == 0.0) and not np.all(left_hand_mat[4] == np.array([-1.13, 0.3, 0.15])): # if hand data has been initialized.
-                    ref_left_value = left_hand_mat[unitree_tip_indices]
-                    ref_right_value = right_hand_mat[unitree_tip_indices]
-                    ref_left_value[0] = ref_left_value[0] * 1.15
-                    ref_left_value[1] = ref_left_value[1] * 1.05
-                    ref_left_value[2] = ref_left_value[2] * 0.95
-                    ref_right_value[0] = ref_right_value[0] * 1.15
-                    ref_right_value[1] = ref_right_value[1] * 1.05
-                    ref_right_value[2] = ref_right_value[2] * 0.95
-
-                    left_q_target  = self.hand_retargeting.left_retargeting.retarget(ref_left_value)[self.hand_retargeting.right_dex_retargeting_to_hardware]
-                    right_q_target = self.hand_retargeting.right_retargeting.retarget(ref_right_value)[self.hand_retargeting.right_dex_retargeting_to_hardware]
-
                 # get dual hand action
-                action_data = np.concatenate((left_q_target, right_q_target))    
+                action_data = np.concatenate((left_hand_mat, right_hand_mat))   
                 if dual_hand_state_array and dual_hand_action_array:
                     with dual_hand_data_lock:
                         dual_hand_state_array[:] = state_data
                         dual_hand_action_array[:] = action_data
+
+                left_q_target = left_hand_mat
+                right_q_target = right_hand_mat
 
                 self.ctrl_dual_hand(left_q_target, right_q_target)
                 current_time = time.time()
@@ -338,24 +323,8 @@ class Gripper_Controller:
         try:
             while self.running:
                 start_time = time.time()
-                # get dual hand skeletal point state from XR device
-                left_hand_mat  = np.array(left_hand_array[:]).reshape(25, 3).copy()
-                right_hand_mat = np.array(right_hand_array[:]).reshape(25, 3).copy()
-
-                if not np.all(right_hand_mat == 0.0) and not np.all(left_hand_mat[4] == np.array([-1.13, 0.3, 0.15])): # if hand data has been initialized.
-                    left_euclidean_distance  = np.linalg.norm(left_hand_mat[unitree_gripper_indices[1]] - left_hand_mat[unitree_gripper_indices[0]])
-                    right_euclidean_distance = np.linalg.norm(right_hand_mat[unitree_gripper_indices[1]] - right_hand_mat[unitree_gripper_indices[0]])
-                    # Linear mapping from [0, THUMB_INDEX_DISTANCE_MAX] to gripper action range
-                    left_target_action  = np.interp(left_euclidean_distance, [THUMB_INDEX_DISTANCE_MIN, THUMB_INDEX_DISTANCE_MAX], [LEFT_MAPPED_MIN, LEFT_MAPPED_MAX])
-                    right_target_action = np.interp(right_euclidean_distance, [THUMB_INDEX_DISTANCE_MIN, THUMB_INDEX_DISTANCE_MAX], [RIGHT_MAPPED_MIN, RIGHT_MAPPED_MAX])
-                # else: # TEST WITHOUT XR DEVICE
-                #     current_time = time.time()
-                #     period = 2.5
-                #     import math
-                #     left_euclidean_distance = THUMB_INDEX_DISTANCE_MAX * (math.sin(2 * math.pi * current_time / period) + 1) / 2
-                #     right_euclidean_distance = THUMB_INDEX_DISTANCE_MAX * (math.sin(2 * math.pi * current_time / period) + 1) / 2
-                #     left_target_action = np.interp(left_euclidean_distance, [THUMB_INDEX_DISTANCE_MIN, THUMB_INDEX_DISTANCE_MAX], [LEFT_MAPPED_MIN, LEFT_MAPPED_MAX])
-                #     right_target_action = np.interp(right_euclidean_distance, [THUMB_INDEX_DISTANCE_MIN, THUMB_INDEX_DISTANCE_MAX], [RIGHT_MAPPED_MIN, RIGHT_MAPPED_MAX])
+                left_target_action  = np.array(left_hand_array[:]).copy()
+                right_target_action = np.array(right_hand_array[:]).copy()
 
                 # get current dual gripper motor state
                 dual_gripper_state = np.array(dual_gripper_state_in[:])
@@ -391,72 +360,3 @@ class Gripper_Controller:
 class Gripper_JointIndex(IntEnum):
     kLeftGripper = 0
     kRightGripper = 1
-
-
-if __name__ == "__main__":
-    import argparse
-    from teleop.open_television.tv_wrapper import TeleVisionWrapper
-    from teleop.image_server.image_client import ImageClient
-
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--dex', action='store_true', help='Use dex3-1 hand')
-    parser.add_argument('--gripper', dest='dex', action='store_false', help='Use gripper')
-    parser.set_defaults(dex=True)
-    args = parser.parse_args()
-    print(f"args:{args}\n")
-
-    # image
-    img_config = {
-        'fps': 30,
-        'head_camera_type': 'opencv',
-        'head_camera_image_shape': [1080, 3840],  # Head camera resolution
-        'head_camera_id_numbers': [0],
-    }
-    ASPECT_RATIO_THRESHOLD = 2.0  # If the aspect ratio exceeds this value, it is considered binocular
-    if len(img_config['head_camera_id_numbers']) > 1 or (img_config['head_camera_image_shape'][1] / img_config['head_camera_image_shape'][0] > ASPECT_RATIO_THRESHOLD):
-        BINOCULAR = True
-    else:
-        BINOCULAR = False
-    # image
-    if BINOCULAR and not (img_config['head_camera_image_shape'][1] / img_config['head_camera_image_shape'][0] > ASPECT_RATIO_THRESHOLD):
-        tv_img_shape = (img_config['head_camera_image_shape'][0], img_config['head_camera_image_shape'][1] * 2, 3)
-    else:
-        tv_img_shape = (img_config['head_camera_image_shape'][0], img_config['head_camera_image_shape'][1], 3)
-
-    img_shm = shared_memory.SharedMemory(create = True, size = np.prod(tv_img_shape) * np.uint8().itemsize)
-    img_array = np.ndarray(tv_img_shape, dtype = np.uint8, buffer = img_shm.buf)
-    img_client = ImageClient(tv_img_shape = tv_img_shape, tv_img_shm_name = img_shm.name)
-    image_receive_thread = threading.Thread(target = img_client.receive_process, daemon = True)
-    image_receive_thread.daemon = True
-    image_receive_thread.start()
-
-    # television and arm
-    tv_wrapper = TeleVisionWrapper(BINOCULAR, tv_img_shape, img_shm.name)
-
-    if args.dex:
-        left_hand_array = Array('d', 75, lock=True)
-        right_hand_array = Array('d', 75, lock=True)
-        dual_hand_data_lock = Lock()
-        dual_hand_state_array = Array('d', 14, lock=False)  # current left, right hand state(14) data.
-        dual_hand_action_array = Array('d', 14, lock=False) # current left, right hand action(14) data.
-        hand_ctrl = Dex3_1_Controller(left_hand_array, right_hand_array, dual_hand_data_lock, dual_hand_state_array, dual_hand_action_array, Unit_Test = True)
-    else:
-        left_hand_array = Array('d', 75, lock=True)
-        right_hand_array = Array('d', 75, lock=True)
-        dual_gripper_data_lock = Lock()
-        dual_gripper_state_array = Array('d', 2, lock=False)   # current left, right gripper state(2) data.
-        dual_gripper_action_array = Array('d', 2, lock=False)  # current left, right gripper action(2) data.
-        gripper_ctrl = Gripper_Controller(left_hand_array, right_hand_array, dual_gripper_data_lock, dual_gripper_state_array, dual_gripper_action_array, Unit_Test = True)
-
-
-    user_input = input("Please enter the start signal (enter 's' to start the subsequent program):\n")
-    if user_input.lower() == 's':
-        while True:
-            head_rmat, left_wrist, right_wrist, left_hand, right_hand = tv_wrapper.get_data()
-            # send hand skeleton data to hand_ctrl.control_process
-            left_hand_array[:] = left_hand.flatten()
-            right_hand_array[:] = right_hand.flatten()
-
-            # with dual_hand_data_lock:
-            #     print(f"state : {list(dual_hand_state_array)} \naction: {list(dual_hand_action_array)} \n")
-            time.sleep(0.01)
