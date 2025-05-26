@@ -63,6 +63,7 @@ def predict_action(observation, policy, device, use_amp):
 def eval_policy(
     policy: torch.nn.Module,
     dataset: LeRobotDataset,
+    cfg: EvalRealConfig,
 ):
     
     assert isinstance(policy, nn.Module), "Policy must be a PyTorch nn module."
@@ -124,6 +125,12 @@ def eval_policy(
 
     # arm
     arm_ctrl = G1_29_ArmController()
+    
+    # Apply speed control settings
+    if cfg.arm_speed is not None:
+        arm_ctrl.arm_velocity_limit = cfg.arm_speed
+        logging.info(f"Setting custom arm velocity limit: {cfg.arm_speed}")
+    
     init_left_arm_pose = step['observation.state'][:14].cpu().numpy()
 
     # hand
@@ -153,6 +160,11 @@ def eval_policy(
     user_input = input("Please enter the start signal (enter 's' to start the subsequent program):")
     if user_input.lower() == 's':
 
+        # Apply gradual speed increase if not disabled
+        if not cfg.no_gradual_speed:
+            arm_ctrl.speed_gradual_max()
+            logging.info("Gradual speed increase enabled")
+
         # "The initial positions of the robot's arm and fingers take the initial positions during data recording."
         print(f"init robot pose")
         arm_ctrl.ctrl_dual_arm(init_left_arm_pose, np.zeros(14))
@@ -163,7 +175,9 @@ def eval_policy(
         time.sleep(1)
 
         frequency = 50.0
+        frame_counter = 0
 
+        logging.info("Starting main evaluation loop")
         while True:
 
             # Get images
@@ -217,6 +231,12 @@ def eval_policy(
                 left_hand_array[:] = action[14]
                 right_hand_array[:] = action[15]
         
+            frame_counter += 1
+            
+            # Log performance info periodically
+            if frame_counter % 300 == 0:  # Every ~6 seconds at 50fps
+                logging.info(f"Evaluation running - frame {frame_counter}, arm velocity limit: {arm_ctrl.arm_velocity_limit:.2f}")
+        
             time.sleep(1/frequency)
 
 
@@ -241,7 +261,7 @@ def eval_main(cfg: EvalRealConfig):
     policy.eval()
 
     with torch.no_grad(), torch.autocast(device_type=device.type) if cfg.policy.use_amp else nullcontext():
-        eval_policy(policy, dataset)
+        eval_policy(policy, dataset, cfg)
 
     logging.info("End of eval")
 

@@ -13,6 +13,10 @@ from lerobot.configs.policies import PreTrainedConfig
 class EvalRealConfig:
     repo_id: str
     policy: PreTrainedConfig | None = None
+    
+    # Speed control parameters
+    arm_speed: float | None = None
+    no_gradual_speed: bool = False
 
     def __post_init__(self):
         # HACK: We parse again the cli args here to get the pretrained path if there was one.

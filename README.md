@@ -143,8 +143,8 @@ cd unitree_lerobot/lerobot
 python lerobot/scripts/train.py \
     --dataset.repo_id=unitreerobotics/G1_ToastedBread_Dataset \
     --policy.type=act \
-    --use_wandb=True
-
+    --use_wandb=True \
+    --wandb_project=my_project_name
     
 ```
 
@@ -183,7 +183,8 @@ To test your trained model on a real robot, you can use the eval_g1.py script lo
 # --repo_id     Dataset repository ID (Why use it? The first frame state of the dataset is loaded as the initial state)
 python unitree_lerobot/eval_robot/eval_g1/eval_g1.py  \
     --policy.path=unitree_lerobot/lerobot/outputs/train/2025-03-25/22-11-16_diffusion/checkpoints/100000/pretrained_model \
-    --repo_id=unitreerobotics/G1_ToastedBread_Dataset
+    --repo_id=unitreerobotics/G1_ToastedBread_Dataset \
+    --arm_speed 10.0 -no_gradual_speed
 
 # If you want to evaluate the model's performance on the dataset, use the command below for testing
 python unitree_lerobot/eval_robot/eval_g1/eval_g1_dataset.py  \
