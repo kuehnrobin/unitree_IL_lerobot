@@ -142,7 +142,10 @@ cd unitree_lerobot/lerobot
 
 python lerobot/scripts/train.py \
     --dataset.repo_id=unitreerobotics/G1_ToastedBread_Dataset \
-    --policy.type=act 
+    --policy.type=act \
+    --use_wandb=True
+
+    
 ```
 
 - `Train Diffusion Policy`
@@ -152,7 +155,9 @@ cd unitree_lerobot/lerobot
 
 python lerobot/scripts/train.py \
   --dataset.repo_id=unitreerobotics/G1_ToastedBread_Dataset \
-  --policy.type=diffusion
+  --policy.type=diffusion \
+  --use_wandb=True
+
 ```
 
 - `Train Pi0 Policy`
@@ -162,7 +167,9 @@ cd unitree_lerobot/lerobot
 
 python lerobot/scripts/train.py \
   --dataset.repo_id=unitreerobotics/G1_ToastedBread_Dataset \
-  --policy.type=pi0
+  --policy.type=pi0 \
+  --use_wandb=True
+
 ```
 
 # 4. 🤖 Real-World Testing
