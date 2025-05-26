@@ -141,10 +141,13 @@ python unitree_lerobot/utils/convert_unitree_json_to_lerobot.py \
 cd unitree_lerobot/lerobot
 
 python lerobot/scripts/train.py \
-    --dataset.repo_id=unitreerobotics/G1_ToastedBread_Dataset \
+    --dataset.repo_id=kuehnrobin/g1_pour_can_left_hand \
     --policy.type=act \
     --use_wandb=True \
-    --wandb_project=my_project_name
+    --wandb_project=pour_can \
+    --trainer.resume_from_checkpoint=/unitree_lerobot/lerobot/outputs/train/pouring_unitree_2025-05-09/10-08-45_act/checkpoints/last/pretrained_model/model.safetensors \
+    --trainer.max_epochs=50 \
+    --trainer.learning_rate=1e-5
     
 ```
 
