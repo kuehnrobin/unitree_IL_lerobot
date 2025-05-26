@@ -141,14 +141,95 @@ python unitree_lerobot/utils/convert_unitree_json_to_lerobot.py \
 cd unitree_lerobot/lerobot
 
 python lerobot/scripts/train.py \
-    --dataset.repo_id=kuehnrobin/g1_pour_can_left_hand \
-    --policy.type=act \
-    --use_wandb=True \
-    --wandb_project=pour_can \
-    --trainer.resume_from_checkpoint=/unitree_lerobot/lerobot/outputs/train/pouring_unitree_2025-05-09/10-08-45_act/checkpoints/last/pretrained_model/model.safetensors \
-    --trainer.max_epochs=50 \
-    --trainer.learning_rate=1e-5
+  --dataset.repo_id kuehnrobin/g1_pour_can_left_hand \
+  --policy.type=act
+  --policy.path outputs/train/pouring_unitree_2025-05-09/10-08-45_act/checkpoints/last/pretrained_model/ \
+  --optimizer.lr 1e-5 \
+  --steps 50000 \
+  --wandb.enable True \
+  --wandb.project pour_can
+
+
+Fine Tune:
+
+python lerobot/scripts/train.py \
+  --dataset.repo_id kuehnrobin/g1_pour_can_left_hand \
+  --policy.path=outputs/train/pouring_unitree_2025-05-09/10-08-45_act/checkpoints/last/pretrained_model/ \
+  --wandb.enable True \
+  --wandb.project pour_can
+
     
+First try of fine tuning Unitree Pouring with my custom Dataset g1_can_pour_left_hand on 26.05.2025
+
+
+
+Given your specific scenario (right hand + water bottle → left hand + can), here are my(Claude Sonnet 4) suggested parameters:
+
+```bash
+cd unitree_lerobot/lerobot
+
+python lerobot/scripts/train.py \
+  --dataset.repo_id kuehnrobin/g1_pour_can_left_hand \
+  --policy.path=outputs/train/pouring_unitree_2025-05-09/10-08-45_act/checkpoints/last/pretrained_model/ \
+  --optimizer.lr 5e-6 \
+  --optimizer.weight_decay 1e-4 \
+  --steps 15000 \
+  --eval_freq 1000 \
+  --save_freq 1000 \
+  --log_freq 100 \
+  --batch_size 16 \
+  --wandb.enable true \
+  --wandb.project pour_can \
+  --job_name left_hand_can_adaptation
+```
+
+## 3. Parameter Rationale
+
+**Learning Rate (`5e-6`)**: 
+- Much lower than training from scratch (typically 1e-4 to 1e-5)
+- Prevents catastrophic forgetting of the pouring skills
+- Allows gradual adaptation to left hand + can
+
+**Steps (`15000`)**:
+- Fewer than full training since you're fine-tuning
+- Should be enough to adapt to the new hand/object combination
+- Monitor loss curves to adjust if needed
+
+**Batch Size (`16`)**:
+- Smaller batch size can help with stability during fine-tuning
+- Adjust based on your GPU memory
+
+**Evaluation Frequency (`1000`)**:
+- More frequent evaluation to monitor adaptation progress
+- Important to catch overfitting early
+
+## 4. Additional Considerations
+
+**Data Augmentation**: Consider if your dataset has enough diversity in:
+- Grasping poses for the left hand
+- Can orientations and positions
+- Pouring trajectories
+
+**Monitoring**: Watch for:
+- Loss plateauing (might need longer training)
+- Evaluation performance degrading (overfitting)
+- Gradual improvement in success rate
+
+**Alternative Approach**: If the above doesn't work well, you might also try:
+
+```bash
+# Even more conservative fine-tuning
+python lerobot/scripts/train.py \
+  --dataset.repo_id your_username/g1_pour_can_left_hand \
+  --policy.path=outputs/train/pouring_unitree_2025-05-09/10-08-45_act/checkpoints/last/pretrained_model/ \
+  --optimizer.lr 1e-6 \
+  --steps 25000 \
+  --wandb.enable True \
+  --wandb.project pour_can_domain_adaptation
+```
+
+The key is starting conservative and increasing learning rate/steps if the model isn't adapting fast enough.
+
 ```
 
 - `Train Diffusion Policy`
