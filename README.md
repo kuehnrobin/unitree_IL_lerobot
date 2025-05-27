@@ -277,6 +277,8 @@ python unitree_lerobot/eval_robot/eval_g1/eval_g1_dataset.py  \
     --policy.path=unitree_lerobot/lerobot/outputs/train/2025-03-25/22-11-16_diffusion/checkpoints/100000/pretrained_model \
     --repo_id=unitreerobotics/G1_ToastedBread_Dataset
 ```
+ python unitree_lerobot/eval_robot/eval_g1/eval_g1_dataset.py --policy.path=unitree_lerobot/lerobot/outputs/train/2025-05-26/14-57-19_left_hand_can_adaptation/checkpoints/last/pretrained_model/ --repo_id=kuehnrobin/pour_can_left_hand
+
 
 # 5. 🤔 Troubleshooting
 
