@@ -183,6 +183,36 @@ python lerobot/scripts/train.py \
   --job_name left_hand_can_adaptation
 ```
 
+#### Phase 1: Conservative Adaptation
+
+  python lerobot/scripts/train.py \
+    --dataset.repo_id kuehnrobin/g1_pour_can_left_hand \
+    --policy.path=outputs/train/pouring_unitree_2025-05-09/10-08-45_act/checkpoints/last/pretrained_model/ \
+    --optimizer.lr 1e-5 \
+    --optimizer.weight_decay 5e-5 \
+    --steps 8000 \
+    --eval_freq 500 \
+    --save_freq 1000 \
+    --log_freq 50 \
+    --batch_size 8 \
+    --wandb.enable true \
+    --wandb.project pour_can \
+    --job_name conservative_adaptation
+
+#### Phase 2: If Phase 1 works, increase learning rate
+
+  python lerobot/scripts/train.py \
+    --dataset.repo_id kuehnrobot/g1_pour_can_left_hand \
+    --policy.path=outputs/from_phase1/checkpoints/last/pretrained_model/ \
+    --optimizer.lr 3e-5 \
+    --optimizer.weight_decay 1e-4 \
+    --steps 10000 \
+    --eval_freq 500 \
+    --save_freq 1000 \
+    --batch_size 12 \
+    --wandb.enable true \
+    --wandb.project pour_can \
+    --job_name aggressive_adaptation
 ## 3. Parameter Rationale
 
 **Learning Rate (`5e-6`)**: 
