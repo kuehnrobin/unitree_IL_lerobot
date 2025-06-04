@@ -1,6 +1,6 @@
 # for dex3-1
 from unitree_sdk2py.core.channel import ChannelPublisher, ChannelSubscriber, ChannelFactoryInitialize # dds
-from unitree_sdk2py.idl.unitree_hg.msg.dds_ import HandCmd_, HandState_                               # idl
+from unitree_sdk2py.idl.unitree_hg.msg.dds_ import HandCmd_, HandState_, PressSensorState_                          # idl
 from unitree_sdk2py.idl.default import unitree_hg_msg_dds__HandCmd_
 # for gripper
 from unitree_sdk2py.core.channel import ChannelPublisher, ChannelSubscriber, ChannelFactoryInitialize # dds
@@ -20,6 +20,7 @@ from unitree_lerobot.utils.weighted_moving_filter import WeightedMovingFilter
 
 unitree_tip_indices = [4, 9, 14] # [thumb, index, middle] in OpenXR
 Dex3_Num_Motors = 7
+Dex3_Num_Pressure_Sensors = 9
 kTopicDex3LeftCommand = "rt/dex3/left/cmd"
 kTopicDex3RightCommand = "rt/dex3/right/cmd"
 kTopicDex3LeftState = "rt/dex3/left/state"
@@ -65,10 +66,15 @@ class Dex3_1_Controller:
         self.LeftHandState_subscriber.Init()
         self.RightHandState_subscriber = ChannelSubscriber(kTopicDex3RightState, HandState_)
         self.RightHandState_subscriber.Init()
+        # Initialize shared arrays for hand pressures
+        self.LeftHandState_subscriber = ChannelSubscriber(kTopicDex3LeftState, PressSensorState__)
+        self.LeftHandState_subscriber.Init()
+        self.RightHandPressState_subscriber = ChannelSubscriber(kTopicDex3RightState, PressSensorState__)
+        self.RightHandPressState_subscriber.Init()
 
-        # Shared Arrays for hand states
-        self.left_hand_state_array  = Array('d', Dex3_Num_Motors, lock=True)  
-        self.right_hand_state_array = Array('d', Dex3_Num_Motors, lock=True)
+        # Shared Arrays for hand states: now store [q0, ..., q6, p0, ..., p8] for each hand
+        self.left_hand_state_array  = Array('d', Dex3_Num_Motors + Dex3_Num_Pressure_Sensors, lock=True)  # [q0...q6, p0...p8]
+        self.right_hand_state_array = Array('d', Dex3_Num_Motors + Dex3_Num_Pressure_Sensors, lock=True)
 
         # initialize subscribe thread
         self.subscribe_state_thread = threading.Thread(target=self._subscribe_hand_state)
@@ -94,14 +100,24 @@ class Dex3_1_Controller:
     def _subscribe_hand_state(self):
         while True:
             left_hand_msg  = self.LeftHandState_subscriber.Read()
+            left_hand_press_msg = self.LeftHandState_subscriber.Read()
             right_hand_msg = self.RightHandState_subscriber.Read()
+            right_hand_press_msg = self.RightHandPressState_subscriber.Read()
+            print("left_hand_press_msg:", left_hand_press_msg)
+            print("right_hand_press_msg:", right_hand_press_msg)
             if left_hand_msg is not None and right_hand_msg is not None:
-                # Update left hand state
+                # Update left hand state: store q and p
                 for idx, id in enumerate(Dex3_1_Left_JointIndex):
                     self.left_hand_state_array[idx] = left_hand_msg.motor_state[id].q
                 # Update right hand state
                 for idx, id in enumerate(Dex3_1_Right_JointIndex):
                     self.right_hand_state_array[idx] = right_hand_msg.motor_state[id].q
+                ## Todo: Update left and right hand pressure sensors
+                # Something like this:
+                for id in range (Dex3_Num_Pressure_Sensors):
+                    idx = id + Dex3_Num_Motors
+                    self.left_hand_state_array[idx] = left_hand_press_msg.pressure[id]
+                    self.right_hand_state_array[idx] = right_hand_press_msg.pressure[id]
             time.sleep(0.002)
     
     class _RIS_Mode:
@@ -211,6 +227,10 @@ class Dex3_1_Right_JointIndex(IntEnum):
     kRightHandMiddle1 = 6
 
 
+
+# ------------------------------------------------------------------------------------------------
+# Gripper Controller for Unitree Go Gripper
+# ------------------------------------------------------------------------------------------------
 unitree_gripper_indices = [4, 9] # [thumb, index]
 Gripper_Num_Motors = 2
 kTopicGripperCommand = "rt/unitree_actuator/cmd"
