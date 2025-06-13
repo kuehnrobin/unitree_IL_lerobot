@@ -261,7 +261,7 @@ class DatasetAugmentor:
             # Process each timestep
             for timestep_data in tqdm(data["data"], desc=f"Processing {src_episode.name}", leave=False):
                 # Process color images
-                if "colors" in timestep_data:
+                if "colors" in timestep_data and timestep_data["colors"]:
                     self.process_timestep_images(
                         timestep_data["colors"], 
                         src_episode, 
@@ -270,7 +270,7 @@ class DatasetAugmentor:
                     )
                 
                 # Process joint states with noise injection
-                if augment and "states" in timestep_data:
+                if augment and "states" in timestep_data and timestep_data["states"]:
                     self.process_timestep_states(timestep_data["states"])
             
             # Save processed data.json
@@ -290,12 +290,25 @@ class DatasetAugmentor:
         augment: bool
     ) -> None:
         """Process color images for a single timestep."""
+        # Check if colors_data is None or empty
+        if not colors_data:
+            return
+        
         for camera_key, relative_path in colors_data.items():
+            # Skip if relative_path is None or empty
+            if not relative_path:
+                continue
+                
             src_image_path = src_episode / relative_path
             dst_image_path = dst_episode / relative_path
             
             # Ensure destination directory exists
             dst_image_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Skip if source image doesn't exist
+            if not src_image_path.exists():
+                logger.warning(f"Source image not found: {src_image_path}")
+                continue
             
             if augment and self.config.enable_lighting_augmentation:
                 # Apply augmentation
@@ -306,8 +319,14 @@ class DatasetAugmentor:
     
     def process_timestep_states(self, states_data: Dict) -> None:
         """Process joint states and add noise if enabled."""
+        if not states_data:
+            return
+            
         for component, state_info in states_data.items():
-            if "qpos" in state_info and isinstance(state_info["qpos"], list):
+            if not state_info or not isinstance(state_info, dict):
+                continue
+                
+            if "qpos" in state_info and isinstance(state_info["qpos"], list) and state_info["qpos"]:
                 # Add noise to joint positions
                 original_qpos = state_info["qpos"]
                 noisy_qpos = self.joint_noise_injector.add_joint_noise(original_qpos)
@@ -443,8 +462,13 @@ def main():
     parser.add_argument(
         "--enable_lighting_augmentation",
         action="store_true",
-        default=True,
-        help="Enable lighting and color augmentation"
+        help="Enable lighting and color augmentation (default: True)"
+    )
+    
+    parser.add_argument(
+        "--disable_lighting_augmentation",
+        action="store_true",
+        help="Disable lighting and color augmentation"
     )
     
     parser.add_argument(
@@ -467,8 +491,13 @@ def main():
     parser.add_argument(
         "--enable_joint_noise",
         action="store_true", 
-        default=True,
-        help="Enable joint coordinate noise injection"
+        help="Enable joint coordinate noise injection (default: True)"
+    )
+    
+    parser.add_argument(
+        "--disable_joint_noise",
+        action="store_true",
+        help="Disable joint coordinate noise injection"
     )
     
     parser.add_argument(
@@ -496,8 +525,13 @@ def main():
     parser.add_argument(
         "--preserve_original",
         action="store_true",
-        default=True,
-        help="Keep original episodes alongside augmented ones"
+        help="Keep original episodes alongside augmented ones (default: True)"
+    )
+    
+    parser.add_argument(
+        "--skip_original",
+        action="store_true", 
+        help="Skip copying original episodes, only create augmented versions"
     )
     
     parser.add_argument(
@@ -514,6 +548,19 @@ def main():
     optimal_episodes = parse_episode_list(args.optimal_episodes) if args.optimal_episodes else None
     recovery_episodes = parse_episode_list(args.recovery_episodes) if args.recovery_episodes else None
     
+    # Handle boolean flags with defaults
+    enable_lighting = not args.disable_lighting_augmentation if hasattr(args, 'disable_lighting_augmentation') else True
+    if hasattr(args, 'enable_lighting_augmentation') and args.enable_lighting_augmentation:
+        enable_lighting = True
+    
+    enable_joint_noise = not args.disable_joint_noise if hasattr(args, 'disable_joint_noise') else True
+    if hasattr(args, 'enable_joint_noise') and args.enable_joint_noise:
+        enable_joint_noise = True
+    
+    preserve_original = not args.skip_original if hasattr(args, 'skip_original') else True
+    if hasattr(args, 'preserve_original') and args.preserve_original:
+        preserve_original = True
+    
     # Create configuration
     config = AugmentationConfig(
         input_dataset_path=args.input_dataset_path,
@@ -521,14 +568,14 @@ def main():
         optimal_episodes=optimal_episodes,
         recovery_episodes=recovery_episodes,
         optimal_weight=args.optimal_weight,
-        enable_lighting_augmentation=args.enable_lighting_augmentation,
+        enable_lighting_augmentation=enable_lighting,
         brightness_range=tuple(args.brightness_range),
         contrast_range=tuple(args.contrast_range),
-        enable_joint_noise=args.enable_joint_noise,
+        enable_joint_noise=enable_joint_noise,
         joint_noise_std=args.joint_noise_std,
         max_joint_noise=args.max_joint_noise,
         augmentation_probability=args.augmentation_probability,
-        preserve_original=args.preserve_original,
+        preserve_original=preserve_original,
         seed=args.seed
     )
     
