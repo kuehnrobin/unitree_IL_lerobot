@@ -204,58 +204,167 @@ class ImageTransforms:
         
         return image
     
-    def augment_image_comprehensive(
-        self, 
-        image: Image.Image,
-        config: dict = None
-    ) -> Image.Image:
+    def generate_timestep_augmentation_params(self, config: dict = None) -> dict:
         """
-        Apply comprehensive image augmentation pipeline.
+        Generate consistent augmentation parameters for all cameras in a timestep.
         
         Args:
-            image: Input PIL Image
             config: Configuration dictionary for augmentation parameters
             
         Returns:
-            Fully augmented image
+            Dictionary with augmentation parameters to apply to all cameras
         """
         if config is None:
             config = {}
         
+        params = {
+            # Lighting parameters (consistent across all cameras)
+            'brightness_factor': self.rng.uniform(*config.get('brightness_range', (0.7, 1.3))),
+            'contrast_factor': self.rng.uniform(*config.get('contrast_range', (0.8, 1.2))),
+            'saturation_factor': self.rng.uniform(*config.get('saturation_range', (0.8, 1.2))),
+            
+            # Color temperature adjustment
+            'apply_temperature_adjust': self.rng.random() < config.get('temperature_prob', 0.4),
+            'temperature_shift': self.rng.uniform(-30, 30) if self.rng.random() < 0.4 else 0,
+            
+            # Motion blur (consistent across cameras)
+            'apply_blur': self.rng.random() < config.get('blur_prob', 0.15),
+            'blur_radius': self.rng.uniform(0.2, config.get('max_blur_radius', 1.0)),
+            
+            # Shadow effects (consistent lighting conditions)
+            'apply_shadow': self.rng.random() < config.get('shadow_prob', 0.2),
+            'shadow_intensity': self.rng.uniform(0.1, config.get('shadow_intensity', 0.3)),
+            'shadow_type': self.rng.choice(['linear', 'circular']),
+            'shadow_params': self._generate_shadow_params(),
+            
+            # Noise parameters (camera-specific but similar characteristics)
+            'apply_noise': self.rng.random() < 0.3,
+            'noise_std': self.rng.uniform(2, config.get('noise_std', 3.0)),
+            'salt_pepper_prob': config.get('salt_pepper_prob', 0.001)
+        }
+        
+        return params
+    
+    def _generate_shadow_params(self) -> dict:
+        """Generate shadow parameters for consistent application across cameras."""
+        return {
+            'linear_start_ratio': self.rng.uniform(0.2, 0.8),  # Position as ratio of width
+            'linear_width_ratio': self.rng.uniform(0.2, 0.6),  # Shadow width as ratio
+            'circular_center_x_ratio': self.rng.uniform(0.25, 0.75),
+            'circular_center_y_ratio': self.rng.uniform(0.25, 0.75),
+            'circular_radius_ratio': self.rng.uniform(0.125, 0.25)  # Radius as ratio of min(width, height)
+        }
+    
+    def apply_timestep_augmentation(
+        self, 
+        image: Image.Image,
+        augmentation_params: dict
+    ) -> Image.Image:
+        """
+        Apply consistent augmentation to an image using pre-generated parameters.
+        
+        Args:
+            image: Input PIL Image
+            augmentation_params: Parameters from generate_timestep_augmentation_params()
+            
+        Returns:
+            Augmented PIL Image
+        """
         # Apply lighting adjustments
-        image = self.adjust_lighting(
-            image,
-            brightness_range=config.get('brightness_range', (0.7, 1.3)),
-            contrast_range=config.get('contrast_range', (0.8, 1.2)),
-            saturation_range=config.get('saturation_range', (0.8, 1.2))
-        )
+        image = ImageEnhance.Brightness(image).enhance(augmentation_params['brightness_factor'])
+        image = ImageEnhance.Contrast(image).enhance(augmentation_params['contrast_factor'])
+        image = ImageEnhance.Color(image).enhance(augmentation_params['saturation_factor'])
         
         # Apply color temperature adjustment
-        if self.rng.random() < config.get('temperature_prob', 0.4):
-            image = self.adjust_color_temperature(
-                image, 
-                temperature_shift=config.get('temperature_shift', 30)
-            )
+        if augmentation_params['apply_temperature_adjust']:
+            image = self._apply_temperature_shift(image, augmentation_params['temperature_shift'])
         
         # Apply motion blur
-        image = self.simulate_motion_blur(
-            image,
-            blur_probability=config.get('blur_prob', 0.15),
-            max_blur_radius=config.get('max_blur_radius', 1.0)
-        )
+        if augmentation_params['apply_blur']:
+            image = image.filter(ImageFilter.GaussianBlur(radius=augmentation_params['blur_radius']))
         
         # Apply shadow effects
-        image = self.apply_random_shadow(
-            image,
-            shadow_probability=config.get('shadow_prob', 0.2),
-            shadow_intensity=config.get('shadow_intensity', 0.3)
-        )
+        if augmentation_params['apply_shadow']:
+            image = self._apply_shadow_with_params(
+                image, 
+                augmentation_params['shadow_type'],
+                augmentation_params['shadow_intensity'],
+                augmentation_params['shadow_params']
+            )
         
         # Add camera noise
-        image = self.add_camera_noise(
-            image,
-            noise_std=config.get('noise_std', 3.0),
-            salt_pepper_prob=config.get('salt_pepper_prob', 0.001)
-        )
+        if augmentation_params['apply_noise']:
+            image = self._add_noise_with_params(
+                image,
+                augmentation_params['noise_std'],
+                augmentation_params['salt_pepper_prob']
+            )
         
         return image
+    
+    def _apply_temperature_shift(self, image: Image.Image, temp_shift: float) -> Image.Image:
+        """Apply color temperature shift using pre-calculated parameters."""
+        img_array = np.array(image).astype(np.float32)
+        
+        if temp_shift > 0:  # Warmer (more red/yellow)
+            img_array[:, :, 0] *= (1 + temp_shift / 1000)  # Red channel
+            img_array[:, :, 1] *= (1 + temp_shift / 2000)  # Green channel
+        else:  # Cooler (more blue)
+            img_array[:, :, 2] *= (1 - temp_shift / 1000)  # Blue channel
+        
+        img_array = np.clip(img_array, 0, 255).astype(np.uint8)
+        return Image.fromarray(img_array)
+    
+    def _apply_shadow_with_params(
+        self, 
+        image: Image.Image, 
+        shadow_type: str,
+        shadow_intensity: float,
+        shadow_params: dict
+    ) -> Image.Image:
+        """Apply shadow effects using pre-calculated parameters."""
+        img_array = np.array(image).astype(np.float32)
+        height, width = img_array.shape[:2]
+        shadow_mask = np.ones((height, width))
+        
+        if shadow_type == 'linear':
+            start_pos = int(shadow_params['linear_start_ratio'] * width)
+            shadow_width = int(shadow_params['linear_width_ratio'] * width)
+            start_x = max(0, start_pos - shadow_width // 2)
+            end_x = min(width, start_pos + shadow_width // 2)
+            shadow_mask[:, start_x:end_x] *= (1 - shadow_intensity)
+        
+        elif shadow_type == 'circular':
+            center_x = int(shadow_params['circular_center_x_ratio'] * width)
+            center_y = int(shadow_params['circular_center_y_ratio'] * height)
+            radius = int(shadow_params['circular_radius_ratio'] * min(width, height))
+            
+            y, x = np.ogrid[:height, :width]
+            mask = (x - center_x)**2 + (y - center_y)**2 <= radius**2
+            shadow_mask[mask] *= (1 - shadow_intensity)
+        
+        img_array *= shadow_mask[:, :, np.newaxis]
+        img_array = np.clip(img_array, 0, 255).astype(np.uint8)
+        return Image.fromarray(img_array)
+    
+    def _add_noise_with_params(
+        self, 
+        image: Image.Image, 
+        noise_std: float,
+        salt_pepper_prob: float
+    ) -> Image.Image:
+        """Add noise using pre-calculated parameters."""
+        img_array = np.array(image)
+        
+        # Add Gaussian noise
+        if noise_std > 0:
+            gaussian_noise = self.rng.normal(0, noise_std, img_array.shape)
+            img_array = img_array.astype(np.float32) + gaussian_noise
+        
+        # Add salt and pepper noise occasionally
+        if salt_pepper_prob > 0 and self.rng.random() < 0.1:
+            mask = self.rng.random(img_array.shape[:2]) < salt_pepper_prob
+            img_array[mask] = self.rng.choice([0, 255], size=np.sum(mask))
+        
+        img_array = np.clip(img_array, 0, 255).astype(np.uint8)
+        return Image.fromarray(img_array)

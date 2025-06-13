@@ -88,13 +88,32 @@ class ImageAugmentor:
         self.config = config
         self.rng = np.random.RandomState(config.seed)
     
-    def augment_image(self, image_path: str, output_path: str) -> None:
+    def generate_timestep_augmentation_params(self) -> Dict:
         """
-        Apply lighting augmentation to a single image.
+        Generate consistent augmentation parameters for all cameras in a timestep.
+        
+        Returns:
+            Dictionary with augmentation parameters to apply to all cameras
+        """
+        params = {
+            'brightness_factor': self.rng.uniform(*self.config.brightness_range),
+            'contrast_factor': self.rng.uniform(*self.config.contrast_range),
+            'saturation_factor': self.rng.uniform(*self.config.saturation_range),
+            'apply_blur': self.rng.random() < 0.2,  # 20% chance
+            'blur_radius': self.rng.uniform(0.3, 0.8) if self.rng.random() < 0.2 else 0.5,
+            'apply_noise': self.rng.random() < 0.3,  # 30% chance
+            'noise_std': self.rng.uniform(2, 5) if self.rng.random() < 0.3 else 3,
+        }
+        return params
+    
+    def augment_image_with_params(self, image_path: str, output_path: str, params: Dict) -> None:
+        """
+        Apply lighting augmentation to a single image using provided parameters.
         
         Args:
             image_path: Path to input image
             output_path: Path to save augmented image
+            params: Augmentation parameters from generate_timestep_augmentation_params()
         """
         try:
             # Load image using PIL for better color manipulation
@@ -103,26 +122,23 @@ class ImageAugmentor:
                 if img.mode != 'RGB':
                     img = img.convert('RGB')
                 
-                # Apply random brightness adjustment
-                brightness_factor = self.rng.uniform(*self.config.brightness_range)
-                img = ImageEnhance.Brightness(img).enhance(brightness_factor)
+                # Apply brightness adjustment
+                img = ImageEnhance.Brightness(img).enhance(params['brightness_factor'])
                 
-                # Apply random contrast adjustment
-                contrast_factor = self.rng.uniform(*self.config.contrast_range)
-                img = ImageEnhance.Contrast(img).enhance(contrast_factor)
+                # Apply contrast adjustment
+                img = ImageEnhance.Contrast(img).enhance(params['contrast_factor'])
                 
-                # Apply random saturation adjustment
-                saturation_factor = self.rng.uniform(*self.config.saturation_range)
-                img = ImageEnhance.Color(img).enhance(saturation_factor)
+                # Apply saturation adjustment
+                img = ImageEnhance.Color(img).enhance(params['saturation_factor'])
                 
-                # Add subtle blur occasionally for realism
-                if self.rng.random() < 0.2:  # 20% chance
-                    img = img.filter(ImageFilter.GaussianBlur(radius=0.5))
+                # Add subtle blur if specified
+                if params['apply_blur']:
+                    img = img.filter(ImageFilter.GaussianBlur(radius=params['blur_radius']))
                 
-                # Add slight noise
-                if self.rng.random() < 0.3:  # 30% chance
+                # Add slight noise if specified
+                if params['apply_noise']:
                     img_array = np.array(img)
-                    noise = self.rng.normal(0, 3, img_array.shape).astype(np.int16)
+                    noise = self.rng.normal(0, params['noise_std'], img_array.shape).astype(np.int16)
                     img_array = np.clip(img_array.astype(np.int16) + noise, 0, 255).astype(np.uint8)
                     img = Image.fromarray(img_array)
                 
@@ -133,6 +149,17 @@ class ImageAugmentor:
             logger.error(f"Error augmenting image {image_path}: {e}")
             # Fallback: copy original image
             shutil.copy2(image_path, output_path)
+    
+    def augment_image(self, image_path: str, output_path: str) -> None:
+        """
+        Apply lighting augmentation to a single image (for backward compatibility).
+        
+        Args:
+            image_path: Path to input image
+            output_path: Path to save augmented image
+        """
+        params = self.generate_timestep_augmentation_params()
+        self.augment_image_with_params(image_path, output_path, params)
     
     def should_augment(self) -> bool:
         """Determine if augmentation should be applied based on probability."""
@@ -289,10 +316,15 @@ class DatasetAugmentor:
         dst_episode: Path, 
         augment: bool
     ) -> None:
-        """Process color images for a single timestep."""
+        """Process color images for a single timestep with consistent augmentation."""
         # Check if colors_data is None or empty
         if not colors_data:
             return
+        
+        # Generate augmentation parameters once per timestep for all cameras
+        augmentation_params = None
+        if augment and self.config.enable_lighting_augmentation:
+            augmentation_params = self.image_augmentor.generate_timestep_augmentation_params()
         
         for camera_key, relative_path in colors_data.items():
             # Skip if relative_path is None or empty
@@ -310,9 +342,13 @@ class DatasetAugmentor:
                 logger.warning(f"Source image not found: {src_image_path}")
                 continue
             
-            if augment and self.config.enable_lighting_augmentation:
-                # Apply augmentation
-                self.image_augmentor.augment_image(str(src_image_path), str(dst_image_path))
+            if augment and self.config.enable_lighting_augmentation and augmentation_params:
+                # Apply consistent augmentation to all cameras in this timestep
+                self.image_augmentor.augment_image_with_params(
+                    str(src_image_path), 
+                    str(dst_image_path), 
+                    augmentation_params
+                )
             else:
                 # Copy original image
                 shutil.copy2(src_image_path, dst_image_path)

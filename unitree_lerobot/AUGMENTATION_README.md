@@ -130,14 +130,15 @@ Episodes are automatically renumbered starting from `episode_0000`.
 
 ### Image Augmentation
 
-The image augmentation pipeline applies:
-- **Brightness**: Random adjustment between specified range
-- **Contrast**: Random contrast enhancement
-- **Saturation**: Color saturation variations
-- **Color Temperature**: Simulates different lighting conditions
-- **Motion Blur**: Simulates camera/robot movement
-- **Shadows**: Random shadow patterns
-- **Noise**: Gaussian and salt-and-pepper noise
+The image augmentation pipeline applies consistent transformations across all four camera views per timestep:
+- **Consistent Lighting**: All four cameras (color_0, color_1, color_2, color_3) receive identical lighting adjustments per timestep
+- **Brightness**: Random adjustment between specified range (applied consistently across all cameras)
+- **Contrast**: Random contrast enhancement (applied consistently across all cameras)
+- **Saturation**: Color saturation variations (applied consistently across all cameras)
+- **Color Temperature**: Simulates different lighting conditions (consistent across cameras)
+- **Motion Blur**: Simulates camera/robot movement (consistent parameters)
+- **Shadows**: Random shadow patterns (consistent shadow effects across views)
+- **Noise**: Gaussian and salt-and-pepper noise (similar characteristics per camera)
 
 ### Joint Noise Injection
 
