@@ -1,0 +1,12 @@
+# Additional requirements for argument_data.py
+# These should be installed in addition to the main lerobot requirements
+
+# Image processing and manipulation
+Pillow>=9.0.0
+opencv-python>=4.5.0
+
+# Progress bars
+tqdm>=4.60.0
+
+# Scientific computing (likely already installed with lerobot)
+numpy>=1.21.0
