@@ -9,6 +9,21 @@ from .rerun_visualizer import RerunLogger
 from queue import Queue, Empty
 from threading import Thread
 
+def convert_to_json_serializable(obj):
+    """Convert NumPy arrays and other non-serializable objects to JSON-serializable format."""
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    elif isinstance(obj, np.integer):
+        return int(obj)
+    elif isinstance(obj, np.floating):
+        return float(obj)
+    elif isinstance(obj, dict):
+        return {key: convert_to_json_serializable(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [convert_to_json_serializable(item) for item in obj]
+    else:
+        return obj
+
 class EpisodeWriter():
     def __init__(self, task_dir, frequency=30, image_size=[640, 480], rerun_log = True):
         """
@@ -247,7 +262,7 @@ class EpisodeWriter():
         # Add quality label if provided
         if hasattr(self, 'quality_label') and self.quality_label:
             self.data['quality'] = self.quality_label
-        self.data['data'] = self.episode_data
+        self.data['data'] = convert_to_json_serializable(self.episode_data)
         with open(self.json_path, 'w', encoding='utf-8') as jsonf:
             jsonf.write(json.dumps(self.data, indent=4, ensure_ascii=False))
         self.need_save = False     # Reset the save flag
