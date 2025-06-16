@@ -40,7 +40,16 @@ shutdown_requested = False
 def signal_handler(signum, frame):
     global shutdown_requested
     shutdown_requested = True
+    print("\n\nShutdown requested via signal, will exit gracefully...")
     logging.info("Shutdown requested via signal, will exit gracefully...")
+    # Force exit if called multiple times
+    if signal_handler.call_count > 0:
+        print("Force exit requested")
+        sys.exit(1)
+    signal_handler.call_count += 1
+
+# Initialize call counter
+signal_handler.call_count = 0
 
 # Set up signal handler for Ctrl+C
 signal.signal(signal.SIGINT, signal_handler)
@@ -96,7 +105,7 @@ def eval_policy(
         'wrist_camera_image_shape': [480, 640],  # Wrist camera resolution
         'wrist_camera_id_numbers': [8, 10],
     }
-    ASPECT_RATIO_THRESHOLD = 2.0 # If the aspect ratio exceeds this value, it is considered binocular
+    ASPECT_RATIO_THRESHOLD = 2.0 # If the aspect ratio exceeds this value, it is considered binocularPlease press 's' to start the subsequent program (no Enter needed):
     if len(img_config['head_camera_id_numbers']) > 1 or (img_config['head_camera_image_shape'][1] / img_config['head_camera_image_shape'][0] > ASPECT_RATIO_THRESHOLD):
         BINOCULAR = True
     else:
@@ -171,39 +180,111 @@ def eval_policy(
         pass
 
     #===============init robot=====================
+    opencv_available = False
     if cfg.record:
         recorder = EpisodeWriter(task_dir=cfg.task_dir, frequency=cfg.frequency, rerun_log=True)
         recording = False
         logging.info(f"Episode recorder initialized with task_dir={cfg.task_dir}")
         
-        # Try to initialize OpenCV window for recording interface
+        # Try to initialize OpenCV window for recording interface (optional)
+        logging.info("Trying to create OpenCV window for recording interface...")
         try:
-            # Set OpenCV backend explicitly to avoid Qt issues
-            cv2.namedWindow("record image", cv2.WINDOW_AUTOSIZE)
-            cv2.moveWindow("record image", 100, 100)  # Position window
+            import os
+            import time
             
-            # Create a simple placeholder image to show initially
-            placeholder = np.zeros((240, 320, 3), dtype=np.uint8)
-            cv2.putText(placeholder, "Recording Interface", (50, 60), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-            cv2.putText(placeholder, "Waiting for camera feed...", (20, 100), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1)
-            cv2.putText(placeholder, "Click window & press keys", (20, 140), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 0), 1)
-            cv2.putText(placeholder, "OR use terminal controls", (20, 180), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 255), 1)
-            cv2.imshow("record image", placeholder)
-            cv2.waitKey(10)
+            # Set environment variable to avoid Qt/Wayland issues
+            os.environ['QT_QPA_PLATFORM'] = 'xcb'  # Force X11 instead of Wayland
             
-            logging.info("Recording interface window created")
-            opencv_available = True
+            # Use a separate thread with timeout for OpenCV window creation
+            window_success = [False]
+            window_error = [None]
+            
+            def create_opencv_window():
+                try:
+                    # Create window with minimal operations
+                    cv2.namedWindow("record image", cv2.WINDOW_AUTOSIZE)
+                    
+                    # Create a simple placeholder image  
+                    placeholder = np.zeros((240, 320, 3), dtype=np.uint8)
+                    cv2.putText(placeholder, "Recording Interface", (50, 60), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                    cv2.putText(placeholder, "Press keys here or use terminal", (10, 100), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1)
+                    cv2.putText(placeholder, "s=start r=abort q/w/e=save", (10, 140), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 0), 1)
+            
+                    # Use non-blocking display
+                    cv2.imshow("record image", placeholder)
+                    cv2.waitKey(1)  # Non-blocking wait
+            
+                    # Try to move window (this might fail but shouldn't hang)
+                    try:
+                        cv2.moveWindow("record image", 100, 100)
+                    except:
+                        pass  # Window move might fail, that's OK
+                    
+                    window_success[0] = True
+                    
+                except Exception as e:
+                    window_error[0] = str(e)
+            
+            # Start window creation in a separate thread
+            window_thread = threading.Thread(target=create_opencv_window, daemon=True)
+            window_thread.start()
+            
+            # Wait for up to 3 seconds for window creation
+            window_thread.join(timeout=3.0)
+            
+            if window_success[0]:
+                logging.info("OpenCV recording interface window created successfully")
+                opencv_available = True
+            else:
+                if window_error[0]:
+                    logging.warning(f"OpenCV window creation failed: {window_error[0]}")
+                else:
+                    logging.warning("OpenCV window creation timed out after 3 seconds")
+                logging.info("Recording will use terminal input only - this is fine!")
+                opencv_available = False
+                
         except Exception as e:
-            logging.warning(f"Could not create OpenCV window: {e}")
-            logging.info("Recording will use terminal input only")
+            logging.warning(f"Could not initialize OpenCV window: {e}")
+            logging.info("Recording will use terminal input only - this is fine!")
             opencv_available = False
+            
+        # Clean up any partial window creation if it failed
+        if not opencv_available:
+            try:
+                cv2.destroyAllWindows()
+            except:
+                pass
     
-    user_input = input("Please enter the start signal (enter 's' to start the subsequent program):")
-    if user_input.lower() == 's':
+    print("Please press 's' to start the subsequent program (no Enter needed):")
+    
+    # Non-blocking input for initial start
+    import sys
+    import tty
+    import termios
+    
+    old_settings = termios.tcgetattr(sys.stdin)
+    try:
+        tty.setraw(sys.stdin.fileno())
+        while True:
+            char = sys.stdin.read(1)
+            if char == '\x03':  # Ctrl+C
+                print("\nExiting...")
+                sys.exit(0)
+            elif char.lower() == 's':
+                print("\nStarting program...")
+                break
+            elif char == '\r' or char == '\n':
+                continue
+            else:
+                print(f"\nPress 's' to start (pressed: {repr(char)})")
+    finally:
+        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
+    
+    # Now continue with the program
+    if True:
 
         # Apply gradual speed increase if not disabled
         if not cfg.no_gradual_speed:
@@ -229,9 +310,8 @@ def eval_policy(
             recording_state = Array('i', [0])  # 0 = not recording, 1 = recording
             
             def terminal_input_handler():
-                """Non-blocking terminal input handler using select on stdin"""
+                """Non-blocking terminal input handler with fallback support"""
                 import sys
-                import select
                 import tty
                 import termios
                 
@@ -255,43 +335,90 @@ def eval_policy(
                     old_settings = termios.tcgetattr(sys.stdin)
                     tty.setraw(sys.stdin.fileno())
                     
-                    while not shutdown_requested:
-                        # Non-blocking check for input
-                        if select.select([sys.stdin], [], [], 0.1) == ([sys.stdin], [], []):
-                            char = sys.stdin.read(1)
-                            
-                            if char == '\x03':  # Ctrl+C
-                                shutdown_requested = True
-                                print("\nShutdown requested via Ctrl+C")
-                                break
-                            elif char == 's' and recording_state[0] == 0:
-                                if recorder.create_episode():
-                                    recording_state[0] = 1
-                                    logging.info("Started recording episode via terminal")
-                                    print("\n✓ Recording started!")
-                                else:
-                                    print("\n✗ Failed to start recording")
-                            elif char == 'r' and recording_state[0] == 1:
-                                recorder.abort_episode()
-                                recording_state[0] = 0
-                                logging.info("Aborted recording episode via terminal")
-                                print("\n✓ Recording aborted!")
-                            elif recording_state[0] == 1 and char in ['q', 'w', 'e']:
-                                quality_map = {'q': 'optimal', 'w': 'suboptimal', 'e': 'recovery'}
-                                quality = quality_map[char]
-                                recorder.save_episode(quality=quality)
-                                recording_state[0] = 0
-                                logging.info(f"Saved recording episode with quality: {quality} via terminal")
-                                print(f"\n✓ Recording saved as {quality}!")
+                    # Try to use non-blocking approach
+                    try:
+                        import fcntl
+                        import os
                         
-                        time.sleep(0.01)  # Small delay to prevent busy waiting
+                        # Make stdin non-blocking
+                        fd = sys.stdin.fileno()
+                        flags = fcntl.fcntl(fd, fcntl.F_GETFL)
+                        fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+                        
+                        while not shutdown_requested:
+                            try:
+                                char = sys.stdin.read(1)
+                                
+                                if char == '\x03':  # Ctrl+C
+                                    shutdown_requested = True
+                                    print("\nShutdown requested via Ctrl+C")
+                                    break
+                                elif char == 's' and recording_state[0] == 0:
+                                    if recorder.create_episode():
+                                        recording_state[0] = 1
+                                        logging.info("Started recording episode via terminal")
+                                        print("\n✓ Recording started!")
+                                    else:
+                                        print("\n✗ Failed to start recording")
+                                elif char == 'r' and recording_state[0] == 1:
+                                    recorder.abort_episode()
+                                    recording_state[0] = 0
+                                    logging.info("Aborted recording episode via terminal")
+                                    print("\n✓ Recording aborted!")
+                                elif recording_state[0] == 1 and char in ['q', 'w', 'e']:
+                                    quality_map = {'q': 'optimal', 'w': 'suboptimal', 'e': 'recovery'}
+                                    quality = quality_map[char]
+                                    recorder.save_episode(quality=quality)
+                                    recording_state[0] = 0
+                                    logging.info(f"Saved recording episode with quality: {quality} via terminal")
+                                    print(f"\n✓ Recording saved as {quality}!")
+                            except IOError:
+                                # No input available, continue
+                                pass
+                            
+                            time.sleep(0.1)  # Small delay to prevent busy waiting
+                        
+                        # Restore blocking mode
+                        fcntl.fcntl(fd, fcntl.F_SETFL, flags)
+                        
+                    except ImportError:
+                        # Fallback: use blocking input method
+                        print("Using fallback blocking input method...")
+                        print("Commands: s/r/q/w/e followed by Enter")
+                        while not shutdown_requested:
+                            try:
+                                char = input("Enter command: ").strip().lower()
+                                if char == 's' and recording_state[0] == 0:
+                                    if recorder.create_episode():
+                                        recording_state[0] = 1
+                                        print("✓ Recording started!")
+                                    else:
+                                        print("✗ Failed to start recording")
+                                elif char == 'r' and recording_state[0] == 1:
+                                    recorder.abort_episode()
+                                    recording_state[0] = 0
+                                    print("✓ Recording aborted!")
+                                elif recording_state[0] == 1 and char in ['q', 'w', 'e']:
+                                    quality_map = {'q': 'optimal', 'w': 'suboptimal', 'e': 'recovery'}
+                                    quality = quality_map[char]
+                                    recorder.save_episode(quality=quality)
+                                    recording_state[0] = 0
+                                    print(f"✓ Recording saved as {quality}!")
+                            except (EOFError, KeyboardInterrupt):
+                                shutdown_requested = True
+                                break
+                            except Exception as e:
+                                logging.debug(f"Fallback input error: {e}")
                         
                 except Exception as e:
                     logging.error(f"Terminal input handler error: {e}")
                 finally:
                     # Restore terminal settings
                     if old_settings:
-                        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
+                        try:
+                            termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
+                        except:
+                            pass
                     print("\nTerminal input handler stopped")
             
             # Start terminal input handler in daemon thread
