@@ -255,6 +255,7 @@ def eval_policy(
                 print("q - Save recording as optimal")
                 print("w - Save recording as suboptimal")
                 print("e - Save recording as recovery")
+                print("x - Exit program")
                 print("Ctrl+C - Exit program")
                 print("="*50)
                 print("Ready for commands...")
@@ -278,6 +279,10 @@ def eval_policy(
                                 shutdown_requested = True
                                 print("\n⚠️  Shutdown requested...")
                                 break
+                            elif char == 'x':  # Exit with 'x' key
+                                shutdown_requested = True
+                                print("\n⚠️  Exit requested via 'x' key...")
+                                break
                             elif char == 's' and recording_state[0] == 0:
                                 if recorder.create_episode():
                                     recording_state[0] = 1
@@ -294,9 +299,14 @@ def eval_policy(
                                 recorder.save_episode(quality=quality)
                                 recording_state[0] = 0
                                 print(f"\n✅ Recording saved as {quality.upper()}!")
+                            elif char and ord(char) >= 32:  # Only show message for printable characters
+                                print(f"\n⚠️  Unknown key '{char}' - use s/r/q/w/e/x")
                         except IOError:
                             # No input available, continue
                             pass
+                        except Exception as e:
+                            print(f"\n⚠️  Input error: {e}")
+                            logging.error(f"Terminal input error: {e}")
                         
                         time.sleep(0.1)  # Small delay to prevent busy waiting
                     
@@ -369,7 +379,7 @@ def eval_policy(
                 # Show periodic instructions for terminal controls (every 60 seconds instead of 30)
                 if cfg.record and time.time() - last_instruction_time > 60:
                     print("\n📝 RECORDING CONTROLS:")
-                    print("   s = Start | r = Abort | q = Save optimal | w = Save suboptimal | e = Save recovery")
+                    print("   s = Start | r = Abort | q = Save optimal | w = Save suboptimal | e = Save recovery | x = Exit")
                     last_instruction_time = time.time()
 
                 # Record data if recording is active
