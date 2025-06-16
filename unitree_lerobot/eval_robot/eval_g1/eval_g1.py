@@ -31,7 +31,7 @@ from unitree_lerobot.eval_robot.eval_g1.image_server.image_client import ImageCl
 from unitree_lerobot.eval_robot.eval_g1.robot_control.robot_arm import G1_29_ArmController
 from unitree_lerobot.eval_robot.eval_g1.robot_control.robot_hand_unitree import Dex3_1_Controller, Gripper_Controller
 from unitree_lerobot.eval_robot.eval_g1.eval_real_config import EvalRealConfig
-from unitree_lerobot.eval_robot.eval_g1.utils.episode_writer import EpisodeWriter
+from unitree_lerobot.eval_robot.eval_g1.utils import EpisodeWriter, PressureSensorCollector
 
 # Global flag for graceful shutdown
 shutdown_requested = False
@@ -179,6 +179,21 @@ def eval_policy(
         pass
 
     #===============init robot=====================
+    # Initialize pressure sensor collector (always available unless explicitly disabled)
+    pressure_collector = PressureSensorCollector(
+        networkInterface=cfg.cyclonedds_uri, 
+        enabled=cfg.pressure
+    )
+    if cfg.pressure:
+        pressure_started = pressure_collector.start()
+        if pressure_started:
+            logging.info("Pressure sensor data collection started successfully")
+        else:
+            logging.warning("Pressure sensor data collection failed to start")
+    else:
+        logging.info("Pressure sensor data collection disabled")
+    
+    # Initialize recorder only if recording is enabled
     if cfg.record:
         recorder = EpisodeWriter(task_dir=cfg.task_dir, frequency=cfg.frequency, rerun_log=True)
         logging.info(f"Episode recorder initialized with task_dir={cfg.task_dir}")
@@ -413,6 +428,11 @@ def eval_policy(
                         left_hand_action = [action[14]]
                         right_hand_action = [action[15]]
                     
+                    # Get pressure sensor data if available
+                    pressure_data = pressure_collector.get_pressure_data() if cfg.record and cfg.pressure else {
+                        'left_pressure': [], 'left_temp': [], 'right_pressure': [], 'right_temp': []
+                    }
+                    
                     states = {
                         "left_arm": {                                                                    
                             "qpos":   left_arm_state.tolist(),    
@@ -427,12 +447,16 @@ def eval_policy(
                         "left_hand": {                                                                    
                             "qpos":   left_hand_state,           
                             "qvel":   [],                           
-                            "torque": [],                          
+                            "torque": [],
+                            "pressures": pressure_data['left_pressure'],
+                            "temperatures": pressure_data['left_temp'],                          
                         }, 
                         "right_hand": {                                                                    
                             "qpos":   right_hand_state,       
                             "qvel":   [],                           
-                            "torque": [],  
+                            "torque": [],
+                            "pressures": pressure_data['right_pressure'],
+                            "temperatures": pressure_data['right_temp'],  
                         }, 
                         "body": None, 
                     }
@@ -488,6 +512,11 @@ def eval_policy(
                 if 'recorder' in locals():
                     recorder.close()
                 logging.info("Recording resources cleaned up")
+            
+            # Clean up pressure sensor
+            if 'pressure_collector' in locals():
+                pressure_collector.stop()
+                logging.info("Pressure sensor resources cleaned up")
             
             arm_ctrl.ctrl_dual_arm_go_home()
             logging.info("Arms returned to home position")
