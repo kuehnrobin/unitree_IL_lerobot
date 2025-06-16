@@ -332,96 +332,16 @@ After training your robot policy, you can share it with the community by uploadi
 
 ## 6.1 🚀 Push Policy to Hugging Face Hub
 
-We provide a convenient script to upload your trained policies to the Hub with various options for checkpoint selection.
+Once you have trained a policy with our training script (lerobot/scripts/train.py), use this script to push it
+to the hub.
 
-### Prerequisites
+Example:
 
-Make sure you're logged in to Hugging Face:
 ```bash
-huggingface-cli login --token ${HUGGINGFACE_TOKEN} --add-to-git-credential
+python lerobot/scripts/push_pretrained.py \
+    --pretrained_path=outputs/train/act_aloha_sim_transfer_cube_human/checkpoints/last/pretrained_model \
+    --repo_id=lerobot/act_aloha_sim_transfer_cube_human
 ```
-
-### Basic Usage
-
-**Push the latest checkpoint (automatic selection):**
-```bash
-python unitree_lerobot/scripts/push_policy_to_hub.py \
-    --train_dir=unitree_lerobot/lerobot/outputs/train/2025-05-27/13-53-10_pour_can_mark_3 \
-    --repo_id=your_username/g1_pour_can_act_policy
-```
-
-**Push a specific checkpoint:**
-```bash
-python unitree_lerobot/scripts/push_policy_to_hub.py \
-    --train_dir=unitree_lerobot/lerobot/outputs/train/2025-05-27/13-53-10_pour_can_mark_3 \
-    --checkpoint=015000 \
-    --repo_id=your_username/g1_pour_can_15k_steps
-```
-
-**Interactive mode (guided selection):**
-```bash
-python unitree_lerobot/scripts/push_policy_to_hub.py --interactive
-```
-
-### Advanced Options
-
-**List available checkpoints:**
-```bash
-python unitree_lerobot/scripts/push_policy_to_hub.py \
-    --train_dir=unitree_lerobot/lerobot/outputs/train/2025-05-27/13-53-10_pour_can_mark_3 \
-    --list_checkpoints
-```
-
-**Upload to a private repository:**
-```bash
-python unitree_lerobot/scripts/push_policy_to_hub.py \
-    --train_dir=unitree_lerobot/lerobot/outputs/train/2025-05-27/13-53-10_pour_can_mark_3 \
-    --repo_id=your_username/private_policy \
-    --private \
-    --commit_message="Final trained policy for G1 pouring task"
-```
-
-**Upload to a specific branch:**
-```bash
-python unitree_lerobot/scripts/push_policy_to_hub.py \
-    --train_dir=unitree_lerobot/lerobot/outputs/train/2025-05-27/13-53-10_pour_can_mark_3 \
-    --repo_id=your_username/experimental_policy \
-    --branch=experimental
-```
-
-### Script Parameters
-
-| Parameter | Description | Example |
-|-----------|-------------|---------|
-| `--train_dir` | Path to your training output directory | `unitree_lerobot/lerobot/outputs/train/2025-05-27/13-53-10_pour_can_mark_3` |
-| `--repo_id` | Hugging Face repository ID | `your_username/model_name` |
-| `--checkpoint` | Specific checkpoint to upload (`last`, `015000`, etc.) | `015000` |
-| `--list_checkpoints` | List available checkpoints and exit | - |
-| `--interactive` | Run in interactive mode for guided selection | - |
-| `--private` | Create a private repository | - |
-| `--branch` | Upload to a specific branch | `experimental` |
-| `--commit_message` | Custom commit message | `"Final policy for pouring task"` |
-
-### What Gets Uploaded
-
-The script uploads the complete `pretrained_model` directory which contains:
-- `config.json`: Policy configuration
-- `model.safetensors`: Trained model weights
-- `train_config.json`: Complete training configuration for reproducibility
-
-### Example Repository Names
-
-Choose descriptive repository names that indicate:
-- Robot type: `g1_`, `z1_`, etc.
-- Task: `pour_can`, `grasp_cube`, `toasted_bread`
-- Policy type: `act`, `diffusion`, `pi0`
-- Hand/version: `left_hand`, `dual_hand`, `v2`
-
-Examples:
-- `your_username/g1_pour_can_left_hand_act`
-- `your_username/z1_grasp_cube_dual_hand_diffusion`
-- `your_username/g1_toasted_bread_act_robust`
-
 ### Using Uploaded Policies
 
 Once uploaded, others can use your policy:
