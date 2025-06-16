@@ -326,8 +326,127 @@ python unitree_lerobot/eval_robot/eval_g1/eval_g1_dataset.py  \
 | **FFmpeg-related errors:**  <br> Q1: `Unknown encoder 'libsvtav1'` <br> Q2: `FileNotFoundError: No such file or directory: 'ffmpeg'` <br> Q3: `RuntimeError: Could not load libtorchcodec. Likely causes: FFmpeg is not properly installed.` | Install FFmpeg: <br> `conda install -c conda-forge ffmpeg` |
 | **Access to model `google/paligemma-3b-pt-224` is restricted.** | Run `huggingface-cli login` and request access if needed. |
 
+# 6. 📤 Sharing Your Trained Policies
 
-# 6. 🙏 Acknowledgement
+After training your robot policy, you can share it with the community by uploading it to the Hugging Face Hub. This allows others to use your trained models and helps advance the field of robot learning.
+
+## 6.1 🚀 Push Policy to Hugging Face Hub
+
+We provide a convenient script to upload your trained policies to the Hub with various options for checkpoint selection.
+
+### Prerequisites
+
+Make sure you're logged in to Hugging Face:
+```bash
+huggingface-cli login --token ${HUGGINGFACE_TOKEN} --add-to-git-credential
+```
+
+### Basic Usage
+
+**Push the latest checkpoint (automatic selection):**
+```bash
+python unitree_lerobot/scripts/push_policy_to_hub.py \
+    --train_dir=unitree_lerobot/lerobot/outputs/train/2025-05-27/13-53-10_pour_can_mark_3 \
+    --repo_id=your_username/g1_pour_can_act_policy
+```
+
+**Push a specific checkpoint:**
+```bash
+python unitree_lerobot/scripts/push_policy_to_hub.py \
+    --train_dir=unitree_lerobot/lerobot/outputs/train/2025-05-27/13-53-10_pour_can_mark_3 \
+    --checkpoint=015000 \
+    --repo_id=your_username/g1_pour_can_15k_steps
+```
+
+**Interactive mode (guided selection):**
+```bash
+python unitree_lerobot/scripts/push_policy_to_hub.py --interactive
+```
+
+### Advanced Options
+
+**List available checkpoints:**
+```bash
+python unitree_lerobot/scripts/push_policy_to_hub.py \
+    --train_dir=unitree_lerobot/lerobot/outputs/train/2025-05-27/13-53-10_pour_can_mark_3 \
+    --list_checkpoints
+```
+
+**Upload to a private repository:**
+```bash
+python unitree_lerobot/scripts/push_policy_to_hub.py \
+    --train_dir=unitree_lerobot/lerobot/outputs/train/2025-05-27/13-53-10_pour_can_mark_3 \
+    --repo_id=your_username/private_policy \
+    --private \
+    --commit_message="Final trained policy for G1 pouring task"
+```
+
+**Upload to a specific branch:**
+```bash
+python unitree_lerobot/scripts/push_policy_to_hub.py \
+    --train_dir=unitree_lerobot/lerobot/outputs/train/2025-05-27/13-53-10_pour_can_mark_3 \
+    --repo_id=your_username/experimental_policy \
+    --branch=experimental
+```
+
+### Script Parameters
+
+| Parameter | Description | Example |
+|-----------|-------------|---------|
+| `--train_dir` | Path to your training output directory | `unitree_lerobot/lerobot/outputs/train/2025-05-27/13-53-10_pour_can_mark_3` |
+| `--repo_id` | Hugging Face repository ID | `your_username/model_name` |
+| `--checkpoint` | Specific checkpoint to upload (`last`, `015000`, etc.) | `015000` |
+| `--list_checkpoints` | List available checkpoints and exit | - |
+| `--interactive` | Run in interactive mode for guided selection | - |
+| `--private` | Create a private repository | - |
+| `--branch` | Upload to a specific branch | `experimental` |
+| `--commit_message` | Custom commit message | `"Final policy for pouring task"` |
+
+### What Gets Uploaded
+
+The script uploads the complete `pretrained_model` directory which contains:
+- `config.json`: Policy configuration
+- `model.safetensors`: Trained model weights
+- `train_config.json`: Complete training configuration for reproducibility
+
+### Example Repository Names
+
+Choose descriptive repository names that indicate:
+- Robot type: `g1_`, `z1_`, etc.
+- Task: `pour_can`, `grasp_cube`, `toasted_bread`
+- Policy type: `act`, `diffusion`, `pi0`
+- Hand/version: `left_hand`, `dual_hand`, `v2`
+
+Examples:
+- `your_username/g1_pour_can_left_hand_act`
+- `your_username/z1_grasp_cube_dual_hand_diffusion`
+- `your_username/g1_toasted_bread_act_robust`
+
+### Using Uploaded Policies
+
+Once uploaded, others can use your policy:
+
+```python
+# Loading from Hub
+from lerobot.common.policies.act.modeling_act import ACTPolicy
+policy = ACTPolicy.from_pretrained("your_username/g1_pour_can_act_policy")
+
+# Or in evaluation script
+python unitree_lerobot/eval_robot/eval_g1/eval_g1.py \
+    --policy.path=your_username/g1_pour_can_act_policy \
+    --repo_id=original_training_dataset \
+    --arm_speed 10.0
+```
+
+## 6.2 📝 Best Practices
+
+1. **Descriptive Names**: Use clear, descriptive repository names
+2. **Documentation**: Add a good README to your model repository describing the task, training data, and performance
+3. **Versioning**: Use branches or separate repositories for different versions
+4. **Testing**: Test your uploaded model before sharing publicly
+5. **Licensing**: Consider adding appropriate licenses to your model repositories
+
+# 7. 🙏 Acknowledgement
 
 This code builds upon following open-source code-bases. Please visit the URLs to see the respective LICENSES:
 
