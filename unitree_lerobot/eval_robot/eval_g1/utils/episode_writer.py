@@ -206,12 +206,14 @@ class EpisodeWriter():
 
         # Log data if necessary - use the copy with actual image data for visualization
         if self.rerun_log and vis_item_data:
-            curent_record_time = time.time()
-            print(f"==> episode_id:{self.episode_id}  item_id:{self.item_id}  current_time:{curent_record_time}")
             try:
                 self.rerun_logger.log_item_data(vis_item_data)
             except Exception as e:
                 print(f"Warning: RerunLogger encountered an issue: {e}")
+        
+        # Show recording progress every 10 items (less verbose)
+        if self.item_id % 10 == 0:
+            print(f"Recording... {self.item_id + 1} items captured")
 
     def save_episode(self, quality=None):
         """

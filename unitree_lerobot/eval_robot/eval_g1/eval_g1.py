@@ -9,7 +9,6 @@ import torch
 import logging
 import threading
 import numpy as np
-import cv2
 import signal
 import sys
 from copy import copy
@@ -180,83 +179,10 @@ def eval_policy(
         pass
 
     #===============init robot=====================
-    opencv_available = False
     if cfg.record:
         recorder = EpisodeWriter(task_dir=cfg.task_dir, frequency=cfg.frequency, rerun_log=True)
-        recording = False
         logging.info(f"Episode recorder initialized with task_dir={cfg.task_dir}")
-        
-        # Try to initialize OpenCV window for recording interface (optional)
-        logging.info("Trying to create OpenCV window for recording interface...")
-        try:
-            import os
-            import time
-            
-            # Set environment variable to avoid Qt/Wayland issues
-            os.environ['QT_QPA_PLATFORM'] = 'xcb'  # Force X11 instead of Wayland
-            
-            # Use a separate thread with timeout for OpenCV window creation
-            window_success = [False]
-            window_error = [None]
-            
-            def create_opencv_window():
-                try:
-                    # Create window with minimal operations
-                    cv2.namedWindow("record image", cv2.WINDOW_AUTOSIZE)
-                    
-                    # Create a simple placeholder image  
-                    placeholder = np.zeros((240, 320, 3), dtype=np.uint8)
-                    cv2.putText(placeholder, "Recording Interface", (50, 60), 
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-                    cv2.putText(placeholder, "Press keys here or use terminal", (10, 100), 
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 200, 200), 1)
-                    cv2.putText(placeholder, "s=start r=abort q/w/e=save", (10, 140), 
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 0), 1)
-            
-                    # Use non-blocking display
-                    cv2.imshow("record image", placeholder)
-                    cv2.waitKey(1)  # Non-blocking wait
-            
-                    # Try to move window (this might fail but shouldn't hang)
-                    try:
-                        cv2.moveWindow("record image", 100, 100)
-                    except:
-                        pass  # Window move might fail, that's OK
-                    
-                    window_success[0] = True
-                    
-                except Exception as e:
-                    window_error[0] = str(e)
-            
-            # Start window creation in a separate thread
-            window_thread = threading.Thread(target=create_opencv_window, daemon=True)
-            window_thread.start()
-            
-            # Wait for up to 3 seconds for window creation
-            window_thread.join(timeout=3.0)
-            
-            if window_success[0]:
-                logging.info("OpenCV recording interface window created successfully")
-                opencv_available = True
-            else:
-                if window_error[0]:
-                    logging.warning(f"OpenCV window creation failed: {window_error[0]}")
-                else:
-                    logging.warning("OpenCV window creation timed out after 3 seconds")
-                logging.info("Recording will use terminal input only - this is fine!")
-                opencv_available = False
-                
-        except Exception as e:
-            logging.warning(f"Could not initialize OpenCV window: {e}")
-            logging.info("Recording will use terminal input only - this is fine!")
-            opencv_available = False
-            
-        # Clean up any partial window creation if it failed
-        if not opencv_available:
-            try:
-                cv2.destroyAllWindows()
-            except:
-                pass
+        logging.info("Recording will use terminal controls - press 's' to start recording episodes")
     
     print("Please press 's' to start the subsequent program (no Enter needed):")
     
@@ -310,24 +236,28 @@ def eval_policy(
             recording_state = Array('i', [0])  # 0 = not recording, 1 = recording
             
             def terminal_input_handler():
-                """Non-blocking terminal input handler with fallback support"""
+                """Clean terminal input handler for recording controls"""
                 import sys
                 import tty
                 import termios
+                import fcntl
+                import os
                 
                 global shutdown_requested
                 nonlocal recording_state
                 
                 # Print initial instructions
-                print("\n=== RECORDING CONTROLS ===")
+                print("\n" + "="*50)
+                print("🎬 RECORDING CONTROLS ACTIVE")
+                print("="*50)
                 print("s - Start recording episode")
                 print("r - Abort current recording") 
                 print("q - Save recording as optimal")
                 print("w - Save recording as suboptimal")
                 print("e - Save recording as recovery")
                 print("Ctrl+C - Exit program")
-                print("============================")
-                print("Ready for single-key commands (no Enter needed)...")
+                print("="*50)
+                print("Ready for commands...")
                 
                 # Save terminal settings
                 old_settings = None
@@ -335,80 +265,43 @@ def eval_policy(
                     old_settings = termios.tcgetattr(sys.stdin)
                     tty.setraw(sys.stdin.fileno())
                     
-                    # Try to use non-blocking approach
-                    try:
-                        import fcntl
-                        import os
-                        
-                        # Make stdin non-blocking
-                        fd = sys.stdin.fileno()
-                        flags = fcntl.fcntl(fd, fcntl.F_GETFL)
-                        fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
-                        
-                        while not shutdown_requested:
-                            try:
-                                char = sys.stdin.read(1)
-                                
-                                if char == '\x03':  # Ctrl+C
-                                    shutdown_requested = True
-                                    print("\nShutdown requested via Ctrl+C")
-                                    break
-                                elif char == 's' and recording_state[0] == 0:
-                                    if recorder.create_episode():
-                                        recording_state[0] = 1
-                                        logging.info("Started recording episode via terminal")
-                                        print("\n✓ Recording started!")
-                                    else:
-                                        print("\n✗ Failed to start recording")
-                                elif char == 'r' and recording_state[0] == 1:
-                                    recorder.abort_episode()
-                                    recording_state[0] = 0
-                                    logging.info("Aborted recording episode via terminal")
-                                    print("\n✓ Recording aborted!")
-                                elif recording_state[0] == 1 and char in ['q', 'w', 'e']:
-                                    quality_map = {'q': 'optimal', 'w': 'suboptimal', 'e': 'recovery'}
-                                    quality = quality_map[char]
-                                    recorder.save_episode(quality=quality)
-                                    recording_state[0] = 0
-                                    logging.info(f"Saved recording episode with quality: {quality} via terminal")
-                                    print(f"\n✓ Recording saved as {quality}!")
-                            except IOError:
-                                # No input available, continue
-                                pass
+                    # Make stdin non-blocking
+                    fd = sys.stdin.fileno()
+                    flags = fcntl.fcntl(fd, fcntl.F_GETFL)
+                    fcntl.fcntl(fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+                    
+                    while not shutdown_requested:
+                        try:
+                            char = sys.stdin.read(1)
                             
-                            time.sleep(0.1)  # Small delay to prevent busy waiting
-                        
-                        # Restore blocking mode
-                        fcntl.fcntl(fd, fcntl.F_SETFL, flags)
-                        
-                    except ImportError:
-                        # Fallback: use blocking input method
-                        print("Using fallback blocking input method...")
-                        print("Commands: s/r/q/w/e followed by Enter")
-                        while not shutdown_requested:
-                            try:
-                                char = input("Enter command: ").strip().lower()
-                                if char == 's' and recording_state[0] == 0:
-                                    if recorder.create_episode():
-                                        recording_state[0] = 1
-                                        print("✓ Recording started!")
-                                    else:
-                                        print("✗ Failed to start recording")
-                                elif char == 'r' and recording_state[0] == 1:
-                                    recorder.abort_episode()
-                                    recording_state[0] = 0
-                                    print("✓ Recording aborted!")
-                                elif recording_state[0] == 1 and char in ['q', 'w', 'e']:
-                                    quality_map = {'q': 'optimal', 'w': 'suboptimal', 'e': 'recovery'}
-                                    quality = quality_map[char]
-                                    recorder.save_episode(quality=quality)
-                                    recording_state[0] = 0
-                                    print(f"✓ Recording saved as {quality}!")
-                            except (EOFError, KeyboardInterrupt):
+                            if char == '\x03':  # Ctrl+C
                                 shutdown_requested = True
+                                print("\n⚠️  Shutdown requested...")
                                 break
-                            except Exception as e:
-                                logging.debug(f"Fallback input error: {e}")
+                            elif char == 's' and recording_state[0] == 0:
+                                if recorder.create_episode():
+                                    recording_state[0] = 1
+                                    print("\n🔴 Recording started!")
+                                else:
+                                    print("\n❌ Failed to start recording")
+                            elif char == 'r' and recording_state[0] == 1:
+                                recorder.abort_episode()
+                                recording_state[0] = 0
+                                print("\n⏹️  Recording aborted!")
+                            elif recording_state[0] == 1 and char in ['q', 'w', 'e']:
+                                quality_map = {'q': 'optimal', 'w': 'suboptimal', 'e': 'recovery'}
+                                quality = quality_map[char]
+                                recorder.save_episode(quality=quality)
+                                recording_state[0] = 0
+                                print(f"\n✅ Recording saved as {quality.upper()}!")
+                        except IOError:
+                            # No input available, continue
+                            pass
+                        
+                        time.sleep(0.1)  # Small delay to prevent busy waiting
+                    
+                    # Restore blocking mode
+                    fcntl.fcntl(fd, fcntl.F_SETFL, flags)
                         
                 except Exception as e:
                     logging.error(f"Terminal input handler error: {e}")
@@ -419,7 +312,6 @@ def eval_policy(
                             termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
                         except:
                             pass
-                    print("\nTerminal input handler stopped")
             
             # Start terminal input handler in daemon thread
             terminal_thread = threading.Thread(target=terminal_input_handler, daemon=True)
@@ -474,60 +366,10 @@ def eval_policy(
                 )
                 action = action.cpu().numpy()
                 
-                # Handle recording display and keyboard input
-                if cfg.record and opencv_available:
-                    current_recording = recording_state[0] == 1
-                    # Prepare display image
-                    tv_resized_image = cv2.resize(current_tv_image, (tv_img_shape[1] // 2, tv_img_shape[0] // 2))
-                    
-                    # Add recording status overlay
-                    status_text = ""
-                    help_text = ""
-                    if current_recording:
-                        status_text = "RECORDING"
-                        help_text = "OpenCV: [r]=abort | [q]=save optimal | [w]=save suboptimal | [e]=save recovery"
-                    else:
-                        status_text = "READY TO RECORD"
-                        help_text = "OpenCV: [s]=start recording | Terminal: use terminal commands"
-                    
-                    # Add status text overlay
-                    cv2.putText(tv_resized_image, status_text, (10, 30), 
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255) if current_recording else (0, 255, 0), 2)
-                    
-                    # Add help text overlay
-                    cv2.putText(tv_resized_image, help_text, (10, 60), 
-                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, (255, 255, 255), 1)
-                    
-                    # Show the window
-                    cv2.imshow("record image", tv_resized_image)
-                    
-                    # Only check for OpenCV keys if window is available
-                    key = cv2.waitKey(1) & 0xFF
-                    
-                    # Handle key presses for recording control (OpenCV window)
-                    if key == ord('s') and not current_recording:
-                        # Start recording
-                        if recorder.create_episode():
-                            recording_state[0] = 1
-                            logging.info("Started recording episode via OpenCV")
-                        else:
-                            logging.warning("Failed to create recording episode")
-                    elif key == ord('r') and current_recording:
-                        # Abort recording
-                        recorder.abort_episode()
-                        recording_state[0] = 0
-                        logging.info("Aborted recording episode via OpenCV")
-                    elif current_recording and key in [ord('q'), ord('w'), ord('e')]:
-                        # Save with quality labels
-                        quality_map = {ord('q'): 'optimal', ord('w'): 'suboptimal', ord('e'): 'recovery'}
-                        quality = quality_map[key]
-                        recorder.save_episode(quality=quality)
-                        recording_state[0] = 0
-                        logging.info(f"Saved recording episode with quality: {quality} via OpenCV")
-                
-                # Show periodic instructions for terminal controls
-                if cfg.record and time.time() - last_instruction_time > 30:  # Every 30 seconds
-                    logging.info("Recording controls: Use terminal interface or click OpenCV window and press keys")
+                # Show periodic instructions for terminal controls (every 60 seconds instead of 30)
+                if cfg.record and time.time() - last_instruction_time > 60:
+                    print("\n📝 RECORDING CONTROLS:")
+                    print("   s = Start | r = Abort | q = Save optimal | w = Save suboptimal | e = Save recovery")
                     last_instruction_time = time.time()
 
                 # Record data if recording is active
@@ -635,7 +477,6 @@ def eval_policy(
             if cfg.record:
                 if 'recorder' in locals():
                     recorder.close()
-                cv2.destroyAllWindows()
                 logging.info("Recording resources cleaned up")
             
             arm_ctrl.ctrl_dual_arm_go_home()
