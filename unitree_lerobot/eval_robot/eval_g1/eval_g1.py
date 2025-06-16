@@ -9,6 +9,7 @@ import torch
 import logging
 import threading
 import numpy as np
+import cv2
 from copy import copy
 from pprint import pformat
 from dataclasses import asdict
@@ -30,6 +31,7 @@ from unitree_lerobot.eval_robot.eval_g1.image_server.image_client import ImageCl
 from unitree_lerobot.eval_robot.eval_g1.robot_control.robot_arm import G1_29_ArmController
 from unitree_lerobot.eval_robot.eval_g1.robot_control.robot_hand_unitree import Dex3_1_Controller, Gripper_Controller
 from unitree_lerobot.eval_robot.eval_g1.eval_real_config import EvalRealConfig
+from unitree_lerobot.eval_robot.eval_g1.utils.episode_writer import EpisodeWriter
 
 
 # copy from lerobot.common.robot_devices.control_utils import predict_action
@@ -157,6 +159,11 @@ def eval_policy(
         pass
 
     #===============init robot=====================
+    if cfg.record:
+        recorder = EpisodeWriter(task_dir=cfg.task_dir, frequency=cfg.frequency, rerun_log=True)
+        recording = False
+        logging.info(f"Episode recorder initialized with task_dir={cfg.task_dir}")
+    
     user_input = input("Please enter the start signal (enter 's' to start the subsequent program):")
     if user_input.lower() == 's':
 
@@ -177,67 +184,218 @@ def eval_policy(
         frequency = 50.0
         frame_counter = 0
 
-        logging.info("Starting main evaluation loop")
-        while True:
+        try:
+            logging.info("Starting main evaluation loop")
+            while True:
 
-            # Get images
-            current_tv_image = tv_img_array.copy()
-            current_wrist_image = wrist_img_array.copy() if WRIST else None
+                # Get images
+                current_tv_image = tv_img_array.copy()
+                current_wrist_image = wrist_img_array.copy() if WRIST else None
 
-            # Assign image data
-            left_top_camera = current_tv_image[:, :tv_img_shape[1] // 2] if BINOCULAR else current_tv_image
-            right_top_camera = current_tv_image[:, tv_img_shape[1] // 2:] if BINOCULAR else None
-            left_wrist_camera, right_wrist_camera = (
-                (current_wrist_image[:, :wrist_img_shape[1] // 2], current_wrist_image[:, wrist_img_shape[1] // 2:])
-                if WRIST else (None, None)
-            )
+                # Assign image data
+                left_top_camera = current_tv_image[:, :tv_img_shape[1] // 2] if BINOCULAR else current_tv_image
+                right_top_camera = current_tv_image[:, tv_img_shape[1] // 2:] if BINOCULAR else None
+                left_wrist_camera, right_wrist_camera = (
+                    (current_wrist_image[:, :wrist_img_shape[1] // 2], current_wrist_image[:, wrist_img_shape[1] // 2:])
+                    if WRIST else (None, None)
+                )
 
-            observation = {
-                "observation.images.cam_left_high": torch.from_numpy(left_top_camera),
-                "observation.images.cam_right_high": torch.from_numpy(right_top_camera) if BINOCULAR else None,
-                "observation.images.cam_left_wrist": torch.from_numpy(left_wrist_camera) if WRIST else None,
-                "observation.images.cam_right_wrist": torch.from_numpy(right_wrist_camera) if WRIST else None,
-            }
+                observation = {
+                    "observation.images.cam_left_high": torch.from_numpy(left_top_camera),
+                    "observation.images.cam_right_high": torch.from_numpy(right_top_camera) if BINOCULAR else None,
+                    "observation.images.cam_left_wrist": torch.from_numpy(left_wrist_camera) if WRIST else None,
+                    "observation.images.cam_right_wrist": torch.from_numpy(right_wrist_camera) if WRIST else None,
+                }
 
-            # get current state data.
-            current_lr_arm_q  = arm_ctrl.get_current_dual_arm_q()
-            # dex hand or gripper
-            if robot_config['hand_type'] == "dex3":
-                with dual_hand_data_lock:
-                    left_hand_state = dual_hand_state_array[:7]
-                    right_hand_state = dual_hand_state_array[-7:]
-            elif robot_config['hand_type'] == "gripper":
-                with dual_gripper_data_lock:
-                    left_hand_state = [dual_gripper_state_array[1]]
-                    right_hand_state = [dual_gripper_state_array[0]]
+                # get current state data.
+                current_lr_arm_q  = arm_ctrl.get_current_dual_arm_q()
+                # dex hand or gripper
+                if robot_config['hand_type'] == "dex3":
+                    with dual_hand_data_lock:
+                        left_hand_state = dual_hand_state_array[:7]
+                        right_hand_state = dual_hand_state_array[-7:]
+                elif robot_config['hand_type'] == "gripper":
+                    with dual_gripper_data_lock:
+                        left_hand_state = [dual_gripper_state_array[1]]
+                        right_hand_state = [dual_gripper_state_array[0]]
+                
+                observation["observation.state"] = torch.from_numpy(np.concatenate((current_lr_arm_q, left_hand_state, right_hand_state), axis=0)).float()
+
+                observation = {
+                    key: observation[key].to(device, non_blocking=device.type == "cuda") for key in observation
+                }
+
+                action = predict_action(
+                    observation, policy, get_safe_torch_device(policy.config.device), policy.config.use_amp
+                )
+                action = action.cpu().numpy()
+                
+                # Handle recording display and keyboard input
+                if cfg.record:
+                    # Prepare display image
+                    tv_resized_image = cv2.resize(current_tv_image, (tv_img_shape[1] // 2, tv_img_shape[0] // 2))
+                    
+                    # Add recording status overlay
+                    status_text = ""
+                    help_text = ""
+                    if recording:
+                        status_text = "RECORDING"
+                        help_text = "Controls: [r]=abort | [q]=save optimal | [w]=save suboptimal | [e]=save recovery"
+                    else:
+                        status_text = "READY TO RECORD"
+                        help_text = "Controls: [s]=start recording | [ESC]=quit"
+                    
+                    # Add status text overlay
+                    cv2.putText(tv_resized_image, status_text, (10, 30), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255) if recording else (0, 255, 0), 2)
+                    
+                    # Add help text overlay
+                    cv2.putText(tv_resized_image, help_text, (10, 60), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
+                    
+                    cv2.imshow("record image", tv_resized_image)
+                    key = cv2.waitKey(1) & 0xFF
+                    
+                    # Handle key presses for recording control
+                    if key == 27:  # ESC key
+                        break
+                    elif key == ord('s') and not recording:
+                        # Start recording
+                        if recorder.create_episode():
+                            recording = True
+                            logging.info("Started recording episode")
+                        else:
+                            logging.warning("Failed to create recording episode")
+                    elif key == ord('r') and recording:
+                        # Abort recording
+                        recorder.abort_episode()
+                        recording = False
+                        logging.info("Aborted recording episode")
+                    elif recording and key in [ord('q'), ord('w'), ord('e')]:
+                        # Save with quality labels
+                        quality_map = {ord('q'): 'optimal', ord('w'): 'suboptimal', ord('e'): 'recovery'}
+                        quality = quality_map[key]
+                        recorder.save_episode(quality=quality)
+                        recording = False
+                        logging.info(f"Saved recording episode with quality: {quality}")
+
+                # Record data if recording is active
+                if recording:
+                    # Prepare data for recording
+                    colors = {}
+                    depths = {}
+                    if BINOCULAR:
+                        colors[f"color_{0}"] = current_tv_image[:, :tv_img_shape[1]//2]
+                        colors[f"color_{1}"] = current_tv_image[:, tv_img_shape[1]//2:]
+                        if WRIST:
+                            colors[f"color_{2}"] = current_wrist_image[:, :wrist_img_shape[1]//2]
+                            colors[f"color_{3}"] = current_wrist_image[:, wrist_img_shape[1]//2:]
+                    else:
+                        colors[f"color_{0}"] = current_tv_image
+                        if WRIST:
+                            colors[f"color_{1}"] = current_wrist_image[:, :wrist_img_shape[1]//2]
+                            colors[f"color_{2}"] = current_wrist_image[:, wrist_img_shape[1]//2:]
+                    
+                    # arm state and action
+                    left_arm_state  = current_lr_arm_q[:7]
+                    right_arm_state = current_lr_arm_q[-7:]
+                    left_arm_action = action[:7]
+                    right_arm_action = action[7:14]
+                    
+                    # hand action (use actual actions for recording)
+                    if robot_config['hand_type'] == "dex3":
+                        left_hand_action = action[14:21]
+                        right_hand_action = action[21:]
+                    elif robot_config['hand_type'] == "gripper":
+                        left_hand_action = [action[14]]
+                        right_hand_action = [action[15]]
+                    
+                    states = {
+                        "left_arm": {                                                                    
+                            "qpos":   left_arm_state.tolist(),    
+                            "qvel":   [],                          
+                            "torque": [],                        
+                        }, 
+                        "right_arm": {                                                                    
+                            "qpos":   right_arm_state.tolist(),       
+                            "qvel":   [],                          
+                            "torque": [],                         
+                        },                        
+                        "left_hand": {                                                                    
+                            "qpos":   left_hand_state,           
+                            "qvel":   [],                           
+                            "torque": [],                          
+                        }, 
+                        "right_hand": {                                                                    
+                            "qpos":   right_hand_state,       
+                            "qvel":   [],                           
+                            "torque": [],  
+                        }, 
+                        "body": None, 
+                    }
+                    actions = {
+                        "left_arm": {                                   
+                            "qpos":   left_arm_action.tolist(),       
+                            "qvel":   [],       
+                            "torque": [],      
+                        }, 
+                        "right_arm": {                                   
+                            "qpos":   right_arm_action.tolist(),       
+                            "qvel":   [],       
+                            "torque": [],       
+                        },                         
+                        "left_hand": {                                   
+                            "qpos":   left_hand_action,       
+                            "qvel":   [],       
+                            "torque": [],       
+                        }, 
+                        "right_hand": {                                   
+                            "qpos":   right_hand_action,       
+                            "qvel":   [],       
+                            "torque": [], 
+                        }, 
+                        "body": None, 
+                    }
+                    recorder.add_item(colors=colors, depths=depths, states=states, actions=actions)
+                
+                # exec action
+                arm_ctrl.ctrl_dual_arm(action[:14], np.zeros(14))
+                if robot_config['hand_type'] == "dex3":
+                    left_hand_array[:] = action[14:21]
+                    right_hand_array[:] = action[21:]
+                elif robot_config['hand_type'] == "gripper":
+                    left_hand_array[:] = action[14]
+                    right_hand_array[:] = action[15]
             
-            observation["observation.state"] = torch.from_numpy(np.concatenate((current_lr_arm_q, left_hand_state, right_hand_state), axis=0)).float()
-
-            observation = {
-                key: observation[key].to(device, non_blocking=device.type == "cuda") for key in observation
-            }
-
-            action = predict_action(
-                observation, policy, get_safe_torch_device(policy.config.device), policy.config.use_amp
-            )
-            action = action.cpu().numpy()
-            
-            # exec action
-            arm_ctrl.ctrl_dual_arm(action[:14], np.zeros(14))
-            if robot_config['hand_type'] == "dex3":
-                left_hand_array[:] = action[14:21]
-                right_hand_array[:] = action[21:]
-            elif robot_config['hand_type'] == "gripper":
-                left_hand_array[:] = action[14]
-                right_hand_array[:] = action[15]
-        
-            frame_counter += 1
+                frame_counter += 1
             
             # Log performance info periodically
             if frame_counter % 300 == 0:  # Every ~6 seconds at 50fps
                 logging.info(f"Evaluation running - frame {frame_counter}, arm velocity limit: {arm_ctrl.arm_velocity_limit:.2f}")
         
             time.sleep(1/frequency)
+
+        except KeyboardInterrupt:
+            logging.warning("KeyboardInterrupt, exiting program...")
+        except Exception as e:
+            logging.exception(f"Error in main loop: {e}")
+        finally:
+            # Clean up
+            if cfg.record:
+                if 'recorder' in locals():
+                    recorder.close()
+                cv2.destroyAllWindows()
+                logging.info("Recording resources cleaned up")
+            
+            arm_ctrl.ctrl_dual_arm_go_home()
+            logging.info("Arms returned to home position")
+            
+            tv_img_shm.unlink()
+            tv_img_shm.close()
+            if WRIST:
+                wrist_img_shm.unlink()
+                wrist_img_shm.close()
+            logging.info("Resources cleaned up, exiting program")
 
 
 @parser.wrap()

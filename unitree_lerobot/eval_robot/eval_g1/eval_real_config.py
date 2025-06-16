@@ -21,6 +21,11 @@ class EvalRealConfig:
     # Network interface for CycloneDDS
     cyclonedds_uri: str = "enxa0cec8616f27"
 
+    # Recording parameters
+    record: bool = field(default=False)
+    task_dir: str = field(default="./data")
+    frequency: int = field(default=30)
+
     def __post_init__(self):
         # HACK: We parse again the cli args here to get the pretrained path if there was one.
         policy_path = parser.get_path_arg("policy")
