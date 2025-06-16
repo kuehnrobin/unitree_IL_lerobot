@@ -13,9 +13,8 @@ import cv2
 from copy import copy
 from pprint import pformat
 from dataclasses import asdict
-from torch import Tensor, nn
+from torch import nn
 from contextlib import nullcontext
-from multiprocessing import Process, shared_memory, Array
 from multiprocessing import shared_memory, Array, Lock
 
 from lerobot.common.policies.factory import make_policy
@@ -173,12 +172,12 @@ def eval_policy(
             logging.info("Gradual speed increase enabled")
 
         # "The initial positions of the robot's arm and fingers take the initial positions during data recording."
-        print(f"init robot pose")
+        print("init robot pose")
         arm_ctrl.ctrl_dual_arm(init_left_arm_pose, np.zeros(14))
         left_hand_array[:] = init_left_hand_pose
         right_hand_array[:] = init_right_hand_pose
 
-        print(f"wait robot to pose")
+        print("wait robot to pose")
         time.sleep(1)
 
         frequency = 50.0
