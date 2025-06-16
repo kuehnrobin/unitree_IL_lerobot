@@ -26,6 +26,7 @@ class EvalRealConfig:
     task_dir: str = field(default="./data")
     frequency: int = field(default=30)
     pressure: bool = field(default=True)
+    force: bool = field(default=False)
 
     def __post_init__(self):
         # HACK: We parse again the cli args here to get the pretrained path if there was one.

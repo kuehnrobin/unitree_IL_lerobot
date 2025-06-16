@@ -307,6 +307,9 @@ python unitree_lerobot/eval_robot/eval_g1/eval_g1.py  \
     --no_gradual_speed=true \
     --cyclonedds_uri enxa0cec8616f27 \
     --record true
+    --force true
+    Optional:
+    --pressure false
 
 
 # If you want to evaluate the model's performance on the dataset, use the command below for testing

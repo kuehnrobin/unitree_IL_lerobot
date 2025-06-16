@@ -31,7 +31,7 @@ from unitree_lerobot.eval_robot.eval_g1.image_server.image_client import ImageCl
 from unitree_lerobot.eval_robot.eval_g1.robot_control.robot_arm import G1_29_ArmController
 from unitree_lerobot.eval_robot.eval_g1.robot_control.robot_hand_unitree import Dex3_1_Controller, Gripper_Controller
 from unitree_lerobot.eval_robot.eval_g1.eval_real_config import EvalRealConfig
-from unitree_lerobot.eval_robot.eval_g1.utils import EpisodeWriter, PressureSensorCollector
+from unitree_lerobot.eval_robot.eval_g1.utils import EpisodeWriter
 
 # Global flag for graceful shutdown
 shutdown_requested = False
@@ -162,7 +162,8 @@ def eval_policy(
         dual_hand_data_lock = Lock()
         dual_hand_state_array = Array('d', 14, lock = False)  # [output] current left, right hand state(14) data.
         dual_hand_action_array = Array('d', 14, lock = False) # [output] current left, right hand action(14) data.
-        hand_ctrl = Dex3_1_Controller(left_hand_array, right_hand_array, dual_hand_data_lock, dual_hand_state_array, dual_hand_action_array, networkInterface=cfg.cyclonedds_uri)
+        # Enable force mode to get pressure sensor data when pressure is enabled
+        hand_ctrl = Dex3_1_Controller(left_hand_array, right_hand_array, dual_hand_data_lock, dual_hand_state_array, dual_hand_action_array, networkInterface=cfg.cyclonedds_uri, force=cfg.force)
         init_left_hand_pose = step['observation.state'][14:21].cpu().numpy()
         init_right_hand_pose = step['observation.state'][21:].cpu().numpy()
 
@@ -175,29 +176,22 @@ def eval_policy(
         gripper_ctrl = Gripper_Controller(left_hand_array, right_hand_array, dual_gripper_data_lock, dual_gripper_state_array, dual_gripper_action_array, networkInterface=cfg.cyclonedds_uri)
         init_left_hand_pose = step['observation.state'][14].cpu().numpy()
         init_right_hand_pose = step['observation.state'][15].cpu().numpy()
+        hand_ctrl = None  # No pressure data available for gripper
     else:
-        pass
+        hand_ctrl = None
 
     #===============init robot=====================
-    # Initialize pressure sensor collector (always available unless explicitly disabled)
-    pressure_collector = PressureSensorCollector(
-        networkInterface=cfg.cyclonedds_uri, 
-        enabled=cfg.pressure
-    )
-    if cfg.pressure:
-        pressure_started = pressure_collector.start()
-        if pressure_started:
-            logging.info("Pressure sensor data collection started successfully")
-        else:
-            logging.warning("Pressure sensor data collection failed to start")
-    else:
-        logging.info("Pressure sensor data collection disabled")
-    
     # Initialize recorder only if recording is enabled
     if cfg.record:
         recorder = EpisodeWriter(task_dir=cfg.task_dir, frequency=cfg.frequency, rerun_log=True)
         logging.info(f"Episode recorder initialized with task_dir={cfg.task_dir}")
         logging.info("Recording will use terminal controls - press 's' to start recording episodes")
+        
+    if cfg.pressure and hand_ctrl and robot_config['hand_type'] == "dex3":
+        force_mode = "enabled" if cfg.force else "disabled"
+        logging.info(f"Pressure sensor data collection enabled via hand controller (force mode: {force_mode})")
+    else:
+        logging.info("Pressure sensor data collection disabled")
     
     print("Please press 's' to start the subsequent program (no Enter needed):")
     
@@ -428,10 +422,13 @@ def eval_policy(
                         left_hand_action = [action[14]]
                         right_hand_action = [action[15]]
                     
-                    # Get pressure sensor data if available
-                    pressure_data = pressure_collector.get_pressure_data() if cfg.record and cfg.pressure else {
-                        'left_pressure': [], 'left_temp': [], 'right_pressure': [], 'right_temp': []
-                    }
+                    # Get pressure sensor data if available from hand controller
+                    if cfg.pressure and hand_ctrl and robot_config['hand_type'] == "dex3":
+                        pressure_data = hand_ctrl.get_pressure_data()
+                    else:
+                        pressure_data = {
+                            'left_pressure': [], 'left_temp': [], 'right_pressure': [], 'right_temp': []
+                        }
                     
                     states = {
                         "left_arm": {                                                                    
@@ -512,11 +509,6 @@ def eval_policy(
                 if 'recorder' in locals():
                     recorder.close()
                 logging.info("Recording resources cleaned up")
-            
-            # Clean up pressure sensor
-            if 'pressure_collector' in locals():
-                pressure_collector.stop()
-                logging.info("Pressure sensor resources cleaned up")
             
             arm_ctrl.ctrl_dual_arm_go_home()
             logging.info("Arms returned to home position")

@@ -20,6 +20,14 @@ from unitree_lerobot.utils.weighted_moving_filter import WeightedMovingFilter
 
 unitree_tip_indices = [4, 9, 14] # [thumb, index, middle] in OpenXR
 Dex3_Num_Motors = 7
+Dex3_Num_Pressure_Sensors = 12  # Updated to match actual sensor count
+# Shared array layout for each hand:
+# [q0...q6, dq0...dq6, tau0...tau6, p0...p11] (7+7+7+12=33)
+# Indices:
+# 0-6:   q (position)
+# 7-13:  dq (velocity)
+# 14-20: tau (torque)
+# 21-32: pressure sensors (12 sensors)
 kTopicDex3LeftCommand = "rt/dex3/left/cmd"
 kTopicDex3RightCommand = "rt/dex3/right/cmd"
 kTopicDex3LeftState = "rt/dex3/left/state"
@@ -28,9 +36,11 @@ kTopicDex3RightState = "rt/dex3/right/state"
 
 class Dex3_1_Controller:
     def __init__(self, left_hand_array, right_hand_array, dual_hand_data_lock = None, dual_hand_state_array = None,
-                       dual_hand_action_array = None, fps = 100.0, Unit_Test = False, networkInterface='enxa0cec8616f27'):
+                       dual_hand_action_array = None, fps = 100.0, Unit_Test = False, networkInterface='enxa0cec8616f27', force=False):
         """
-        [note] A *_array type parameter requires using a multiprocessing Array, because it needs to be passed to the internal child process
+        [note] A *_array type parameter requires using a multiprocessing Array, because it needs to be passed to the internal child process.
+        If force=True, shared array layout is [q0...q6, dq0...dq6, tau0...tau6, p0...p11] (33).
+        If force=False, shared array layout is [q0...q6, p0...p11] (19).
 
         left_hand_array: [input] Left hand skeleton data (required from XR device) to hand_ctrl.control_process
 
@@ -45,11 +55,18 @@ class Dex3_1_Controller:
         fps: Control frequency
 
         Unit_Test: Whether to enable unit testing
+        
+        force: If True, collect full state (q, dq, tau, pressure). If False, only q and pressure.
         """
         print("Initialize Dex3_1_Controller...")
 
         self.fps = fps
         self.Unit_Test = Unit_Test
+        self.force = force
+        if self.force:
+            self.shared_array_size = 33  # [q0...q6, dq0...dq6, tau0...tau6, p0...p11]
+        else:
+            self.shared_array_size = 19  # [q0...q6, p0...p11]
         if not self.Unit_Test:
             pass
         else:
@@ -67,8 +84,8 @@ class Dex3_1_Controller:
         self.RightHandState_subscriber.Init()
 
         # Shared Arrays for hand states
-        self.left_hand_state_array  = Array('d', Dex3_Num_Motors, lock=True)  
-        self.right_hand_state_array = Array('d', Dex3_Num_Motors, lock=True)
+        self.left_hand_state_array  = Array('d', self.shared_array_size, lock=True)
+        self.right_hand_state_array = Array('d', self.shared_array_size, lock=True)
 
         # initialize subscribe thread
         self.subscribe_state_thread = threading.Thread(target=self._subscribe_hand_state)
@@ -96,12 +113,45 @@ class Dex3_1_Controller:
             left_hand_msg  = self.LeftHandState_subscriber.Read()
             right_hand_msg = self.RightHandState_subscriber.Read()
             if left_hand_msg is not None and right_hand_msg is not None:
-                # Update left hand state
-                for idx, id in enumerate(Dex3_1_Left_JointIndex):
-                    self.left_hand_state_array[idx] = left_hand_msg.motor_state[id].q
-                # Update right hand state
-                for idx, id in enumerate(Dex3_1_Right_JointIndex):
-                    self.right_hand_state_array[idx] = right_hand_msg.motor_state[id].q
+                if self.force:
+                    # Fill left hand: q, dq, tau, pressures
+                    for idx, id in enumerate(Dex3_1_Left_JointIndex):
+                        self.left_hand_state_array[idx] = left_hand_msg.motor_state[id].q
+                        self.left_hand_state_array[idx+7] = left_hand_msg.motor_state[id].dq
+                        self.left_hand_state_array[idx+14] = left_hand_msg.motor_state[id].tau_est
+                    # Get pressure data from press_sensor_state within HandState_
+                    if len(left_hand_msg.press_sensor_state) > 0:
+                        press_sensor = left_hand_msg.press_sensor_state[0]
+                        for id in range(min(Dex3_Num_Pressure_Sensors, len(press_sensor.pressure))):
+                            self.left_hand_state_array[21+id] = press_sensor.pressure[id]
+                    
+                    # Fill right hand: q, dq, tau, pressures
+                    for idx, id in enumerate(Dex3_1_Right_JointIndex):
+                        self.right_hand_state_array[idx] = right_hand_msg.motor_state[id].q
+                        self.right_hand_state_array[idx+7] = right_hand_msg.motor_state[id].dq
+                        self.right_hand_state_array[idx+14] = right_hand_msg.motor_state[id].tau_est
+                    # Get pressure data from press_sensor_state within HandState_
+                    if len(right_hand_msg.press_sensor_state) > 0:
+                        press_sensor = right_hand_msg.press_sensor_state[0]
+                        for id in range(min(Dex3_Num_Pressure_Sensors, len(press_sensor.pressure))):
+                            self.right_hand_state_array[21+id] = press_sensor.pressure[id]
+                else:
+                    # Only q and pressures
+                    for idx, id in enumerate(Dex3_1_Left_JointIndex):
+                        self.left_hand_state_array[idx] = left_hand_msg.motor_state[id].q
+                    # Get pressure data from press_sensor_state within HandState_
+                    if len(left_hand_msg.press_sensor_state) > 0:
+                        press_sensor = left_hand_msg.press_sensor_state[0]
+                        for id in range(min(Dex3_Num_Pressure_Sensors, len(press_sensor.pressure))):
+                            self.left_hand_state_array[7+id] = press_sensor.pressure[id]
+                    
+                    for idx, id in enumerate(Dex3_1_Right_JointIndex):
+                        self.right_hand_state_array[idx] = right_hand_msg.motor_state[id].q
+                    # Get pressure data from press_sensor_state within HandState_
+                    if len(right_hand_msg.press_sensor_state) > 0:
+                        press_sensor = right_hand_msg.press_sensor_state[0]
+                        for id in range(min(Dex3_Num_Pressure_Sensors, len(press_sensor.pressure))):
+                            self.right_hand_state_array[7+id] = press_sensor.pressure[id]
             time.sleep(0.002)
     
     class _RIS_Mode:
@@ -191,6 +241,27 @@ class Dex3_1_Controller:
                 time.sleep(sleep_time)
         finally:
             print("Dex3_1_Controller has been closed.")
+
+    def get_pressure_data(self):
+        """
+        Get current pressure sensor data from both hands.
+        Returns dict with left_pressure and right_pressure lists.
+        """
+        if self.force:
+            # Pressure data is in indices 21-32 for force=True
+            left_pressure = list(self.left_hand_state_array[21:21+Dex3_Num_Pressure_Sensors])
+            right_pressure = list(self.right_hand_state_array[21:21+Dex3_Num_Pressure_Sensors])
+        else:
+            # Pressure data is in indices 7-18 for force=False
+            left_pressure = list(self.left_hand_state_array[7:7+Dex3_Num_Pressure_Sensors])
+            right_pressure = list(self.right_hand_state_array[7:7+Dex3_Num_Pressure_Sensors])
+        
+        return {
+            'left_pressure': left_pressure,
+            'right_pressure': right_pressure,
+            'left_temp': [],  # Temperature not available in current implementation
+            'right_temp': []  # Temperature not available in current implementation
+        }
 
 class Dex3_1_Left_JointIndex(IntEnum):
     kLeftHandThumb0 = 0
