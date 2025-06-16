@@ -301,10 +301,12 @@ python unitree_lerobot/eval_robot/eval_g1/eval_g1.py  \
 
 
 python unitree_lerobot/eval_robot/eval_g1/eval_g1.py  \
-    --policy.path=unitree_lerobot/lerobot/outputs/train/2025-05-27/13-53-10_pour_can_mark_3/checkpoints/015000/     --repo_id=kuehnrobin/g1_pour_can_left_hand \
+    --policy.path=unitree_lerobot/lerobot/outputs/train/2025-05-27/13-53-10_pour_can_mark_3/checkpoints/015000/pretrained_model/ \
+    --repo_id=kuehnrobin/g1_pour_can_left_hand \
     --arm_speed 10.0 \
     --no_gradual_speed=true \
-    --cyclonedds_uri enxa0cec8616f27
+    --cyclonedds_uri enxa0cec8616f27 \
+    --record true
 
 
 # If you want to evaluate the model's performance on the dataset, use the command below for testing
