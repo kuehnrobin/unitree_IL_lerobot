@@ -4,17 +4,18 @@
 Data Augmentation Script for Teleoperation Datasets
 
 This script provides comprehensive data augmentation capabilities for teleoperation datasets
-to improve imitation learning performance. It includes episode weighting, lighting augmentation,
-and noise injection to create more robust training datasets.
+to improve imitation learning performance. It automatically reads episode quality from each
+episode's data.json file and applies appropriate weighting and augmentation.
 
 Key Features:
-1. Episode weighting based on quality (optimal vs recovery episodes)
-2. Image augmentation with lighting variations and noise
-3. Joint coordinate noise injection for robustness
-4. Proper episode naming and organization
+1. Automatic episode quality detection from data.json files ('optimal', 'suboptimal', 'recovery')
+2. Episode weighting based on quality (optimal episodes get additional copies)
+3. Image augmentation with lighting variations and noise
+4. Joint coordinate noise injection for robustness
+5. Proper episode naming and organization
 
 Author: Created for Unitree IL Lerobot project
-Date: 2025-06-12
+Date: 2025-06-17
 """
 
 import argparse
@@ -50,8 +51,6 @@ class AugmentationConfig:
     output_dataset_path: str
     
     # Episode weighting parameters
-    optimal_episodes: Optional[List[int]] = None
-    recovery_episodes: Optional[List[int]] = None
     optimal_weight: float = 2.0  # Multiplication factor for optimal episodes
     
     # Image augmentation parameters
@@ -227,6 +226,37 @@ class DatasetAugmentor:
         """Extract episode number from directory name."""
         return int(episode_dir.name.split('_')[1])
     
+    def get_episode_quality(self, episode_dir: Path) -> str:
+        """
+        Extract quality value from episode's data.json file.
+        
+        Args:
+            episode_dir: Path to episode directory
+            
+        Returns:
+            Quality string ('optimal', 'suboptimal', 'recovery') or 'unknown' if not found
+        """
+        data_json_path = episode_dir / "data.json"
+        
+        if not data_json_path.exists():
+            logger.warning(f"data.json not found in {episode_dir.name}, assuming 'unknown' quality")
+            return "unknown"
+        
+        try:
+            with open(data_json_path, 'r') as f:
+                data = json.load(f)
+            
+            quality = data.get('quality', 'unknown')
+            if quality not in ['optimal', 'suboptimal', 'recovery']:
+                logger.warning(f"Invalid quality '{quality}' in {episode_dir.name}, assuming 'unknown'")
+                return "unknown"
+            
+            return quality
+            
+        except Exception as e:
+            logger.error(f"Error reading data.json from {episode_dir.name}: {e}")
+            return "unknown"
+    
     def create_output_episode_name(self) -> str:
         """Generate new episode directory name with proper numbering."""
         episode_name = f"episode_{self.episode_counter:04d}"
@@ -372,18 +402,23 @@ class DatasetAugmentor:
         """Process a single episode with appropriate weighting and augmentation."""
         output_path = Path(self.config.output_dataset_path)
         
-        # Determine if this is an optimal episode
-        is_optimal = (self.config.optimal_episodes and 
-                     episode_num in self.config.optimal_episodes)
-        is_recovery = (self.config.recovery_episodes and 
-                      episode_num in self.config.recovery_episodes)
+        # Get quality from the episode's data.json file
+        episode_quality = self.get_episode_quality(episode_dir)
+        
+        # Determine episode type based on quality
+        is_optimal = (episode_quality == 'optimal')
+        is_recovery = (episode_quality == 'recovery')
+        is_suboptimal = (episode_quality == 'suboptimal')
+        
+        # Log episode quality
+        logger.info(f"Episode {episode_num} quality: {episode_quality}")
         
         # Always copy original episode if preserve_original is True
         if self.config.preserve_original:
             dst_episode_name = self.create_output_episode_name()
             dst_episode_path = output_path / dst_episode_name
             self.copy_episode_structure(episode_dir, dst_episode_path, augment=False)
-            logger.info(f"Copied original episode {episode_num} -> {dst_episode_name}")
+            logger.info(f"Copied original episode {episode_num} -> {dst_episode_name} (quality: {episode_quality})")
         
         # Create additional copies for optimal episodes (weighting)
         if is_optimal:
@@ -400,7 +435,7 @@ class DatasetAugmentor:
             dst_episode_name = self.create_output_episode_name()
             dst_episode_path = output_path / dst_episode_name
             self.copy_episode_structure(episode_dir, dst_episode_path, augment=True)
-            logger.info(f"Created augmented episode {episode_num} -> {dst_episode_name}")
+            logger.info(f"Created augmented episode {episode_num} -> {dst_episode_name} (quality: {episode_quality})")
     
     def augment_dataset(self) -> None:
         """Main method to perform dataset augmentation."""
@@ -415,12 +450,7 @@ class DatasetAugmentor:
         # Get all episode directories
         episode_dirs = self.get_episode_directories()
         logger.info(f"Found {len(episode_dirs)} episodes to process")
-        
-        # Log episode categorization
-        if self.config.optimal_episodes:
-            logger.info(f"Optimal episodes (weight {self.config.optimal_weight}x): {self.config.optimal_episodes}")
-        if self.config.recovery_episodes:
-            logger.info(f"Recovery episodes: {self.config.recovery_episodes}")
+        logger.info(f"Optimal episodes will be weighted {self.config.optimal_weight}x based on quality in data.json")
         
         # Process each episode
         for episode_dir in tqdm(episode_dirs, desc="Processing episodes"):
@@ -430,24 +460,6 @@ class DatasetAugmentor:
         logger.info(f"Dataset augmentation completed!")
         logger.info(f"Total episodes created: {self.episode_counter}")
         logger.info(f"Output saved to: {output_path}")
-
-
-def parse_episode_list(episode_str: str) -> List[int]:
-    """Parse comma-separated episode numbers."""
-    if not episode_str:
-        return []
-    
-    episodes = []
-    for part in episode_str.split(','):
-        part = part.strip()
-        if '-' in part:
-            # Handle ranges like "1-5"
-            start, end = map(int, part.split('-'))
-            episodes.extend(range(start, end + 1))
-        else:
-            episodes.append(int(part))
-    
-    return sorted(list(set(episodes)))  # Remove duplicates and sort
 
 
 def main():
@@ -474,24 +486,10 @@ def main():
     
     # Episode weighting arguments
     parser.add_argument(
-        "--optimal_episodes",
-        type=str,
-        default="",
-        help="Comma-separated list of optimal episode numbers (e.g., '1,2,5-8')"
-    )
-    
-    parser.add_argument(
-        "--recovery_episodes",
-        type=str, 
-        default="",
-        help="Comma-separated list of recovery episode numbers (e.g., '3,4,9-12')"
-    )
-    
-    parser.add_argument(
         "--optimal_weight",
         type=float,
         default=2.0,
-        help="Multiplication factor for optimal episodes"
+        help="Multiplication factor for optimal episodes (quality will be read from data.json)"
     )
     
     # Image augmentation arguments
@@ -580,10 +578,6 @@ def main():
     # Parse arguments
     args = parser.parse_args()
     
-    # Parse episode lists
-    optimal_episodes = parse_episode_list(args.optimal_episodes) if args.optimal_episodes else None
-    recovery_episodes = parse_episode_list(args.recovery_episodes) if args.recovery_episodes else None
-    
     # Handle boolean flags with defaults
     enable_lighting = not args.disable_lighting_augmentation if hasattr(args, 'disable_lighting_augmentation') else True
     if hasattr(args, 'enable_lighting_augmentation') and args.enable_lighting_augmentation:
@@ -597,12 +591,10 @@ def main():
     if hasattr(args, 'preserve_original') and args.preserve_original:
         preserve_original = True
     
-    # Create configuration
+    # Create configuration (episode quality will be read from each episode's data.json)
     config = AugmentationConfig(
         input_dataset_path=args.input_dataset_path,
         output_dataset_path=args.output_dataset_path,
-        optimal_episodes=optimal_episodes,
-        recovery_episodes=recovery_episodes,
         optimal_weight=args.optimal_weight,
         enable_lighting_augmentation=enable_lighting,
         brightness_range=tuple(args.brightness_range),

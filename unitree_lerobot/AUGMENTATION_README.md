@@ -1,18 +1,20 @@
 # Dataset Augmentation for Teleoperation Data
 
-This module provides comprehensive data augmentation capabilities for teleoperation datasets to improve imitation learning performance. The augmentation script includes episode weighting, lighting variations, noise injection, and other robustness techniques.
+This module provides comprehensive data augmentation capabilities for teleoperation datasets to improve imitation learning performance. The augmentation script automatically reads episode quality from data.json files and applies appropriate weighting, lighting variations, noise injection, and other robustness techniques.
 
 ## Overview
 
 The `argument_data.py` script augments teleoperation datasets with the following features:
 
-1. **Episode Weighting**: Multiply optimal episodes to increase their representation in the dataset while preserving recovery episodes for robustness.
+1. **Automatic Episode Quality Detection**: Reads episode quality ('optimal', 'suboptimal', 'recovery') from each episode's data.json file and applies appropriate weighting automatically.
 
-2. **Image Augmentation**: Apply realistic lighting variations, color adjustments, motion blur, shadows, and noise to improve visual robustness.
+2. **Episode Weighting**: Multiply optimal episodes to increase their representation in the dataset while preserving recovery and suboptimal episodes for robustness.
 
-3. **Joint Noise Injection**: Add controlled noise to joint coordinates to improve policy robustness without disrupting the task objective.
+3. **Image Augmentation**: Apply realistic lighting variations, color adjustments, motion blur, shadows, and noise to improve visual robustness.
 
-4. **Proper Episode Management**: Automatically handles episode numbering and directory structure creation.
+4. **Joint Noise Injection**: Add controlled noise to joint coordinates to improve policy robustness without disrupting the task objective.
+
+5. **Proper Episode Management**: Automatically handles episode numbering and directory structure creation.
 
 ## Installation
 
@@ -40,14 +42,14 @@ python unitree_lerobot/argument_data.py \
     --output_dataset_path /media/robin/DATA/argumented_stack_cube_left
 ```
 
-### Advanced Usage with Episode Weighting
+*Note: Episode quality ('optimal', 'suboptimal', 'recovery') is automatically read from each episode's data.json file. No manual specification of episode lists is required.*
+
+### Advanced Usage with Custom Weighting
 
 ```bash
 python unitree_lerobot/argument_data.py \
     --input_dataset_path /media/robin/DATA/stack_cube_left \
     --output_dataset_path /media/robin/DATA/argumented_stack_cube_left \
-    --optimal_episodes "1,3,5-8,12" \
-    --recovery_episodes "2,4,9-11" \
     --optimal_weight 3.0 \
     --joint_noise_std 0.03 \
     --augmentation_probability 0.7
@@ -60,9 +62,10 @@ python unitree_lerobot/argument_data.py \
 - `--output_dataset_path`: Path to output augmented dataset directory (default: `/media/robin/DATA/argumented_stack_cube_left`)
 
 #### Episode Weighting
-- `--optimal_episodes`: Comma-separated list of optimal episode numbers (e.g., `"1,2,5-8"`)
-- `--recovery_episodes`: Comma-separated list of recovery episode numbers 
 - `--optimal_weight`: Multiplication factor for optimal episodes (default: 2.0)
+  - *Episode quality is automatically read from each episode's data.json file*
+  - *Episodes with quality 'optimal' will be weighted according to this factor*
+  - *Episodes with quality 'suboptimal' or 'recovery' are preserved as-is for robustness*
 
 #### Image Augmentation
 - `--enable_lighting_augmentation`: Enable lighting and color augmentation (default: True)
@@ -79,21 +82,38 @@ python unitree_lerobot/argument_data.py \
 - `--preserve_original`: Keep original episodes alongside augmented ones (default: True)
 - `--seed`: Random seed for reproducibility (default: 42)
 
-## Episode List Format
+## Episode Quality Detection
 
-Episode numbers can be specified in several formats:
-- Individual episodes: `"1,3,5"`
-- Ranges: `"1-5"` (includes episodes 1,2,3,4,5)
-- Mixed: `"1,3,5-8,12"` (includes episodes 1,3,5,6,7,8,12)
+The script automatically reads episode quality from each episode's `data.json` file. The quality field should contain one of the following values:
+
+- **"optimal"**: High-quality demonstrations that will be weighted more heavily in the augmented dataset
+- **"suboptimal"**: Standard demonstrations that are included normally
+- **"recovery"**: Demonstrations that include mistake recovery, important for robustness
+
+### Data.json Quality Field Format
+
+Each episode's `data.json` file should include a quality field at the root level:
+
+```json
+{
+    "info": { ... },
+    "text": { ... },
+    "quality": "optimal",
+    "data": [ ... ]
+}
+```
+
+If the quality field is missing or contains an invalid value, the episode will be treated as "unknown" and processed as a standard episode.
 
 ## Augmentation Process
 
-### 1. Episode Classification and Weighting
+### 1. Automatic Episode Classification and Weighting
 
-Episodes are classified into categories:
-- **Optimal Episodes**: High-quality demonstrations that should be weighted more heavily
-- **Recovery Episodes**: Demonstrations that include mistake recovery, important for robustness
-- **Regular Episodes**: Standard demonstrations
+Episodes are automatically classified based on their data.json quality field:
+- **Optimal Episodes**: High-quality demonstrations that are weighted according to `--optimal_weight`
+- **Suboptimal Episodes**: Standard demonstrations included normally
+- **Recovery Episodes**: Demonstrations with mistake recovery, preserved for robustness
+- **Unknown Episodes**: Episodes without valid quality information, processed as standard episodes
 
 ### 2. Augmentation Pipeline
 
@@ -170,11 +190,12 @@ python unitree_lerobot/argument_data.py \
 python unitree_lerobot/argument_data.py \
     --input_dataset_path /path/to/original/dataset \
     --output_dataset_path /path/to/augmented/dataset \
-    --optimal_episodes "1,3,5,7,9" \
     --optimal_weight 5.0 \
     --augmentation_probability 1.0 \
     --joint_noise_std 0.05
 ```
+
+*Note: Episodes marked as 'optimal' in their data.json files will be weighted 5x*
 
 ### Example 3: Conservative Augmentation
 ```bash
@@ -190,9 +211,18 @@ python unitree_lerobot/argument_data.py \
 
 The script provides comprehensive logging:
 - Progress bars for each episode
+- Episode quality detection and logging
 - Summary statistics
 - Error reporting
 - Final dataset statistics
+
+Example log output:
+```
+2025-06-17 10:30:15 - INFO - Found 5 episodes to process
+2025-06-17 10:30:15 - INFO - Episode 1 quality: optimal
+2025-06-17 10:30:16 - INFO - Episode 2 quality: suboptimal  
+2025-06-17 10:30:17 - INFO - Episode 3 quality: recovery
+```
 
 After augmentation, verify your dataset:
 ```bash
@@ -220,7 +250,9 @@ python lerobot/scripts/train.py \
 1. **Memory Issues**: Reduce `--augmentation_probability` or process in smaller batches
 2. **Disk Space**: Monitor output directory size, especially with high `--optimal_weight`
 3. **Invalid Episodes**: Check input dataset structure and permissions
-4. **Performance**: Use SSD storage for better I/O performance
+4. **Missing Quality Field**: Episodes without quality field in data.json will be processed as 'unknown'
+5. **Invalid Quality Values**: Only 'optimal', 'suboptimal', and 'recovery' are recognized quality values
+6. **Performance**: Use SSD storage for better I/O performance
 
 ### Logging
 
@@ -249,3 +281,5 @@ These can be used for custom augmentation pipelines or integration with other to
 4. **Preserve Originals**: Keep original episodes in the augmented dataset
 5. **Use Appropriate Weighting**: Don't over-weight optimal episodes (2-3x is usually sufficient)
 6. **Balance Augmentation**: Mix augmented and original episodes for best results
+7. **Quality Labeling**: Ensure all episodes have proper quality labels in their data.json files
+8. **Quality Distribution**: Aim for a balanced mix of optimal, suboptimal, and recovery episodes
