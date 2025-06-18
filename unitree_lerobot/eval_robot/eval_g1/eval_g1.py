@@ -433,27 +433,27 @@ def eval_policy(
                     states = {
                         "left_arm": {                                                                    
                             "qpos":   left_arm_state.tolist(),    
-                            "qvel":   [],                          
-                            "torque": [],                        
+                            "qvel":   [],  #TODO: Add velocity data                        
+                            "torque": [],       
                         }, 
                         "right_arm": {                                                                    
                             "qpos":   right_arm_state.tolist(),       
-                            "qvel":   [],                          
+                            "qvel":   [],  #TODO: Add velocity data                        
                             "torque": [],                         
                         },                        
                         "left_hand": {                                                                    
                             "qpos":   left_hand_state,           
                             "qvel":   [],                           
-                            "torque": [],
+                            "torque": [], 
                             "pressures": pressure_data['left_pressure'],
-                            "temperatures": pressure_data['left_temp'],                          
+                            #"temperatures": pressure_data['left_temp'],  TODO: Testen, denke aber nicht dass das einen großen einfluss hat           
                         }, 
                         "right_hand": {                                                                    
                             "qpos":   right_hand_state,       
                             "qvel":   [],                           
                             "torque": [],
                             "pressures": pressure_data['right_pressure'],
-                            "temperatures": pressure_data['right_temp'],  
+                            #"temperatures": pressure_data['right_temp'],  
                         }, 
                         "body": None, 
                     }

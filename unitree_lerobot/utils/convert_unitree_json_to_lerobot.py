@@ -100,14 +100,15 @@ class JsonDataset:
         return self.episodes_data_cached
 
 
-    def _extract_data(self, episode_data: Dict, key: str, parts: List[str]) -> np.ndarray:
+    def _extract_data(self, episode_data: Dict, key: str, parts: List[str], data_type: str = 'qpos') -> np.ndarray:
         """
-        Extract data from episode dictionary for specified parts.
+        Extract data from episode dictionary for specified parts and data type.
         
         Args:
             episode_data: Dictionary containing episode data
             key: Data key to extract ('states' or 'actions')
-            parts: List of parts to include ('left_arm', 'right_arm')
+            parts: List of parts to include ('left_arm', 'right_arm', 'left_hand', 'right_hand')
+            data_type: Type of data to extract ('qpos', 'qvel', 'pressure')
             
         Returns:
             Concatenated numpy array of the requested data
@@ -117,10 +118,49 @@ class JsonDataset:
             data_array = np.array([], dtype=np.float32)
             for part in parts:
                 if part in sample_data[key] and sample_data[key][part] is not None:
-                    qpos = np.array(sample_data[key][part]['qpos'], dtype=np.float32)
-                    data_array = np.concatenate([data_array, qpos])
+                    if data_type == 'pressure':
+                        # Handle pressure data for hands only
+                        if 'hand' in part and 'pressure' in sample_data[key][part]:
+                            pressure_data = np.array(sample_data[key][part]['pressure'], dtype=np.float32)
+                            data_array = np.concatenate([data_array, pressure_data])
+                    else:
+                        # Handle qpos and qvel data
+                        if data_type in sample_data[key][part]:
+                            joint_data = np.array(sample_data[key][part][data_type], dtype=np.float32)
+                            data_array = np.concatenate([data_array, joint_data])
             result.append(data_array)
         return np.array(result)
+
+    def _extract_velocity_data(self, episode_data: Dict, key: str, parts: List[str]) -> np.ndarray:
+        """Extract joint velocity data from episode dictionary."""
+        return self._extract_data(episode_data, key, parts, 'qvel')
+
+    def _extract_pressure_data(self, episode_data: Dict, key: str, hand_parts: List[str]) -> np.ndarray:
+        """Extract pressure data from episode dictionary for hand parts only."""
+        return self._extract_data(episode_data, key, hand_parts, 'pressure')
+
+    def _get_enriched_state_data(self, episode_data: Dict) -> Dict[str, np.ndarray]:
+        """
+        Extract all types of state data (positions, velocities, pressures).
+        
+        Returns:
+            Dictionary containing different types of state data
+        """
+        # Extract position data (qpos)
+        state_qpos = self._extract_data(episode_data, 'states', self.json_state_data_name, 'qpos')
+        
+        # Extract velocity data (qvel) 
+        state_qvel = self._extract_velocity_data(episode_data, 'states', self.json_state_data_name)
+        
+        # Extract pressure data for hands only
+        hand_parts = [part for part in self.json_state_data_name if 'hand' in part]
+        state_pressure = self._extract_pressure_data(episode_data, 'states', hand_parts)
+        
+        return {
+            'qpos': state_qpos,
+            'qvel': state_qvel, 
+            'pressure': state_pressure
+        }
 
 
     def _parse_images(self, episode_path: str, episode_data) -> dict[str, list[np.ndarray]]:
@@ -161,12 +201,29 @@ class JsonDataset:
         file_path = np.random.choice(self.episode_paths) if index is None else self.episode_paths[index]
         episode_data = self.episodes_data_cached[index]
 
-        # Load state and action data
+        # Extract all available sensor data and combine into single state
+        enriched_state_data = self._get_enriched_state_data(episode_data)
+        
+        # Create combined state array with all available sensor data
+        state_components = [enriched_state_data['qpos']]
+        
+        # Add velocity if available
+        if enriched_state_data['qvel'].size > 0:
+            state_components.append(enriched_state_data['qvel'])
+        
+        # Add pressure if available  
+        if enriched_state_data['pressure'].size > 0:
+            state_components.append(enriched_state_data['pressure'])
+        
+        # Concatenate all state components into single state array
+        state = np.concatenate(state_components, axis=1)
+        
+        # Action data (qpos only for actions)
         action = self._extract_data(episode_data, 'actions', self.json_action_data_name)
-        state = self._extract_data(episode_data, 'states', self.json_state_data_name)
+        
         episode_length = len(state)
         state_dim = state.shape[1] if len(state.shape) == 2 else state.shape[0]
-        action_dim = action.shape[1] if len(action.shape) == 2 else state.shape[0]
+        action_dim = action.shape[1] if len(action.shape) == 2 else action.shape[0]
         
         # Load task description
         task = episode_data.get('text', {}).get('goal', "")
@@ -182,15 +239,17 @@ class JsonDataset:
             'cam_width': cam_width,
             'state_dim': state_dim,
             'action_dim': action_dim,
+            'has_velocity': enriched_state_data['qvel'].size > 0,
+            'has_pressure': enriched_state_data['pressure'].size > 0,
         }
         
         return {'episode_index': index,
                 'episode_length': episode_length,
-                'state': state, 
+                'state': state,  # This now contains all sensor data
                 'action': action,
                 'cameras': cameras,
                 'task': task,
-                'data_cfg':data_cfg}
+                'data_cfg': data_cfg}
 
 
 def create_empty_dataset(
@@ -200,26 +259,46 @@ def create_empty_dataset(
     *,
     has_velocity: bool = False,
     has_effort: bool = False,
+    has_pressure: bool = False,
+    state_dim: int = None,
     dataset_config: DatasetConfig = DEFAULT_DATASET_CONFIG,
 ) -> LeRobotDataset:
     
     motors = ROBOT_CONFIGS[robot_type].motors
     cameras = ROBOT_CONFIGS[robot_type].cameras
 
+    # Use provided state dimension or calculate from motors count
+    if state_dim is None:
+        state_dim = len(motors)
+    
+    # Create feature names for enriched state
+    state_names = []
+    
+    # Add position names (qpos)
+    state_names.extend([f"{motor}_pos" for motor in motors])
+    
+    # Add velocity names (qvel) if available
+    if has_velocity:
+        state_names.extend([f"{motor}_vel" for motor in motors])
+    
+    # Add pressure names if available
+    if has_pressure:
+        # Add pressure sensors for hands (assuming 3 pressure sensors per hand)
+        state_names.extend([
+            "left_hand_pressure_0", "left_hand_pressure_1", "left_hand_pressure_2",
+            "right_hand_pressure_0", "right_hand_pressure_1", "right_hand_pressure_2"
+        ])
+
     features = {
         "observation.state": {
             "dtype": "float32",
-            "shape": (len(motors),),
-            "names": [
-                motors,
-            ],
+            "shape": (state_dim,),
+            "names": state_names,
         },
         "action": {
             "dtype": "float32",
             "shape": (len(motors),),
-            "names": [
-                motors,
-            ],
+            "names": motors,
         },
     }
 
@@ -227,17 +306,23 @@ def create_empty_dataset(
         features["observation.velocity"] = {
             "dtype": "float32",
             "shape": (len(motors),),
-            "names": [
-                motors,
-            ],
+            "names": [f"{motor}_vel" for motor in motors],
         }
 
     if has_effort:
         features["observation.effort"] = {
             "dtype": "float32",
             "shape": (len(motors),),
+            "names": [f"{motor}_effort" for motor in motors],
+        }
+
+    if has_pressure:
+        features["observation.pressure"] = {
+            "dtype": "float32",
+            "shape": (6,),  # 3 sensors per hand * 2 hands
             "names": [
-                motors,
+                "left_hand_pressure_0", "left_hand_pressure_1", "left_hand_pressure_2",
+                "right_hand_pressure_0", "right_hand_pressure_1", "right_hand_pressure_2"
             ],
         }
 
@@ -275,10 +360,11 @@ def populate_dataset(
 ) -> LeRobotDataset:
 
     json_dataset = JsonDataset(raw_dir, robot_type)
+    
     for i in tqdm.tqdm(range(len(json_dataset))):
         episode = json_dataset.get_item(i)
 
-        state = episode["state"]
+        state = episode["state"]  # Already contains all sensor data combined
         action = episode["action"]
         cameras = episode["cameras"]
         task = episode["task"]
@@ -315,12 +401,27 @@ def json_to_lerobot(
     if (HF_LEROBOT_HOME / repo_id).exists():
         shutil.rmtree(HF_LEROBOT_HOME / repo_id)
 
+    # Create a temporary dataset instance to detect available features
+    temp_json_dataset = JsonDataset(raw_dir, robot_type)
+    temp_episode = temp_json_dataset.get_item(0)
+    data_cfg = temp_episode["data_cfg"]
+    
+    # Detect available features
+    has_velocity = data_cfg.get('has_velocity', False)
+    has_pressure = data_cfg.get('has_pressure', False)
+    state_dim = data_cfg.get('state_dim', None)
+    
+    print(f"Detected features - Velocity: {has_velocity}, Pressure: {has_pressure}")
+    print(f"State dimension: {state_dim}")
+
     dataset = create_empty_dataset(
         repo_id,
         robot_type=robot_type,
         mode=mode,
         has_effort=False,
-        has_velocity=False,
+        has_velocity=has_velocity,
+        has_pressure=has_pressure,
+        state_dim=state_dim,
         dataset_config=dataset_config,
     )
     dataset = populate_dataset(
