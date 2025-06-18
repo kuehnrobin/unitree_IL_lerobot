@@ -301,13 +301,6 @@ def create_empty_dataset(
             "names": motors,
         },
     }
-    has_velocity = False
-    if has_velocity:
-        features["observation.velocity"] = {
-            "dtype": "float32",
-            "shape": (len(motors),),
-            "names": [f"{motor}_vel" for motor in motors],
-        }
 
     if has_effort:
         features["observation.effort"] = {
@@ -316,15 +309,6 @@ def create_empty_dataset(
             "names": [f"{motor}_effort" for motor in motors],
         }
 
-    if has_pressure:
-        features["observation.pressure"] = {
-            "dtype": "float32",
-            "shape": (6,),  # 3 sensors per hand * 2 hands
-            "names": [
-                "left_hand_pressure_0", "left_hand_pressure_1", "left_hand_pressure_2",
-                "right_hand_pressure_0", "right_hand_pressure_1", "right_hand_pressure_2"
-            ],
-        }
 
     for cam in cameras:
         features[f"observation.images.{cam}"] = {
