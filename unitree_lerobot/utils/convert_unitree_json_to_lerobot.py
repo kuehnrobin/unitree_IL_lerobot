@@ -120,8 +120,8 @@ class JsonDataset:
                 if part in sample_data[key] and sample_data[key][part] is not None:
                     if data_type == 'pressure':
                         # Handle pressure data for hands only
-                        if 'hand' in part and 'pressure' in sample_data[key][part]:
-                            pressure_data = np.array(sample_data[key][part]['pressure'], dtype=np.float32)
+                        if 'hand' in part and 'pressures' in sample_data[key][part]:
+                            pressure_data = np.array(sample_data[key][part]['pressures'], dtype=np.float32)
                             data_array = np.concatenate([data_array, pressure_data])
                     else:
                         # Handle qpos and qvel data
@@ -301,7 +301,7 @@ def create_empty_dataset(
             "names": motors,
         },
     }
-
+    has_velocity = False
     if has_velocity:
         features["observation.velocity"] = {
             "dtype": "float32",
