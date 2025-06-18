@@ -283,3 +283,11 @@ These can be used for custom augmentation pipelines or integration with other to
 6. **Balance Augmentation**: Mix augmented and original episodes for best results
 7. **Quality Labeling**: Ensure all episodes have proper quality labels in their data.json files
 8. **Quality Distribution**: Aim for a balanced mix of optimal, suboptimal, and recovery episodes
+
+python unitree_lerobot/argument_data.py \
+    --input_dataset_path /media/robin/SSD2/DATA/pack_cans/pack\ cans/ \
+    --output_dataset_path /media/robin/SSD2/DATA/argumented_pack_cans \
+    --optimal_weight 3.0 \
+    --joint_noise_std 0.01 \
+    --augmentation_probability 0.7
+
