@@ -221,8 +221,10 @@ class Dex3_1_Controller:
                 # get dual hand state
                 left_hand_mat  = np.array(left_hand_array[:]).copy()
                 right_hand_mat = np.array(right_hand_array[:]).copy()
-                # Read left and right q_state from shared arrays
-                state_data = np.concatenate((np.array(left_hand_state_array[:]), np.array(right_hand_state_array[:])))
+                # Read left and right q_state from shared arrays (only positions - first 7 elements)
+                left_hand_q = np.array(left_hand_state_array[:7])  # Only position data
+                right_hand_q = np.array(right_hand_state_array[:7])  # Only position data
+                state_data = np.concatenate((left_hand_q, right_hand_q))
 
                 # get dual hand action
                 action_data = np.concatenate((left_hand_mat, right_hand_mat))   
