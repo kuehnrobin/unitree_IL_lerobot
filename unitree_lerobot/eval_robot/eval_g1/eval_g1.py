@@ -164,8 +164,9 @@ def eval_policy(
         dual_hand_action_array = Array('d', 14, lock = False) # [output] current left, right hand action(14) data.
         # Enable force mode to get pressure sensor data when pressure is enabled
         hand_ctrl = Dex3_1_Controller(left_hand_array, right_hand_array, dual_hand_data_lock, dual_hand_state_array, dual_hand_action_array, networkInterface=cfg.cyclonedds_uri, force=cfg.force)
+        # For 80D state (qpos+qvel+pressure), extract hand poses from qpos portion (first 28 dims)
         init_left_hand_pose = step['observation.state'][14:21].cpu().numpy()
-        init_right_hand_pose = step['observation.state'][21:].cpu().numpy()
+        init_right_hand_pose = step['observation.state'][21:28].cpu().numpy()
 
     elif robot_config['hand_type'] == "gripper":
         left_hand_array = Array('d', 1, lock=True)             # [input]
@@ -362,19 +363,64 @@ def eval_policy(
                     "observation.images.cam_right_wrist": torch.from_numpy(right_wrist_camera) if WRIST else None,
                 }
 
-                # get current state data.
-                current_lr_arm_q  = arm_ctrl.get_current_dual_arm_q()
-                # dex hand or gripper
+                # Build 80D observation state: qpos (28D) + qvel (28D) + pressure (24D)
+                current_lr_arm_q = arm_ctrl.get_current_dual_arm_q()  # 14D
+                current_lr_arm_dq = arm_ctrl.get_current_dual_arm_dq()  # 14D velocity
+                
+                # Get hand state data
                 if robot_config['hand_type'] == "dex3":
                     with dual_hand_data_lock:
-                        left_hand_state = dual_hand_state_array[:7]
-                        right_hand_state = dual_hand_state_array[-7:]
+                        left_hand_state = dual_hand_state_array[:7]   # 7D position
+                        right_hand_state = dual_hand_state_array[-7:] # 7D position
+                    
+                    # For velocity, hands provide velocity if available in shared array
+                    # For now using zeros for hand velocities since not available in simple mode
+                    left_hand_vel = np.zeros(7)
+                    right_hand_vel = np.zeros(7)
+                    
+                    # Get pressure sensor data if available
+                    if cfg.pressure and hand_ctrl:
+                        pressure_data = hand_ctrl.get_pressure_data()
+                        left_pressure = np.array(pressure_data['left_pressure'])  # 12D
+                        right_pressure = np.array(pressure_data['right_pressure']) # 12D
+                    else:
+                        left_pressure = np.zeros(12)
+                        right_pressure = np.zeros(12)
+                    
+                    # Construct 80D state: [arm_q(14) + hand_q(14)] + [arm_dq(14) + hand_dq(14)] + [pressure(24)]
+                    observation_state = np.concatenate([
+                        current_lr_arm_q,      # 14D arm positions
+                        left_hand_state,       # 7D left hand positions  
+                        right_hand_state,      # 7D right hand positions
+                        current_lr_arm_dq,     # 14D arm velocities
+                        left_hand_vel,         # 7D left hand velocities
+                        right_hand_vel,        # 7D right hand velocities  
+                        left_pressure,         # 12D left hand pressure
+                        right_pressure         # 12D right hand pressure
+                    ])
+                    
                 elif robot_config['hand_type'] == "gripper":
                     with dual_gripper_data_lock:
                         left_hand_state = [dual_gripper_state_array[1]]
                         right_hand_state = [dual_gripper_state_array[0]]
+                    
+                    # For grippers, simpler state structure - extend with zeros to match training data dimensions
+                    left_hand_vel = [0.0]
+                    right_hand_vel = [0.0]
+                    # Pad with zeros to match expected dimensions
+                    padding = np.zeros(24)  # Adjust based on actual trained model expectations
+                    
+                    observation_state = np.concatenate([
+                        current_lr_arm_q,      # 14D
+                        left_hand_state,       # 1D
+                        right_hand_state,      # 1D
+                        current_lr_arm_dq,     # 14D
+                        left_hand_vel,         # 1D
+                        right_hand_vel,        # 1D
+                        padding                # Padding to match training dimensions
+                    ])
                 
-                observation["observation.state"] = torch.from_numpy(np.concatenate((current_lr_arm_q, left_hand_state, right_hand_state), axis=0)).float()
+                observation["observation.state"] = torch.from_numpy(observation_state).float()
 
                 observation = {
                     key: observation[key].to(device, non_blocking=device.type == "cuda") for key in observation
@@ -486,7 +532,7 @@ def eval_policy(
                 arm_ctrl.ctrl_dual_arm(action[:14], np.zeros(14))
                 if robot_config['hand_type'] == "dex3":
                     left_hand_array[:] = action[14:21]
-                    right_hand_array[:] = action[21:]
+                    right_hand_array[:] = action[21:28]
                 elif robot_config['hand_type'] == "gripper":
                     left_hand_array[:] = action[14]
                     right_hand_array[:] = action[15]
