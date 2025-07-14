@@ -28,6 +28,12 @@ class EvalRealConfig:
     pressure: bool = field(default=True)
     force: bool = field(default=False)
 
+    # Active Camera options
+    active_camera: bool = field(default=True)
+    camera_port: str = field(default="/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FT3R4A5A-if00-port0")
+    camera_safe_mode: bool = field(default=False)
+    camera_max_movement: float = field(default=60.0)
+
     def __post_init__(self):
         # HACK: We parse again the cli args here to get the pretrained path if there was one.
         policy_path = parser.get_path_arg("policy")

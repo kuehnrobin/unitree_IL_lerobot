@@ -283,10 +283,12 @@ def create_empty_dataset(
     
     # Add pressure names if available
     if has_pressure:
-        # Add pressure sensors for hands (assuming 3 pressure sensors per hand)
+        # Add pressure sensors for hands (12 per hand for dex3 hands)
         state_names.extend([
-            "left_hand_pressure_0", "left_hand_pressure_1", "left_hand_pressure_2",
-            "right_hand_pressure_0", "right_hand_pressure_1", "right_hand_pressure_2"
+            f"left_hand_pressure_{i}" for i in range(12)
+        ])
+        state_names.extend([
+            f"right_hand_pressure_{i}" for i in range(12)
         ])
 
     features = {

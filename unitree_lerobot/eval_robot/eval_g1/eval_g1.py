@@ -30,6 +30,7 @@ from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
 from unitree_lerobot.eval_robot.eval_g1.image_server.image_client import ImageClient
 from unitree_lerobot.eval_robot.eval_g1.robot_control.robot_arm import G1_29_ArmController
 from unitree_lerobot.eval_robot.eval_g1.robot_control.robot_hand_unitree import Dex3_1_Controller, Gripper_Controller
+from unitree_lerobot.eval_robot.eval_g1.robot_control.active_head_cam import ActiveCameraController
 from unitree_lerobot.eval_robot.eval_g1.eval_real_config import EvalRealConfig
 from unitree_lerobot.eval_robot.eval_g1.utils import EpisodeWriter
 
@@ -181,6 +182,48 @@ def eval_policy(
     else:
         hand_ctrl = None
 
+    # active camera controller
+    camera_controller = None
+    if cfg.active_camera:
+        try:
+            logging.info("Initializing active camera controller...")
+            camera_controller = ActiveCameraController(
+                port=cfg.camera_port,
+                safe_mode=cfg.camera_safe_mode,
+                max_movement_deg=cfg.camera_max_movement,
+                logger=logging.getLogger('ActiveCameraController')
+            )
+            
+            # Connect to servos
+            logging.info("Connecting to camera servos...")
+            if not camera_controller.connect():
+                logging.error("Failed to connect to camera servos")
+                camera_controller = None
+            else:
+                logging.info("Camera controller connected successfully")
+                # Extract initial camera positions from dataset if available
+                state_dim = step['observation.state'].shape[0]
+                logging.info(f"Dataset state dimension: {state_dim}")
+                if state_dim >= 30:  # Check if we have camera data (28 robot joints + 2 camera)
+                    # Camera positions should be after arm and hand positions
+                    if robot_config['hand_type'] == "dex3":
+                        # Layout: arm(14) + hand(14) + camera(2) + velocities + pressure
+                        init_camera_pose = step['observation.state'][28:30].cpu().numpy()  # positions 28-29 are camera
+                    elif robot_config['hand_type'] == "gripper": 
+                        # Layout: arm(14) + gripper(2) + camera(2) + velocities + pressure  
+                        init_camera_pose = step['observation.state'][16:18].cpu().numpy()  # positions 16-17 are camera
+                    else:
+                        init_camera_pose = camera_controller.start_positions
+                    logging.info(f"Initial camera positions from dataset: Pitch={np.rad2deg(init_camera_pose[0]):.2f}°, Yaw={np.rad2deg(init_camera_pose[1]):.2f}°")
+                else:
+                    init_camera_pose = camera_controller.start_positions
+                    logging.info(f"Using default camera positions: Pitch={np.rad2deg(init_camera_pose[0]):.2f}°, Yaw={np.rad2deg(init_camera_pose[1]):.2f}°")
+        except Exception as e:
+            logging.error(f"Failed to initialize active camera: {e}")
+            camera_controller = None
+    else:
+        logging.info("Active camera disabled")
+
     #===============init robot=====================
     # Initialize recorder only if recording is enabled
     if cfg.record:
@@ -232,6 +275,14 @@ def eval_policy(
         arm_ctrl.ctrl_dual_arm(init_left_arm_pose, np.zeros(14))
         left_hand_array[:] = init_left_hand_pose
         right_hand_array[:] = init_right_hand_pose
+        
+        # Initialize camera to initial position if available
+        if camera_controller and camera_controller.connected:
+            try:
+                camera_controller._set_target_positions(init_camera_pose[0], init_camera_pose[1])
+                logging.info(f"Camera initialized to: Pitch={np.rad2deg(init_camera_pose[0]):.2f}°, Yaw={np.rad2deg(init_camera_pose[1]):.2f}°")
+            except Exception as e:
+                logging.error(f"Error initializing camera position: {e}")
 
         print("wait robot to pose")
         time.sleep(1)
@@ -363,7 +414,17 @@ def eval_policy(
                     "observation.images.cam_right_wrist": torch.from_numpy(right_wrist_camera) if WRIST else None,
                 }
 
-                # Build 80D observation state: qpos (28D) + qvel (28D) + pressure (24D)
+                # Get camera positions if active camera is enabled
+                if camera_controller and camera_controller.connected:
+                    servo_states = camera_controller.get_servo_states()
+                    current_camera_q = np.array([servo_states['current_pitch'], servo_states['current_yaw']])  # 2D
+                    current_camera_dq = np.zeros(2)  # Camera velocities not available, use zeros for now
+                else:
+                    # Use default positions if camera not available
+                    current_camera_q = np.array([195.0 * np.pi / 180, 90.0 * np.pi / 180])  # Default safe positions
+                    current_camera_dq = np.zeros(2)
+
+                # Build observation state: depends on whether camera is included in training data
                 current_lr_arm_q = arm_ctrl.get_current_dual_arm_q()  # 14D
                 current_lr_arm_dq = arm_ctrl.get_current_dual_arm_dq()  # 14D velocity
                 
@@ -387,14 +448,16 @@ def eval_policy(
                         left_pressure = np.zeros(12)
                         right_pressure = np.zeros(12)
                     
-                    # Construct 80D state: [arm_q(14) + hand_q(14)] + [arm_dq(14) + hand_dq(14)] + [pressure(24)]
+                    # Construct state with camera: [arm_q(14) + hand_q(14) + camera_q(2)] + [arm_dq(14) + hand_dq(14) + camera_dq(2)] + [pressure(24)]
                     observation_state = np.concatenate([
                         current_lr_arm_q,      # 14D arm positions
                         left_hand_state,       # 7D left hand positions  
                         right_hand_state,      # 7D right hand positions
+                        current_camera_q,      # 2D camera positions (pitch, yaw)
                         current_lr_arm_dq,     # 14D arm velocities
                         left_hand_vel,         # 7D left hand velocities
                         right_hand_vel,        # 7D right hand velocities  
+                        current_camera_dq,     # 2D camera velocities
                         left_pressure,         # 12D left hand pressure
                         right_pressure         # 12D right hand pressure
                     ])
@@ -414,9 +477,11 @@ def eval_policy(
                         current_lr_arm_q,      # 14D
                         left_hand_state,       # 1D
                         right_hand_state,      # 1D
+                        current_camera_q,      # 2D camera positions
                         current_lr_arm_dq,     # 14D
                         left_hand_vel,         # 1D
                         right_hand_vel,        # 1D
+                        current_camera_dq,     # 2D camera velocities  
                         padding                # Padding to match training dimensions
                     ])
                 
@@ -460,13 +525,25 @@ def eval_policy(
                     left_arm_action = action[:7]
                     right_arm_action = action[7:14]
                     
-                    # hand action (use actual actions for recording)
-                    if robot_config['hand_type'] == "dex3":
-                        left_hand_action = action[14:21]
-                        right_hand_action = action[21:]
-                    elif robot_config['hand_type'] == "gripper":
-                        left_hand_action = [action[14]]
-                        right_hand_action = [action[15]]
+                    # hand action and camera action (split based on hand type and camera availability)
+                    if camera_controller and camera_controller.connected:
+                        if robot_config['hand_type'] == "dex3":
+                            left_hand_action = action[14:21]
+                            right_hand_action = action[21:28]
+                            camera_action = action[28:30]  # Last 2 values
+                        elif robot_config['hand_type'] == "gripper":
+                            left_hand_action = [action[14]]
+                            right_hand_action = [action[15]]
+                            camera_action = action[16:18]  # Last 2 values
+                    else:
+                        # No camera, use original split
+                        if robot_config['hand_type'] == "dex3":
+                            left_hand_action = action[14:21]
+                            right_hand_action = action[21:28]
+                        elif robot_config['hand_type'] == "gripper":
+                            left_hand_action = [action[14]]
+                            right_hand_action = [action[15]]
+                        camera_action = current_camera_q  # Use current positions if no camera control
                     
                     # Get pressure sensor data if available from hand controller
                     if cfg.pressure and hand_ctrl and robot_config['hand_type'] == "dex3":
@@ -500,7 +577,12 @@ def eval_policy(
                             "torque": [],
                             "pressures": pressure_data['right_pressure'],
                             #"temperatures": pressure_data['right_temp'],  
-                        }, 
+                        },
+                        "camera": {
+                            "qpos": current_camera_q.tolist(),
+                            "qvel": [],
+                            "torque": []
+                        },
                         "body": None, 
                     }
                     actions = {
@@ -523,19 +605,55 @@ def eval_policy(
                             "qpos":   right_hand_action,       
                             "qvel":   [],       
                             "torque": [], 
-                        }, 
+                        },
+                        "camera": {
+                            "qpos": camera_action.tolist() if isinstance(camera_action, np.ndarray) else camera_action,
+                            "qvel": [],
+                            "torque": []
+                        },
                         "body": None, 
                     }
                     recorder.add_item(colors=colors, depths=depths, states=states, actions=actions)
                 
                 # exec action
-                arm_ctrl.ctrl_dual_arm(action[:14], np.zeros(14))
+                # Split actions: camera actions are at the end
+                if camera_controller and camera_controller.connected:
+                    if robot_config['hand_type'] == "dex3":
+                        # Actions: [arm(14) + hand(14) + camera(2)] = 30D total
+                        arm_action = action[:14]
+                        hand_action = action[14:28]
+                        camera_action = action[28:30]  # Last 2 values are camera pitch/yaw
+                    elif robot_config['hand_type'] == "gripper":
+                        # Actions: [arm(14) + gripper(2) + camera(2)] = 18D total
+                        arm_action = action[:14]
+                        hand_action = action[14:16]
+                        camera_action = action[16:18]  # Last 2 values are camera pitch/yaw
+                    
+                    # Execute camera action using active camera controller
+                    try:
+                        target_pitch, target_yaw = camera_action
+                        # Use threaded control method to set target positions
+                        camera_controller._set_target_positions(target_pitch, target_yaw)
+                        if frame_counter % 150 == 0:  # Log every 5 seconds
+                            logging.info(f"Camera targets: Pitch={np.rad2deg(target_pitch):.1f}°, Yaw={np.rad2deg(target_yaw):.1f}°")
+                    except Exception as e:
+                        logging.error(f"Error controlling camera: {e}")
+                else:
+                    # No active camera, use original action dimensions
+                    arm_action = action[:14]
+                    if robot_config['hand_type'] == "dex3":
+                        hand_action = action[14:28]
+                    elif robot_config['hand_type'] == "gripper":
+                        hand_action = action[14:16]
+                
+                # Execute arm and hand actions
+                arm_ctrl.ctrl_dual_arm(arm_action, np.zeros(14))
                 if robot_config['hand_type'] == "dex3":
-                    left_hand_array[:] = action[14:21]
-                    right_hand_array[:] = action[21:28]
+                    left_hand_array[:] = hand_action[:7]
+                    right_hand_array[:] = hand_action[7:]
                 elif robot_config['hand_type'] == "gripper":
-                    left_hand_array[:] = action[14]
-                    right_hand_array[:] = action[15]
+                    left_hand_array[:] = hand_action[0]
+                    right_hand_array[:] = hand_action[1]
             
                 frame_counter += 1
             
@@ -555,6 +673,14 @@ def eval_policy(
                 if 'recorder' in locals():
                     recorder.close()
                 logging.info("Recording resources cleaned up")
+            
+            # Cleanup camera controller
+            if camera_controller:
+                try:
+                    camera_controller.disconnect()
+                    logging.info("Camera controller disconnected")
+                except Exception as e:
+                    logging.error(f"Error disconnecting camera controller: {e}")
             
             arm_ctrl.ctrl_dual_arm_go_home()
             logging.info("Arms returned to home position")
