@@ -16,8 +16,8 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 
-from teleop.robot_control.dynamixel.active_cam import DynamixelAgent
-from teleop.robot_control.dynamixel.error_analyzer import DynamixelErrorAnalyzer
+from unitree_lerobot.eval_robot.eval_g1.robot_control.dynamixel.active_cam import DynamixelAgent
+from unitree_lerobot.eval_robot.eval_g1.robot_control.dynamixel.error_analyzer import DynamixelErrorAnalyzer
 
 
 class ActiveCameraController:
