@@ -1,0 +1,237 @@
+# ACT Architecture Ablation Study Configuration
+# Systematic testing of ACT architecture parameters
+
+description: "Comprehensive testing of ACT architecture parameters for optimal performance"
+
+experiments:
+  # Baseline
+  - name: "baseline_default_act"
+    description: "Default ACT configuration (baseline)"
+    params: {}
+    
+  # Chunk size experiments
+  - name: "very_short_chunks"
+    description: "Very short action chunks for reactive behavior"
+    params:
+      policy.chunk_size: 15
+      policy.n_action_steps: 3
+      
+  - name: "short_chunks"
+    description: "Short action chunks"
+    params:
+      policy.chunk_size: 30
+      policy.n_action_steps: 6
+      
+  - name: "medium_chunks"
+    description: "Medium action chunks"
+    params:
+      policy.chunk_size: 60
+      policy.n_action_steps: 12
+      
+  - name: "long_chunks"
+    description: "Long action chunks for planning"
+    params:
+      policy.chunk_size: 120
+      policy.n_action_steps: 24
+      
+  - name: "very_long_chunks"
+    description: "Very long action chunks for complex planning"
+    params:
+      policy.chunk_size: 240
+      policy.n_action_steps: 48
+
+  # Model size experiments
+  - name: "tiny_transformer"
+    description: "Tiny transformer for fast training"
+    params:
+      policy.dim_model: 128
+      policy.n_heads: 4
+      policy.dim_feedforward: 512
+      policy.n_encoder_layers: 2
+      policy.n_decoder_layers: 2
+      
+  - name: "small_transformer"
+    description: "Small transformer"
+    params:
+      policy.dim_model: 256
+      policy.n_heads: 4
+      policy.dim_feedforward: 1024
+      policy.n_encoder_layers: 3
+      policy.n_decoder_layers: 2
+      
+  - name: "large_transformer"
+    description: "Large transformer for complex tasks"
+    params:
+      policy.dim_model: 768
+      policy.n_heads: 12
+      policy.dim_feedforward: 3072
+      policy.n_encoder_layers: 6
+      policy.n_decoder_layers: 4
+      
+  - name: "xl_transformer"
+    description: "Extra large transformer"
+    params:
+      policy.dim_model: 1024
+      policy.n_heads: 16
+      policy.dim_feedforward: 4096
+      policy.n_encoder_layers: 8
+      policy.n_decoder_layers: 6
+
+  # VAE experiments
+  - name: "no_vae_deterministic"
+    description: "Deterministic policy without VAE"
+    params:
+      policy.use_vae: false
+      
+  - name: "tiny_vae"
+    description: "Tiny VAE latent dimension"
+    params:
+      policy.use_vae: true
+      policy.latent_dim: 8
+      policy.kl_weight: 2.0
+      
+  - name: "small_vae"
+    description: "Small VAE latent dimension"
+    params:
+      policy.use_vae: true
+      policy.latent_dim: 16
+      policy.kl_weight: 5.0
+      
+  - name: "large_vae"
+    description: "Large VAE latent dimension"
+    params:
+      policy.use_vae: true
+      policy.latent_dim: 64
+      policy.kl_weight: 15.0
+      
+  - name: "xl_vae"
+    description: "Extra large VAE latent dimension"
+    params:
+      policy.use_vae: true
+      policy.latent_dim: 128
+      policy.kl_weight: 25.0
+
+  # Temporal ensembling experiments
+  - name: "no_temporal_ensemble"
+    description: "No temporal ensembling"
+    params:
+      policy.temporal_ensemble_coeff: null
+      policy.n_action_steps: 12
+      
+  - name: "minimal_temporal_ensemble"
+    description: "Minimal temporal ensembling"
+    params:
+      policy.temporal_ensemble_coeff: 0.001
+      policy.n_action_steps: 1
+      
+  - name: "light_temporal_ensemble"
+    description: "Light temporal ensembling"
+    params:
+      policy.temporal_ensemble_coeff: 0.005
+      policy.n_action_steps: 1
+      
+  - name: "strong_temporal_ensemble"
+    description: "Strong temporal ensembling"
+    params:
+      policy.temporal_ensemble_coeff: 0.01
+      policy.n_action_steps: 1
+      
+  - name: "very_strong_temporal_ensemble"
+    description: "Very strong temporal ensembling"
+    params:
+      policy.temporal_ensemble_coeff: 0.02
+      policy.n_action_steps: 1
+
+  # Vision backbone experiments  
+  - name: "resnet18_backbone"
+    description: "ResNet18 vision backbone (lightest)"
+    params:
+      policy.vision_backbone: "resnet18"
+      
+  - name: "resnet34_backbone"
+    description: "ResNet34 vision backbone (medium)"
+    params:
+      policy.vision_backbone: "resnet34"
+      
+  - name: "resnet50_backbone"
+    description: "ResNet50 vision backbone (heavy)"
+    params:
+      policy.vision_backbone: "resnet50"
+
+  # Dropout and regularization experiments
+  - name: "no_dropout"
+    description: "No dropout regularization"
+    params:
+      policy.dropout: 0.0
+      
+  - name: "light_dropout"
+    description: "Light dropout regularization"
+    params:
+      policy.dropout: 0.05
+      
+  - name: "medium_dropout"
+    description: "Medium dropout regularization"
+    params:
+      policy.dropout: 0.1
+      
+  - name: "heavy_dropout"
+    description: "Heavy dropout regularization"
+    params:
+      policy.dropout: 0.2
+      
+  - name: "very_heavy_dropout"
+    description: "Very heavy dropout regularization"
+    params:
+      policy.dropout: 0.3
+
+  # Learning rate experiments
+  - name: "very_low_lr"
+    description: "Very low learning rate"
+    params:
+      optimizer.lr: 1e-6
+      
+  - name: "low_lr"
+    description: "Low learning rate"
+    params:
+      optimizer.lr: 5e-6
+      
+  - name: "high_lr"
+    description: "High learning rate"
+    params:
+      optimizer.lr: 5e-5
+      
+  - name: "very_high_lr"
+    description: "Very high learning rate"
+    params:
+      optimizer.lr: 1e-4
+
+  # Combined optimal configurations (based on typical findings)
+  - name: "fast_reactive_optimized"
+    description: "Optimized for fast reactive behavior"
+    params:
+      policy.chunk_size: 15
+      policy.n_action_steps: 1
+      policy.temporal_ensemble_coeff: 0.01
+      policy.dim_model: 256
+      policy.dropout: 0.1
+      policy.use_vae: false
+      
+  - name: "manipulation_optimized"
+    description: "Optimized for manipulation tasks"
+    params:
+      policy.chunk_size: 45
+      policy.n_action_steps: 1
+      policy.temporal_ensemble_coeff: 0.005
+      policy.dim_model: 512
+      policy.latent_dim: 32
+      policy.dropout: 0.15
+      
+  - name: "planning_optimized"
+    description: "Optimized for long-horizon planning"
+    params:
+      policy.chunk_size: 120
+      policy.n_action_steps: 24
+      policy.dim_model: 768
+      policy.latent_dim: 64
+      policy.dropout: 0.1
+      policy.vision_backbone: "resnet34"

@@ -1,0 +1,212 @@
+# Combined Feature Selection + ACT Parameter Optimization
+# Testing optimal combinations of features and ACT parameters for specific use cases
+
+description: "Combined optimization of sensor features and ACT architecture parameters"
+
+experiments:
+  # Minimal setups for different scenarios
+  - name: "ultra_minimal_fast"
+    description: "Ultra minimal setup for fastest training and inference"
+    params:
+      feature_selection.cameras: ["cam_high"]
+      feature_selection.use_joint_velocities: false
+      feature_selection.use_joint_torques: false
+      feature_selection.use_pressure_sensors: false
+      feature_selection.exclude_joint_groups: ["camera"]
+      policy.chunk_size: 15
+      policy.n_action_steps: 3
+      policy.dim_model: 128
+      policy.n_heads: 4
+      policy.use_vae: false
+      
+  - name: "minimal_robust"
+    description: "Minimal sensors with robust ACT configuration"
+    params:
+      feature_selection.cameras: ["cam_high"]
+      feature_selection.use_joint_torques: false
+      feature_selection.use_pressure_sensors: false
+      policy.chunk_size: 30
+      policy.n_action_steps: 1
+      policy.temporal_ensemble_coeff: 0.005
+      policy.dropout: 0.15
+      policy.dim_model: 256
+
+  # Wrist camera specializations
+  - name: "wrist_cams_short_horizon"
+    description: "Wrist cameras for short-horizon precise manipulation"
+    params:
+      feature_selection.cameras: ["cam_left_wrist", "cam_right_wrist"]
+      feature_selection.exclude_joint_groups: ["camera"]
+      policy.chunk_size: 30
+      policy.n_action_steps: 6
+      policy.temporal_ensemble_coeff: 0.01
+      policy.dim_model: 384
+      
+  - name: "wrist_cams_medium_horizon"
+    description: "Wrist cameras for medium-horizon manipulation tasks"
+    params:
+      feature_selection.cameras: ["cam_left_wrist", "cam_right_wrist"]
+      policy.chunk_size: 60
+      policy.n_action_steps: 12
+      policy.latent_dim: 32
+      policy.dim_model: 512
+      
+  - name: "single_wrist_cam_specialized"
+    description: "Single wrist camera highly optimized"
+    params:
+      feature_selection.cameras: ["cam_left_wrist"]
+      feature_selection.joint_groups: ["left_arm", "left_hand"]
+      policy.chunk_size: 45
+      policy.n_action_steps: 1
+      policy.temporal_ensemble_coeff: 0.01
+      policy.dim_model: 384
+
+  # Stereo vision experiments
+  - name: "stereo_3d_small_model"
+    description: "Stereo cameras with compact model for 3D awareness"
+    params:
+      feature_selection.cameras: ["cam_stereo_left", "cam_stereo_right"]
+      policy.dim_model: 512
+      policy.n_heads: 8
+      policy.chunk_size: 60
+      policy.vision_backbone: "resnet34"
+      
+  - name: "stereo_3d_large_model"
+    description: "Stereo cameras with large model for complex 3D understanding"
+    params:
+      feature_selection.cameras: ["cam_stereo_left", "cam_stereo_right"]
+      policy.dim_model: 768
+      policy.n_heads: 12
+      policy.chunk_size: 60
+      policy.latent_dim: 64
+      policy.vision_backbone: "resnet34"
+
+  # Multi-camera optimizations
+  - name: "tri_cam_balanced"
+    description: "Three cameras with balanced ACT config"
+    params:
+      feature_selection.cameras: ["cam_high", "cam_left_wrist", "cam_right_wrist"]
+      policy.chunk_size: 60
+      policy.n_action_steps: 10
+      policy.dim_model: 512
+      policy.temporal_ensemble_coeff: 0.005
+      policy.dropout: 0.1
+      
+  - name: "quad_cam_robust"
+    description: "Four cameras for robust perception"
+    params:
+      feature_selection.cameras: ["cam_high", "cam_low", "cam_left_wrist", "cam_right_wrist"]
+      policy.chunk_size: 75
+      policy.n_action_steps: 15
+      policy.dim_model: 768
+      policy.dropout: 0.15
+      
+  - name: "all_cams_optimized"
+    description: "All cameras with optimized ACT parameters"
+    params:
+      policy.chunk_size: 60
+      policy.n_action_steps: 12
+      policy.dim_model: 768
+      policy.temporal_ensemble_coeff: 0.005
+      policy.latent_dim: 48
+      policy.vision_backbone: "resnet34"
+
+  # Task-specific optimizations
+  - name: "fine_manipulation_focused"
+    description: "Optimized for fine manipulation with minimal latency"
+    params:
+      feature_selection.cameras: ["cam_left_wrist", "cam_right_wrist", "cam_stereo_left"]
+      feature_selection.exclude_joint_groups: ["camera"]
+      feature_selection.use_joint_torques: false
+      policy.chunk_size: 30
+      policy.n_action_steps: 1
+      policy.temporal_ensemble_coeff: 0.01
+      policy.dim_model: 512
+      policy.dropout: 0.1
+      
+  - name: "navigation_focused"
+    description: "Optimized for navigation and gross motor control"
+    params:
+      feature_selection.cameras: ["cam_high", "cam_low"]
+      feature_selection.joint_groups: ["left_arm", "right_arm", "camera"]
+      feature_selection.use_pressure_sensors: false
+      policy.chunk_size: 90
+      policy.n_action_steps: 18
+      policy.dim_model: 384
+      policy.latent_dim: 32
+      
+  - name: "bimanual_coordination"
+    description: "Optimized for bimanual coordination tasks"
+    params:
+      feature_selection.cameras: ["cam_high", "cam_left_wrist", "cam_right_wrist"]
+      feature_selection.joint_groups: ["left_arm", "right_arm", "left_hand", "right_hand"]
+      policy.chunk_size: 75
+      policy.n_action_steps: 15
+      policy.dim_model: 768
+      policy.temporal_ensemble_coeff: 0.002
+
+  # State feature variations with different ACT configs
+  - name: "positions_only_fast"
+    description: "Only joint positions with fast ACT config"
+    params:
+      feature_selection.use_joint_velocities: false
+      feature_selection.use_joint_torques: false
+      feature_selection.use_pressure_sensors: false
+      policy.chunk_size: 30
+      policy.n_action_steps: 6
+      policy.dim_model: 384
+      
+  - name: "full_state_long_horizon"
+    description: "All state features with long-horizon planning"
+    params:
+      policy.chunk_size: 120
+      policy.n_action_steps: 24
+      policy.dim_model: 768
+      policy.latent_dim: 64
+      policy.dropout: 0.1
+      
+  - name: "no_proprioception_vision_heavy"
+    description: "Vision-only with large vision processing"
+    params:
+      feature_selection.use_joint_velocities: false
+      feature_selection.use_joint_torques: false
+      feature_selection.use_pressure_sensors: false
+      feature_selection.cameras: ["cam_high", "cam_stereo_left", "cam_stereo_right", "cam_left_wrist"]
+      policy.dim_model: 768
+      policy.vision_backbone: "resnet34"
+      policy.chunk_size: 45
+
+  # Extreme configurations for edge case testing
+  - name: "ultra_reactive"
+    description: "Ultra-reactive policy for real-time control"
+    params:
+      feature_selection.cameras: ["cam_high"]
+      feature_selection.use_joint_velocities: false
+      feature_selection.use_pressure_sensors: false
+      policy.chunk_size: 10
+      policy.n_action_steps: 2
+      policy.temporal_ensemble_coeff: 0.02
+      policy.dim_model: 128
+      policy.use_vae: false
+      
+  - name: "ultra_planning"
+    description: "Ultra long-horizon planning policy"
+    params:
+      policy.chunk_size: 300
+      policy.n_action_steps: 60
+      policy.dim_model: 1024
+      policy.latent_dim: 128
+      policy.n_encoder_layers: 8
+      policy.vision_backbone: "resnet34"
+      
+  - name: "memory_efficient"
+    description: "Maximum performance with minimal memory usage"
+    params:
+      feature_selection.cameras: ["cam_high", "cam_left_wrist"]
+      feature_selection.use_joint_torques: false
+      feature_selection.use_pressure_sensors: false
+      policy.chunk_size: 30
+      policy.dim_model: 256
+      policy.n_heads: 4
+      policy.use_vae: false
+      policy.vision_backbone: "resnet18"
