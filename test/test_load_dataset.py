@@ -10,7 +10,7 @@ episode_index = 1
 #dataset = LeRobotDataset(repo_id="unitreerobotics/G1_ObjectPlacement_Dataset")
 #dataset = LeRobotDataset(repo_id="unitreerobotics/G1_BlockStacking_Dataset")
 #dataset = LeRobotDataset(repo_id="unitreerobotics/G1_CameraPackaging_Dataset")
-dataset = LeRobotDataset(repo_id="kuehnrobin/g1_pour_can_left_hand")
+dataset = LeRobotDataset(repo_id="kuehnrobin/g1_cubes_box")
 
 
 from_idx = dataset.episode_data_index["from"][episode_index].item()

@@ -1,0 +1,45 @@
+# Custom ablation study configuration
+# This file defines a series of experiments to test different feature combinations
+
+experiments:
+  - name: "baseline_all_features"
+    config: {}  # Use all available features
+    
+  - name: "minimal_setup"
+    config:
+      cameras: '["cam_high"]'
+      use_joint_velocities: false
+      use_joint_torques: false
+      use_pressure_sensors: false
+      
+  - name: "no_camera_movement"
+    config:
+      exclude_joint_groups: '["camera"]'
+      
+  - name: "stereo_vision_test"
+    config:
+      cameras: '["cam_stereo_left", "cam_stereo_right"]'
+      exclude_joint_groups: '["camera"]'
+      
+  - name: "single_arm_test"
+    config:
+      joint_groups: '["left_arm", "left_hand"]'
+      cameras: '["cam_high", "cam_left_wrist"]'
+      
+  - name: "positions_and_vision_only"
+    config:
+      use_joint_velocities: false
+      use_joint_torques: false
+      use_pressure_sensors: false
+      cameras: '["cam_high", "cam_low"]'
+      
+  - name: "full_sensing_minimal_vision"
+    config:
+      cameras: '["cam_high"]'
+      # Keep all joint data
+      
+  - name: "bilateral_arms_only"
+    config:
+      joint_groups: '["left_arm", "right_arm"]'
+      cameras: '["cam_high"]'
+      use_pressure_sensors: false
