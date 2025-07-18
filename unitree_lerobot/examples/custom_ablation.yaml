@@ -1,75 +1,45 @@
 # Custom ablation study configuration
-# This file defines a series of experiments to test different feature combinations and ACT parameters
+# This file defines a series of experiments to test different feature combinations
 
 experiments:
   - name: "baseline_all_features"
-    description: "Use all available features with default ACT config"
-    params: {}  # Use all defaults
+    config: {}  # Use all available features
     
   - name: "minimal_setup"
-    description: "Minimal sensor setup for fast iteration"
-    params:
-      feature_selection.cameras: ["cam_high"]
-      feature_selection.use_joint_velocities: false
-      feature_selection.use_joint_torques: false
-      feature_selection.use_pressure_sensors: false
-      policy.chunk_size: 30
-      policy.n_action_steps: 6
+    config:
+      cameras: '["cam_high"]'
+      use_joint_velocities: false
+      use_joint_torques: false
+      use_pressure_sensors: false
       
   - name: "no_camera_movement"
-    description: "Exclude camera joint control"
-    params:
-      feature_selection.exclude_joint_groups: ["camera"]
+    config:
+      exclude_joint_groups: '["camera"]'
       
   - name: "stereo_vision_test"
-    description: "Test stereo cameras with optimized ACT"
-    params:
-      feature_selection.cameras: ["cam_stereo_left", "cam_stereo_right"]
-      feature_selection.exclude_joint_groups: ["camera"]
-      policy.dim_model: 768
-      policy.n_heads: 12
+    config:
+      cameras: '["cam_stereo_left", "cam_stereo_right"]'
+      exclude_joint_groups: '["camera"]'
       
   - name: "single_arm_test"
-    description: "Left arm and hand only with short horizon"
-    params:
-      feature_selection.joint_groups: ["left_arm", "left_hand"]
-      feature_selection.cameras: ["cam_high", "cam_left_wrist"]
-      policy.chunk_size: 45
-      policy.n_action_steps: 9
+    config:
+      joint_groups: '["left_arm", "left_hand"]'
+      cameras: '["cam_high", "cam_left_wrist"]'
       
   - name: "positions_and_vision_only"
-    description: "Joint positions and vision only"
-    params:
-      feature_selection.use_joint_velocities: false
-      feature_selection.use_joint_torques: false
-      feature_selection.use_pressure_sensors: false
-      feature_selection.cameras: ["cam_high", "cam_low"]
+    config:
+      use_joint_velocities: false
+      use_joint_torques: false
+      use_pressure_sensors: false
+      cameras: '["cam_high", "cam_low"]'
       
   - name: "full_sensing_minimal_vision"
-    description: "All joint data with single camera"
-    params:
-      feature_selection.cameras: ["cam_high"]
+    config:
+      cameras: '["cam_high"]'
+      # Keep all joint data
       
-  - name: "wrist_cameras_manipulation"
-    description: "Wrist cameras optimized for manipulation"
-    params:
-      feature_selection.cameras: ["cam_left_wrist", "cam_right_wrist"]
-      policy.chunk_size: 30
-      policy.n_action_steps: 1
-      policy.temporal_ensemble_coeff: 0.01
-      
-  - name: "long_horizon_planning"
-    description: "Long horizon for complex tasks"
-    params:
-      policy.chunk_size: 120
-      policy.n_action_steps: 24
-      policy.dim_model: 768
-      policy.latent_dim: 64
-      
-  - name: "fast_reactive_policy"
-    description: "Very short chunks for reactive behavior"
-    params:
-      feature_selection.cameras: ["cam_high", "cam_left_wrist"]
-      policy.chunk_size: 15
-      policy.n_action_steps: 3
-      policy.temporal_ensemble_coeff: 0.01
+  - name: "bilateral_arms_only"
+    config:
+      joint_groups: '["left_arm", "right_arm"]'
+      cameras: '["cam_high"]'
+      use_pressure_sensors: false
