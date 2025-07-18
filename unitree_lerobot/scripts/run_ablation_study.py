@@ -6,9 +6,18 @@ This script helps you run systematic ablation studies to understand
 which features in your dataset are most important for your policy.
 
 Usage:
-python run_ablation_study.py --config_file custom_ablation.yaml --dataset_repo your_dataset
+python run_ablation_study.py --config_file custom_ablation.yaml --dataset_repo your_dataset \
+    --steps 50000 --eval_freq 10000 --save_freq 10000 --log_freq 1000 --batch_size 12
 
 The script requires a custom YAML configuration file that defines the experiments to run.
+Each experiment will be saved with a name matching the experiment name in the YAML config,
+making it easy to identify which policy corresponds to which configuration.
+
+Optional parameters:
+  --eval_freq: How often to run evaluation (default: 10000)
+  --save_freq: How often to save checkpoints (default: 10000)  
+  --log_freq: How often to log metrics (default: 1000)
+  --batch_size: Training batch size (default: 12)
 """
 
 import argparse
@@ -29,16 +38,34 @@ class AblationStudy:
     def __init__(self, base_config: Dict[str, Any]):
         self.base_config = base_config
         
-    def run_experiment(self, name: str, feature_overrides: Dict[str, Any], steps: int = 10000):
+    def run_experiment(self, name: str, feature_overrides: Dict[str, Any], 
+                      steps: int = 10000, eval_freq: int = 10000, save_freq: int = 10000, 
+                      log_freq: int = 1000, batch_size: int = 12):
         """Run a single ablation experiment."""
         
-        # Build command
+        # Determine the correct path to train.py based on current working directory
+        import os
+        cwd = os.getcwd()
+        if 'unitree_lerobot/scripts' in cwd:
+            # Running from scripts directory
+            train_script_path = "../lerobot/lerobot/scripts/train.py"
+        else:
+            # Running from root directory
+            train_script_path = "./unitree_lerobot/lerobot/lerobot/scripts/train.py"
+        
+        # Build command with policy type and training parameters
         cmd = [
-            "python", "lerobot/scripts/train.py",
+            "python", train_script_path,
             f"--dataset.repo_id={self.base_config['dataset_repo']}",
+            "--policy.type=act",  # Add policy type
             f"--steps={steps}",
-            f"--job_name={name}",
+            f"--eval_freq={eval_freq}",
+            f"--save_freq={save_freq}",
+            f"--log_freq={log_freq}",
+            f"--batch_size={batch_size}",
+            f"--job_name={name}",  # This will be used in the output directory naming
             f"--wandb.project={self.base_config.get('wandb_project', 'ablation_study')}",
+            f"--wandb.run_name={name}",  # Ensure WandB run has the experiment name
             "--wandb.enable=true"
         ]
         
@@ -84,6 +111,10 @@ def main():
     parser.add_argument('--dataset_repo', required=True, help='Dataset repository ID')
     parser.add_argument('--wandb_project', default='ablation_study', help='WandB project name')
     parser.add_argument('--steps', type=int, default=10000, help='Training steps per experiment')
+    parser.add_argument('--eval_freq', type=int, default=10000, help='Evaluation frequency')
+    parser.add_argument('--save_freq', type=int, default=10000, help='Save checkpoint frequency')
+    parser.add_argument('--log_freq', type=int, default=1000, help='Logging frequency')
+    parser.add_argument('--batch_size', type=int, default=12, help='Batch size for training')
     parser.add_argument('--base_config', help='Base training configuration overrides (YAML)')
     
     args = parser.parse_args()
@@ -110,7 +141,15 @@ def main():
         name = exp['name']
         config = exp['config']
         
-        success = study.run_experiment(name, config, args.steps)
+        success = study.run_experiment(
+            name, 
+            config, 
+            steps=args.steps,
+            eval_freq=args.eval_freq,
+            save_freq=args.save_freq,
+            log_freq=args.log_freq,
+            batch_size=args.batch_size
+        )
         results[name] = success
         
     # Print summary

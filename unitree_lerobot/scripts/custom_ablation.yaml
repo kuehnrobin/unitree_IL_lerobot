@@ -9,19 +9,13 @@ experiments:
     config:
       use_joint_velocities: false
       use_joint_torques: false
-
+      exclude_cameras: '["cam_left_head"]'
       
   - name: "no_active_cam"
     config:
       exclude_cameras: '["cam_left_active", "cam_right_active"]'
       exclude_joint_groups: '["camera"]'
-      
-  - name: "just_one_high_cam"
-    config:
-      exclude_cameras: '["cam_left_head"]'
-      use_joint_velocities: false
-      use_joint_torques: false
-      
+            
   - name: "no_high_cams"
     config:
       exclude_cameras: '["cam_left_head", "cam_right_head"]'

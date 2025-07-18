@@ -188,7 +188,15 @@ python lerobot/scripts/train.py \
   --policy.type=act \
   --feature_selection.use_joint_velocities=false \
   --feature_selection.use_joint_torques=false \
-  --steps 15000
+  --steps 50000 \
+  --eval_freq 10000 \
+  --save_freq 10000 \
+  --log_freq 1000 \
+  --batch_size 12 \
+  --wandb.enable true \
+  --wandb.project cubes_box_no_hover \
+  --feature_selection.exclude_cameras='["cam_left_head"]'
+
 
 # Use only specific cameras
 python lerobot/scripts/train.py \
