@@ -179,7 +179,56 @@ python lerobot/scripts/train.py \
   --wandb.enable true \
   --wandb.project pour_can \
   --job_name left_hand_can_adaptation
+
+# Feature Selection Examples
+
+# Disable joint velocities and torques
+python lerobot/scripts/train.py \
+  --dataset.repo_id kuehnrobin/g1_cubes_box_no_hover \
+  --policy.type=act \
+  --feature_selection.use_joint_velocities=false \
+  --feature_selection.use_joint_torques=false \
+  --steps 15000
+
+# Use only specific cameras
+python lerobot/scripts/train.py \
+  --dataset.repo_id kuehnrobin/g1_cubes_box_no_hover \
+  --policy.type=act \
+  --feature_selection.cameras='["cam_left_head"]' \
+  --steps 15000
+
+# Exclude camera joints and pressure sensors
+python lerobot/scripts/train.py \
+  --dataset.repo_id kuehnrobin/g1_cubes_box_no_hover \
+  --policy.type=act \
+  --feature_selection.exclude_joint_groups='["camera"]' \
+  --feature_selection.use_pressure_sensors=false \
+  --steps 15000
 ```
+
+## 3.1 🔬 Feature Ablation Studies
+
+You can run systematic ablation studies to understand which features are most important for your policy using the ablation study script:
+
+```bash
+cd unitree_lerobot
+
+# Run ablation study with custom configuration
+python scripts/run_ablation_study.py \
+  --config_file examples/custom_ablation.yaml \
+  --dataset_repo kuehnrobin/g1_cubes_box_no_hover \
+  --wandb_project feature_ablation \
+  --steps 10000
+```
+
+The `custom_ablation.yaml` file defines different feature combinations to test:
+- Baseline with all features
+- No joint velocities and torques
+- Different camera configurations
+- Pressure sensor ablation
+- Joint group filtering
+
+Edit `examples/custom_ablation.yaml` to define your own experiments.
 
 #### Phase 1: Conservative Adaptation
 
