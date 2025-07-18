@@ -170,12 +170,12 @@ python scripts/run_ablation_study.py \
 Your dataset features are mapped as follows:
 
 ### Cameras (based on your 6-camera setup)
-- `cam_high` → `color_0` (high overview camera)
-- `cam_low` → `color_1` (low overview camera)  
+- `cam_left_high` → `color_0` (left head cam )
+- `cam_right_high` → `color_1` (right head cam)  
 - `cam_left_wrist` → `color_2` (left wrist camera)
 - `cam_right_wrist` → `color_3` (right wrist camera)
-- `cam_stereo_left` → `color_4` (stereo head left)
-- `cam_stereo_right` → `color_5` (stereo head right)
+- `cam_left_active` → `color_4` (stereo active head left)
+- `cam_right_active` → `color_5` (stereo active head right)
 
 ### Joint Groups
 - `left_arm` → 7 joints (shoulder to wrist)
