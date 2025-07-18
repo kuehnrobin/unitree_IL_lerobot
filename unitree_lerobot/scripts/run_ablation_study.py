@@ -48,6 +48,9 @@ class AblationStudy:
             
         # Add feature selection overrides
         for key, value in feature_overrides.items():
+            # Convert boolean values to strings for command line
+            if isinstance(value, bool):
+                value = str(value).lower()
             cmd.append(f"--feature_selection.{key}={value}")
             
         logger.info(f"Running experiment: {name}")

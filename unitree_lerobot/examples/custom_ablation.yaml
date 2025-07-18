@@ -1,0 +1,43 @@
+# Custom ablation study configuration
+# This file defines a series of experiments to test different feature combinations
+
+experiments:
+  - name: "baseline_all_features"
+    config: {}  # Use all available features
+    
+  - name: "no_joint_velocities_and_torques"
+    config:
+      use_joint_velocities: false
+      use_joint_torques: false
+
+      
+  - name: "no_active_cam"
+    config:
+      exclude_cameras: '["cam_left_active", "cam_right_active"]'
+      exclude_joint_groups: '["camera"]'
+      
+  - name: "just_one_high_cam"
+    config:
+      exclude_cameras: '["cam_left_head"]'
+      use_joint_velocities: false
+      use_joint_torques: false
+      
+  - name: "no_high_cams"
+    config:
+      exclude_cameras: '["cam_left_head", "cam_right_head"]'
+      use_joint_velocities: false
+      use_joint_torques: false
+      
+  - name: "active_cam_only"
+    config:
+      use_joint_velocities: false
+      use_joint_torques: false
+      use_pressure_sensors: false
+      cameras: '["cam_left_active", "cam_right_active"]'
+      
+  - name: "no_pressure_high_cams"
+    config:
+      exclude_cameras: '["cam_left_high", "cam_right_high"]'
+      use_pressure_sensors: false
+      use_joint_velocities: false
+      use_joint_torques: false
