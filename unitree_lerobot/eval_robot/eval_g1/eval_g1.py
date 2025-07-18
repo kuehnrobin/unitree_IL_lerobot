@@ -418,11 +418,11 @@ def eval_policy(
                 if camera_controller and camera_controller.connected:
                     servo_states = camera_controller.get_servo_states()
                     current_camera_q = np.array([servo_states['current_pitch'], servo_states['current_yaw']])  # 2D
-                    current_camera_dq = np.zeros(2)  # Camera velocities not available, use zeros for now
+                    # current_camera_dq not used in training data
                 else:
                     # Use default positions if camera not available
                     current_camera_q = np.array([195.0 * np.pi / 180, 90.0 * np.pi / 180])  # Default safe positions
-                    current_camera_dq = np.zeros(2)
+                    # current_camera_dq not used in training data
 
                 # Build observation state: depends on whether camera is included in training data
                 current_lr_arm_q = arm_ctrl.get_current_dual_arm_q()  # 14D
@@ -448,7 +448,7 @@ def eval_policy(
                         left_pressure = np.zeros(12)
                         right_pressure = np.zeros(12)
                     
-                    # Construct state with camera: [arm_q(14) + hand_q(14) + camera_q(2)] + [arm_dq(14) + hand_dq(14) + camera_dq(2)] + [pressure(24)]
+                    # Construct state with camera: [arm_q(14) + hand_q(14) + camera_q(2)] + [arm_dq(14) + hand_dq(14)] + [pressure(24)] = 82D
                     observation_state = np.concatenate([
                         current_lr_arm_q,      # 14D arm positions
                         left_hand_state,       # 7D left hand positions  
@@ -457,7 +457,7 @@ def eval_policy(
                         current_lr_arm_dq,     # 14D arm velocities
                         left_hand_vel,         # 7D left hand velocities
                         right_hand_vel,        # 7D right hand velocities  
-                        current_camera_dq,     # 2D camera velocities
+                        # current_camera_dq,   # 2D camera velocities - REMOVED (not in training data)
                         left_pressure,         # 12D left hand pressure
                         right_pressure         # 12D right hand pressure
                     ])
@@ -481,7 +481,7 @@ def eval_policy(
                         current_lr_arm_dq,     # 14D
                         left_hand_vel,         # 1D
                         right_hand_vel,        # 1D
-                        current_camera_dq,     # 2D camera velocities  
+                        # current_camera_dq,   # 2D camera velocities - REMOVED (not in training data)
                         padding                # Padding to match training dimensions
                     ])
                 
