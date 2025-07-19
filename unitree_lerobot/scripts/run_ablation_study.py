@@ -65,7 +65,7 @@ class AblationStudy:
             f"--batch_size={batch_size}",
             f"--job_name={name}",  # This will be used in the output directory naming
             f"--wandb.project={self.base_config.get('wandb_project', 'ablation_study')}",
-            f"--wandb.run_name={name}",  # Ensure WandB run has the experiment name
+            f"--wandb.notes={name}",  # Use notes to identify the experiment
             "--wandb.enable=true"
         ]
         
