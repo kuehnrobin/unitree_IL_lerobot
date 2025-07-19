@@ -1,0 +1,38 @@
+# Test configuration for ACT policy parameter ablation
+# This is a minimal config to test that policy parameters are working correctly
+
+experiments:
+  - name: "test_baseline"
+    config: {}  # Use defaults
+    
+  - name: "test_resnet34"
+    config:
+      vision_backbone: "resnet34"
+      pretrained_backbone_weights: "ResNet34_Weights.IMAGENET1K_V1"
+      
+  - name: "test_small_transformer"
+    config:
+      dim_model: 256
+      n_heads: 4
+      dim_feedforward: 1024
+      n_encoder_layers: 2
+      n_decoder_layers: 1
+      
+  - name: "test_feature_and_policy"
+    config:
+      # Feature selection
+      use_joint_velocities: false
+      use_joint_torques: false
+      exclude_cameras: '["cam_left_head"]'
+      # Policy configuration
+      chunk_size: 50
+      n_action_steps: 25
+      dropout: 0.2
+      
+  - name: "test_dinov2"
+    config:
+      vision_backbone: "dinov2_vits14"
+      pretrained_backbone_weights: null
+      dim_model: 384
+      temporal_ensemble_coeff: 0.01
+      n_action_steps: 1

@@ -3,7 +3,8 @@
 Feature Ablation Study Script
 
 This script helps you run systematic ablation studies to understand
-which features in your dataset are most important for your policy.
+which features in your dataset are most important for your policy, and
+how different ACT policy architectures affect performance.
 
 Usage:
 python run_ablation_study.py --config_file custom_ablation.yaml --dataset_repo your_dataset \
@@ -13,7 +14,26 @@ The script requires a custom YAML configuration file that defines the experiment
 Each experiment will be saved with a name matching the experiment name in the YAML config,
 making it easy to identify which policy corresponds to which configuration.
 
-Optional parameters:
+You can configure both feature selection parameters AND ACT policy parameters in the YAML:
+
+Feature Selection Parameters:
+  - cameras, exclude_cameras: Control which cameras to use
+  - use_joint_velocities, use_joint_torques: Include joint dynamics
+  - use_pressure_sensors: Include pressure sensor data
+  - joint_groups, exclude_joint_groups: Filter joint groups
+
+ACT Policy Parameters:
+  - vision_backbone: "resnet18", "resnet34", "dinov2_vits14", etc.
+  - n_decoder_layers, n_encoder_layers: Transformer architecture
+  - dim_model, n_heads, dim_feedforward: Model dimensions
+  - chunk_size, n_action_steps: Action chunking configuration
+  - use_vae, latent_dim, kl_weight: VAE settings
+  - temporal_ensemble_coeff: Temporal ensembling
+  - dropout, optimizer_lr: Training parameters
+
+See ACT_CONFIG_GUIDE.md for detailed parameter explanations and examples.
+
+Optional CLI parameters:
   --eval_freq: How often to run evaluation (default: 10000)
   --save_freq: How often to save checkpoints (default: 10000)  
   --log_freq: How often to log metrics (default: 1000)
@@ -74,11 +94,36 @@ class AblationStudy:
             cmd.append(f"--{key}={value}")
             
         # Add feature selection overrides
+        policy_params = []
+        feature_params = []
+        
         for key, value in feature_overrides.items():
-            # Convert boolean values to strings for command line
-            if isinstance(value, bool):
-                value = str(value).lower()
-            cmd.append(f"--feature_selection.{key}={value}")
+            # Check if this is a policy parameter
+            if key in ['vision_backbone', 'n_decoder_layers', 'n_encoder_layers', 'dim_model', 
+                      'n_heads', 'dim_feedforward', 'chunk_size', 'n_action_steps', 'use_vae', 
+                      'latent_dim', 'n_vae_encoder_layers', 'temporal_ensemble_coeff', 'dropout', 
+                      'kl_weight', 'optimizer_lr', 'optimizer_weight_decay', 'optimizer_lr_backbone',
+                      'pretrained_backbone_weights', 'pre_norm', 'feedforward_activation',
+                      'replace_final_stride_with_dilation']:
+                # This is a policy parameter
+                if isinstance(value, bool):
+                    value = str(value).lower()
+                elif value is None:
+                    value = "null"
+                cmd.append(f"--policy.{key}={value}")
+                policy_params.append(f"{key}={value}")
+            else:
+                # This is a feature selection parameter
+                if isinstance(value, bool):
+                    value = str(value).lower()
+                cmd.append(f"--feature_selection.{key}={value}")
+                feature_params.append(f"{key}={value}")
+        
+        # Log configuration details
+        if policy_params:
+            logger.info(f"Policy parameters: {', '.join(policy_params)}")
+        if feature_params:
+            logger.info(f"Feature parameters: {', '.join(feature_params)}")
             
         logger.info(f"Running experiment: {name}")
         logger.info(f"Command: {' '.join(cmd)}")
