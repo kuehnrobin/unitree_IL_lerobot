@@ -2,6 +2,22 @@
 
 This guide explains all the ACT (Action Chunking Transformer) policy parameters you can configure in your `custom_ablation.yaml` file for comprehensive ablation studies.
 
+## Dataset Parameters
+
+You can specify different datasets for different experiments:
+
+```yaml
+config:
+  dataset_repo: "kuehnrobin/g1_cubes_box_s_61"  # Override the default dataset
+  batch_size: 8  # Override the default batch size
+```
+
+This allows you to:
+- Test the same model configuration on different datasets
+- Compare dataset difficulty/characteristics
+- Find dataset-specific optimal configurations
+- Adjust batch size for memory constraints (e.g., smaller batches for DINOv2)
+
 ## Feature Selection Parameters
 
 These parameters control which input features are used:
@@ -41,9 +57,45 @@ config:
 ```
 
 ### Popular Vision Backbone Combinations:
-- **ResNet18**: `vision_backbone: "resnet18"`, `pretrained_backbone_weights: "ResNet18_Weights.IMAGENET1K_V1"`
-- **ResNet34**: `vision_backbone: "resnet34"`, `pretrained_backbone_weights: "ResNet34_Weights.IMAGENET1K_V1"`
-- **DINOv2**: `vision_backbone: "dinov2_vits14"`, `pretrained_backbone_weights: null`
+- **ResNet18**: `vision_backbone: "resnet18"`, `pretrained_backbone_weights: "ResNet18_Weights.IMAGENET1K_V1"`, `batch_size: 12`
+- **ResNet34**: `vision_backbone: "resnet34"`, `pretrained_backbone_weights: "ResNet34_Weights.IMAGENET1K_V1"`, `batch_size: 10`
+- **DINOv2 Small**: `vision_backbone: "dinov2_vits14"`, `pretrained_backbone_weights: null`, `batch_size: 6`
+- **DINOv2 Base**: `vision_backbone: "dinov2_vitb14"`, `pretrained_backbone_weights: null`, `batch_size: 4`
+
+## Batch Size and Memory Considerations
+
+Configure batch size for different model architectures:
+
+```yaml
+config:
+  batch_size: 8  # Adjust based on model size and available GPU memory
+```
+
+### Recommended Batch Sizes:
+- **ResNet18/34 + Small Transformer**: `batch_size: 12-16`
+- **ResNet18/34 + Large Transformer**: `batch_size: 6-8`
+- **DINOv2 Small + Small Transformer**: `batch_size: 6-8`
+- **DINOv2 Small + Large Transformer**: `batch_size: 4-6`
+- **DINOv2 Base/Large**: `batch_size: 2-4`
+
+### Memory-Optimized Configurations:
+```yaml
+# For limited GPU memory
+- name: "memory_efficient"
+  config:
+    vision_backbone: "resnet18"
+    dim_model: 256
+    n_encoder_layers: 2
+    batch_size: 16
+    
+# For high-end GPU with lots of memory
+- name: "memory_intensive"
+  config:
+    vision_backbone: "dinov2_vitb14"
+    dim_model: 768
+    n_encoder_layers: 6
+    batch_size: 4
+```
 
 ## Transformer Architecture Parameters
 
@@ -177,10 +229,61 @@ config:
     n_action_steps: 1  # Required for temporal ensembling
 ```
 
+## Dataset Ablation Examples
+
+### Cross-Dataset Comparison
+```yaml
+- name: "baseline_dataset_a"
+  config:
+    dataset_repo: "kuehnrobin/dataset_a"
+    
+- name: "baseline_dataset_b"  
+  config:
+    dataset_repo: "kuehnrobin/dataset_b"
+```
+
+### Dataset-Specific Optimization
+```yaml
+- name: "simple_task_config"
+  config:
+    dataset_repo: "kuehnrobin/simple_task"
+    dim_model: 256
+    n_encoder_layers: 2
+    chunk_size: 50
+    
+- name: "complex_task_config"
+  config:
+    dataset_repo: "kuehnrobin/complex_task"
+    vision_backbone: "dinov2_vits14"
+    dim_model: 768
+    n_encoder_layers: 6
+    chunk_size: 150
+```
+
+### Combined Dataset + Architecture Ablation
+```yaml
+- name: "dataset_a_optimized"
+  config:
+    dataset_repo: "kuehnrobin/dataset_a"
+    cameras: '["cam_left_active", "cam_right_active"]'
+    vision_backbone: "resnet34"
+    chunk_size: 75
+    
+- name: "dataset_b_optimized"
+  config:
+    dataset_repo: "kuehnrobin/dataset_b"
+    vision_backbone: "dinov2_vits14"
+    pretrained_backbone_weights: null
+    dim_model: 384
+    temporal_ensemble_coeff: 0.01
+    n_action_steps: 1
+```
+
 ## Tips for Effective Ablations
 
 1. **Start Simple**: Begin with minimal configurations and gradually add complexity
-2. **Vision Backbone**: DINOv2 often works better but is slower; ResNet is faster
+2. **Dataset Selection**: Use `dataset_repo` to test configurations across different tasks
+3. **Vision Backbone**: DINOv2 often works better but is slower; ResNet is faster
 3. **Architecture Size**: Larger models need more data and compute but may perform better
 4. **Chunking**: Longer horizons are better for complex tasks but harder to train
 5. **VAE**: Helps with action diversity but adds complexity

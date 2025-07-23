@@ -36,3 +36,16 @@ experiments:
       dim_model: 384
       temporal_ensemble_coeff: 0.01
       n_action_steps: 1
+      
+  # Test dataset configuration
+  - name: "test_different_dataset"
+    config:
+      dataset_repo: "kuehnrobin/g1_cubes_box_s_61"
+      vision_backbone: "resnet34"
+      
+  - name: "test_dataset_with_features"
+    config:
+      dataset_repo: "kuehnrobin/g1_cubes_box_s_61"
+      cameras: '["cam_left_active", "cam_right_active"]'
+      use_joint_velocities: false
+      dim_model: 256

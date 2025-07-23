@@ -1,0 +1,211 @@
+# Custom ablation study configuration
+# This file defines a series of experiments to test different feature combinations and policy architectures
+
+experiments:
+    
+  # - name: "expected_optimal_big_cubes"
+  #   config:
+  #     use_joint_velocities: false
+  #     use_joint_torques: false
+  #     exclude_cameras: '["cam_left_head"]'
+  #     dataset_repo: "kuehnrobin/g1_cubes_box_242"
+  #     n_decoder_layers: 3
+
+  # ===== ARCHITECTURE ABLATIONS =====
+  # Test different vision backbones
+      
+  - name: "dinov2_backbone"
+    config:
+      vision_backbone: "dinov2_vits14"
+      pretrained_backbone_weights: null
+      batch_size: 1   # Smaller batch size for DINOv2 due to memory requirements
+      optimizer_lr: 5e-6  # Lower learning rate often works better with DINOv2
+      optimizer_lr_backbone: 1e-6  # Even lower for backbone
+      use_joint_velocities: false
+      use_joint_torques: false
+      exclude_cameras: '["cam_left_head", "cam_left_active"]'
+      dataset_repo: "kuehnrobin/g1_cubes_box_242"
+      # DINOv2ACTConfig settings
+      chunk_size: 60
+      n_action_steps: 1
+      temporal_ensemble_coeff: 0.005
+      dim_model: 512
+      n_heads: 8
+      n_encoder_layers: 4
+      n_decoder_layers: 2
+      # Additional VAE settings for stability
+      use_vae: true
+      latent_dim: 32
+      n_vae_encoder_layers: 4
+      kl_weight: 10.0
+      dropout: 0.1
+      use_amp: true
+
+
+      
+  - name: "dinov2_backbone_with_registers"
+    config:
+      vision_backbone: "dinov2_vits14_reg"
+      pretrained_backbone_weights: null
+      batch_size: 1   # Even smaller batch size
+      optimizer_lr: 5e-6  # Lower learning rate
+      optimizer_lr_backbone: 1e-6  # Even lower for backbone
+      use_joint_velocities: false
+      use_joint_torques: false
+      exclude_cameras: '["cam_left_head"]'
+      dataset_repo: "kuehnrobin/g1_cubes_box_242"
+      # DINOv2RegisterACTConfig settings
+      chunk_size: 60
+      n_action_steps: 1
+      temporal_ensemble_coeff: 0.005
+      dim_model: 512
+      n_heads: 8
+      n_encoder_layers: 4
+      n_decoder_layers: 2
+      # Additional VAE settings for stability
+      use_vae: true
+      latent_dim: 32
+      n_vae_encoder_layers: 4
+      kl_weight: 10.0
+      dropout: 0.1
+      use_amp: true
+      
+
+  - name: "dinov2_backbone_no_hover"
+    config:
+      vision_backbone: "dinov2_vits14"
+      pretrained_backbone_weights: null
+      batch_size: 1   # Smaller batch size for DINOv2 due to memory requirements
+      optimizer_lr: 5e-6  # Lower learning rate often works better with DINOv2
+      optimizer_lr_backbone: 1e-6  # Even lower for backbone
+      use_joint_velocities: false
+      use_joint_torques: false
+      exclude_cameras: '["cam_left_head"]'
+      dataset_repo: "kuehnrobin/g1_cubes_box_no_hover"
+      # DINOv2ACTConfig settings
+      chunk_size: 60
+      n_action_steps: 1
+      temporal_ensemble_coeff: 0.005
+      dim_model: 512
+      n_heads: 8
+      n_encoder_layers: 4
+      n_decoder_layers: 2
+      # Additional VAE settings for stability
+      use_vae: true
+      latent_dim: 32
+      n_vae_encoder_layers: 4
+      kl_weight: 10.0
+      dropout: 0.1
+      use_amp: true
+      
+  # # Test different transformer architectures
+  # - name: "larger_transformer"
+  #   config:
+  #     dim_model: 768
+  #     n_heads: 12
+  #     dim_feedforward: 4096
+  #     n_encoder_layers: 6
+  #     n_decoder_layers: 3
+  #     batch_size: 6  # Smaller batch size for larger model
+  #     optimizer_lr: 3e-6  # Lower learning rate for larger model
+      
+  # - name: "smaller_transformer"
+  #   config:
+  #     dim_model: 256
+  #     n_heads: 4
+  #     dim_feedforward: 1024
+  #     n_encoder_layers: 2
+  #     n_decoder_layers: 1
+  #     batch_size: 16  # Can use larger batch size with smaller model
+      
+  # # Test different action chunking configurations
+  # - name: "short_horizon"
+  #   config:
+  #     chunk_size: 50
+  #     n_action_steps: 25
+  #     temporal_ensemble_coeff: 0.01
+      
+  # - name: "long_horizon"
+  #   config:
+  #     chunk_size: 200
+  #     n_action_steps: 100
+      
+  # # Test VAE configurations
+  # - name: "no_vae"
+  #   config:
+  #     use_vae: false
+      
+  # - name: "larger_vae"
+  #   config:
+  #     use_vae: true
+  #     latent_dim: 64
+  #     n_vae_encoder_layers: 6
+  #     kl_weight: 15.0
+      
+  # # Test regularization
+  # - name: "high_dropout"
+  #   config:
+  #     dropout: 0.3
+      
+  # - name: "low_learning_rate"
+  #   config:
+  #     optimizer_lr: 5e-6
+  #     optimizer_lr_backbone: 1e-6
+      
+  # # ===== COMBINED ABLATIONS =====
+  # # Combine feature selection with architecture changes
+  # - name: "active_cam_resnet34"
+  #   config:
+  #     cameras: '["cam_left_active", "cam_right_active"]'
+  #     use_joint_velocities: false
+  #     use_joint_torques: false
+  #     vision_backbone: "resnet34"
+  #     pretrained_backbone_weights: "ResNet34_Weights.IMAGENET1K_V1"
+      
+  # - name: "minimal_features_robust_arch"
+  #   config:
+  #     cameras: '["cam_left_active", "cam_right_active"]'
+  #     use_joint_velocities: false
+  #     use_joint_torques: false
+  #     use_pressure_sensors: false
+  #     # Robust architecture compensating for fewer features
+  #     dim_model: 768
+  #     n_heads: 12
+  #     n_encoder_layers: 6
+  #     n_decoder_layers: 2
+  #     dropout: 0.2
+  #     latent_dim: 48
+
+  # # ===== DATASET ABLATIONS =====
+  # # Test the same configuration on different datasets
+  # - name: "baseline_dataset_a"
+  #   config:
+  #     dataset_repo: "kuehnrobin/g1_cubes_box_no_hover"
+      
+  # - name: "baseline_dataset_b"
+  #   config:
+  #     dataset_repo: "kuehnrobin/g1_cubes_box_s_61"
+      
+  # - name: "resnet34_on_different_dataset"
+  #   config:
+  #     dataset_repo: "kuehnrobin/g1_cubes_box_s_61"
+  #     vision_backbone: "resnet34"
+  #     pretrained_backbone_weights: "ResNet34_Weights.IMAGENET1K_V1"
+      
+  # # Test dataset-specific optimal configurations
+  # - name: "dataset_a_optimized"
+  #   config:
+  #     dataset_repo: "kuehnrobin/g1_cubes_box_no_hover"
+  #     cameras: '["cam_left_active", "cam_right_active"]'
+  #     use_joint_velocities: false
+  #     chunk_size: 75
+  #     n_action_steps: 25
+      
+  # - name: "dataset_b_optimized"
+  #   config:
+  #     dataset_repo: "kuehnrobin/g1_cubes_box_s_61"
+  #     vision_backbone: "dinov2_vits14"
+  #     pretrained_backbone_weights: null
+  #     dim_model: 384
+  #     temporal_ensemble_coeff: 0.01
+  #     n_action_steps: 1

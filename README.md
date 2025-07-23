@@ -356,6 +356,18 @@ python unitree_lerobot/eval_robot/eval_g1/eval_g1.py  \
     --no_gradual_speed=true \
     --cyclonedds_uri enxa0cec8616f27
 
+# For DINOv2 models trained with custom feature selection (from ablation studies)
+# IMPORTANT: Use the same feature selection parameters that were used during training
+python unitree_lerobot/eval_robot/eval_g1/eval_g1.py  \
+    --policy.path=outputs/train/2025-07-20/16-44-06_dinov2_backbone/checkpoints/last/pretrained_model/ \
+    --repo_id=kuehnrobin/g1_cubes_box_242 \
+    --arm_speed 10.0 \
+    --no_gradual_speed=true \
+    --cyclonedds_uri enxa0cec8616f27 \
+    --feature_selection.exclude_cameras='["cam_left_active", "cam_right_active"]' \
+    --feature_selection.use_joint_velocities=false \
+    --feature_selection.use_joint_torques=false
+
 
 python unitree_lerobot/eval_robot/eval_g1/eval_g1.py  \
     --policy.path=unitree_lerobot/lerobot/outputs/train/2025-05-27/13-53-10_pour_can_mark_3/checkpoints/015000/pretrained_model/ \
@@ -385,6 +397,7 @@ python unitree_lerobot/eval_robot/eval_g1/eval_g1_dataset.py  \
 | **401 Client Error: Unauthorized** (`huggingface_hub.errors.HfHubHTTPError`) | Run `huggingface-cli login` to authenticate. |
 | **FFmpeg-related errors:**  <br> Q1: `Unknown encoder 'libsvtav1'` <br> Q2: `FileNotFoundError: No such file or directory: 'ffmpeg'` <br> Q3: `RuntimeError: Could not load libtorchcodec. Likely causes: FFmpeg is not properly installed.` | Install FFmpeg: <br> `conda install -c conda-forge ffmpeg` |
 | **Access to model `google/paligemma-3b-pt-224` is restricted.** | Run `huggingface-cli login` and request access if needed. |
+| **Missing policy type error** <br> `Expected a dict with a 'type' key for PreTrainedConfig` | Add `"type": "act"` to the beginning of your model's `config.json` file. |
 
 # 6. 📤 Sharing Your Trained Policies
 
