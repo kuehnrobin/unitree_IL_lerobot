@@ -14,7 +14,11 @@ The script requires a custom YAML configuration file that defines the experiment
 Each experiment will be saved with a name matching the experiment name in the YAML config,
 making it easy to identify which policy corresponds to which configuration.
 
-You can configure both feature selection parameters AND ACT policy parameters in the YAML:
+You can configure both feature selection parameters AND ACT policy parameters AND datasets in the YAML:
+
+Dataset Parameters:
+  - dataset_repo: Override the default dataset for specific experiments
+  - batch_size: Override the default batch size for specific experiments
 
 Feature Selection Parameters:
   - cameras, exclude_cameras: Control which cameras to use
@@ -73,16 +77,22 @@ class AblationStudy:
             # Running from root directory
             train_script_path = "./unitree_lerobot/lerobot/lerobot/scripts/train.py"
         
+        # Determine dataset to use (experiment-specific or default)
+        dataset_repo = feature_overrides.get('dataset_repo', self.base_config['dataset_repo'])
+        
+        # Determine batch size to use (experiment-specific or default)
+        experiment_batch_size = feature_overrides.get('batch_size', batch_size)
+        
         # Build command with policy type and training parameters
         cmd = [
             "python", train_script_path,
-            f"--dataset.repo_id={self.base_config['dataset_repo']}",
+            f"--dataset.repo_id={dataset_repo}",
             "--policy.type=act",  # Add policy type
             f"--steps={steps}",
             f"--eval_freq={eval_freq}",
             f"--save_freq={save_freq}",
             f"--log_freq={log_freq}",
-            f"--batch_size={batch_size}",
+            f"--batch_size={experiment_batch_size}",
             f"--job_name={name}",  # This will be used in the output directory naming
             f"--wandb.project={self.base_config.get('wandb_project', 'ablation_study')}",
             f"--wandb.notes={name}",  # Use notes to identify the experiment
@@ -96,15 +106,24 @@ class AblationStudy:
         # Add feature selection overrides
         policy_params = []
         feature_params = []
+        dataset_params = []
         
         for key, value in feature_overrides.items():
+            # Check if this is a dataset parameter
+            if key == 'dataset_repo':
+                dataset_params.append(f"dataset={value}")
+                continue  # Skip adding to cmd since we already handled it above
+            # Check if this is a training parameter
+            elif key == 'batch_size':
+                dataset_params.append(f"batch_size={value}")
+                continue  # Skip adding to cmd since we already handled it above
             # Check if this is a policy parameter
-            if key in ['vision_backbone', 'n_decoder_layers', 'n_encoder_layers', 'dim_model', 
+            elif key in ['vision_backbone', 'n_decoder_layers', 'n_encoder_layers', 'dim_model', 
                       'n_heads', 'dim_feedforward', 'chunk_size', 'n_action_steps', 'use_vae', 
                       'latent_dim', 'n_vae_encoder_layers', 'temporal_ensemble_coeff', 'dropout', 
                       'kl_weight', 'optimizer_lr', 'optimizer_weight_decay', 'optimizer_lr_backbone',
                       'pretrained_backbone_weights', 'pre_norm', 'feedforward_activation',
-                      'replace_final_stride_with_dilation']:
+                      'replace_final_stride_with_dilation', 'use_amp']:
                 # This is a policy parameter
                 if isinstance(value, bool):
                     value = str(value).lower()
@@ -120,6 +139,8 @@ class AblationStudy:
                 feature_params.append(f"{key}={value}")
         
         # Log configuration details
+        if dataset_params:
+            logger.info(f"Dataset: {', '.join(dataset_params)}")
         if policy_params:
             logger.info(f"Policy parameters: {', '.join(policy_params)}")
         if feature_params:

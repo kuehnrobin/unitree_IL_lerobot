@@ -7,12 +7,14 @@ from dataclasses import dataclass, field
 
 from lerobot.configs import parser
 from lerobot.configs.policies import PreTrainedConfig
+from lerobot.configs.train import FeatureSelectionConfig
 
 
 @dataclass
 class EvalRealConfig:
     repo_id: str
     policy: PreTrainedConfig | None = None
+    feature_selection: FeatureSelectionConfig = field(default_factory=FeatureSelectionConfig)
     
     # Speed control parameters
     arm_speed: float | None = None
