@@ -8,14 +8,17 @@ experiments:
   #     use_joint_velocities: false
   #     use_joint_torques: false
   #     exclude_cameras: '["cam_left_head"]'
-  #     dataset_repo: "kuehnrobin/g1_cubes_box_242"
+  #     dataset_repo: "kuehnrobin/g1_cubes_s_fixed"
   #     n_decoder_layers: 3
+  #     n_action_steps: 1
+  #     temporal_ensemble_coeff: 0.005
 
   # ===== ARCHITECTURE ABLATIONS =====
   # Test different vision backbones
       
-  - name: "dinov2_backbone"
+  - name: "dinov2_backbone_just_active_cam"
     config:
+      # Based on Open Television parametersTest DINOv2 backbone with specific settings
       vision_backbone: "dinov2_vits14"
       pretrained_backbone_weights: null
       batch_size: 1   # Smaller batch size for DINOv2 due to memory requirements
@@ -23,8 +26,8 @@ experiments:
       optimizer_lr_backbone: 1e-6  # Even lower for backbone
       use_joint_velocities: false
       use_joint_torques: false
-      exclude_cameras: '["cam_left_head", "cam_left_active"]'
-      dataset_repo: "kuehnrobin/g1_cubes_box_242"
+      dataset_repo: "kuehnrobin/g1_cubes_no_hover_fixed"
+      cameras: '["cam_right_active", "cam_left_active"]'
       # DINOv2ACTConfig settings
       chunk_size: 60
       n_action_steps: 1
@@ -33,6 +36,90 @@ experiments:
       n_heads: 8
       n_encoder_layers: 4
       n_decoder_layers: 2
+      # Additional VAE settings for stability
+      use_vae: true
+      latent_dim: 32
+      n_vae_encoder_layers: 4
+      kl_weight: 10.0
+      dropout: 0.1
+      use_amp: true
+    
+  - name: "dinov2_backbone_active__wrist_cam"
+    config:
+      # Based on Open Television parametersTest DINOv2 backbone with specific settings
+      vision_backbone: "dinov2_vits14"
+      pretrained_backbone_weights: null
+      batch_size: 1   # Smaller batch size for DINOv2 due to memory requirements
+      optimizer_lr: 5e-6  # Lower learning rate often works better with DINOv2
+      optimizer_lr_backbone: 1e-6  # Even lower for backbone
+      use_joint_velocities: false
+      use_joint_torques: false
+      dataset_repo: "kuehnrobin/g1_cubes_no_hover_fixed"
+      cameras: '["cam_right_active", "cam_left_active", "cam_left_wrist", "cam_right_wrist"]'
+      # DINOv2ACTConfig settings
+      chunk_size: 60
+      n_action_steps: 1
+      temporal_ensemble_coeff: 0.005
+      dim_model: 512
+      n_heads: 8
+      n_encoder_layers: 4
+      n_decoder_layers: 2
+      # Additional VAE settings for stability
+      use_vae: true
+      latent_dim: 32
+      n_vae_encoder_layers: 4
+      kl_weight: 10.0
+      dropout: 0.1
+      use_amp: true
+
+  - name: "dinov2_backbone"
+    config:
+      # Based on Open Television parametersTest DINOv2 backbone with specific settings
+      vision_backbone: "dinov2_vits14"
+      pretrained_backbone_weights: null
+      batch_size: 1   # Smaller batch size for DINOv2 due to memory requirements
+      optimizer_lr: 5e-6  # Lower learning rate often works better with DINOv2
+      optimizer_lr_backbone: 1e-6  # Even lower for backbone
+      use_joint_velocities: false
+      use_joint_torques: false
+      exclude_cameras: '["cam_left_head"]'
+      dataset_repo: "kuehnrobin/g1_cubes_no_hover_fixed"
+      # DINOv2ACTConfig settings
+      chunk_size: 60
+      n_action_steps: 1
+      temporal_ensemble_coeff: 0.005
+      dim_model: 512
+      n_heads: 8
+      n_encoder_layers: 4
+      n_decoder_layers: 2
+      # Additional VAE settings for stability
+      use_vae: true
+      latent_dim: 32
+      n_vae_encoder_layers: 4
+      kl_weight: 10.0
+      dropout: 0.1
+      use_amp: true
+    
+  - name: "dinov2_backbone_7dec_only_active"
+    config:
+      # Based on Open Television parametersTest DINOv2 backbone with specific settings
+      vision_backbone: "dinov2_vits14"
+      pretrained_backbone_weights: null
+      batch_size: 1   # Smaller batch size for DINOv2 due to memory requirements
+      optimizer_lr: 5e-6  # Lower learning rate often works better with DINOv2
+      optimizer_lr_backbone: 1e-6  # Even lower for backbone
+      use_joint_velocities: false
+      use_joint_torques: false
+      cameras: '["cam_right_active", "cam_left_active", "cam_left_wrist", "cam_right_wrist"]'
+      dataset_repo: "kuehnrobin/g1_cubes_no_hover_fixed"
+      # DINOv2ACTConfig settings
+      chunk_size: 60
+      n_action_steps: 1
+      temporal_ensemble_coeff: 0.005
+      dim_model: 512
+      n_heads: 8
+      n_encoder_layers: 4
+      n_decoder_layers: 7
       # Additional VAE settings for stability
       use_vae: true
       latent_dim: 32
@@ -52,8 +139,8 @@ experiments:
       optimizer_lr_backbone: 1e-6  # Even lower for backbone
       use_joint_velocities: false
       use_joint_torques: false
-      exclude_cameras: '["cam_left_head"]'
-      dataset_repo: "kuehnrobin/g1_cubes_box_242"
+      cameras: '["cam_right_active", "cam_left_active", "cam_left_wrist", "cam_right_wrist"]'
+      dataset_repo: "kuehnrobin/g1_cubes_no_hover_fixed"
       # DINOv2RegisterACTConfig settings
       chunk_size: 60
       n_action_steps: 1
@@ -71,33 +158,6 @@ experiments:
       use_amp: true
       
 
-  - name: "dinov2_backbone_no_hover"
-    config:
-      vision_backbone: "dinov2_vits14"
-      pretrained_backbone_weights: null
-      batch_size: 1   # Smaller batch size for DINOv2 due to memory requirements
-      optimizer_lr: 5e-6  # Lower learning rate often works better with DINOv2
-      optimizer_lr_backbone: 1e-6  # Even lower for backbone
-      use_joint_velocities: false
-      use_joint_torques: false
-      exclude_cameras: '["cam_left_head"]'
-      dataset_repo: "kuehnrobin/g1_cubes_box_no_hover"
-      # DINOv2ACTConfig settings
-      chunk_size: 60
-      n_action_steps: 1
-      temporal_ensemble_coeff: 0.005
-      dim_model: 512
-      n_heads: 8
-      n_encoder_layers: 4
-      n_decoder_layers: 2
-      # Additional VAE settings for stability
-      use_vae: true
-      latent_dim: 32
-      n_vae_encoder_layers: 4
-      kl_weight: 10.0
-      dropout: 0.1
-      use_amp: true
-      
   # # Test different transformer architectures
   # - name: "larger_transformer"
   #   config:
