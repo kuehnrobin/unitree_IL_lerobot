@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=act_parameter_study
+#SBATCH --job-name=dinov2_ablation_study
 #SBATCH --partition=gpu
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -10,7 +10,7 @@
 #SBATCH --output=%x_%j.out
 #SBATCH --error=%x_%j.err
 #SBATCH --mail-type=BEGIN,END,FAIL
-#SBATCH --mail-user=robin.kuhn@stud.uni-hannover.de
+#SBATCH --mail-user=your.email@uni-hannover.de
 
 # Set up environment
 echo "Job started at: $(date)"
@@ -20,20 +20,48 @@ echo "Partition: $SLURM_JOB_PARTITION"
 echo "Number of GPUs: $CUDA_VISIBLE_DEVICES"
 
 # Navigate to your project directory
-cd $BIGWORK/unitree_IL_lerobot
+cd /home/robin/humanoid/humanoid_ws/src/unitree_IL_lerobot
 
-# Activate conda environment
-conda activate $SOFTWARE/humanoid/IL_env
+# Load necessary modules (adjust based on your cluster's module system)
+# module load Python/3.9.6-GCCcore-11.2.0
+# module load CUDA/11.7.0
+# module load PyTorch/1.12.1-foss-2022a-CUDA-11.7.0
+
+# Activate your conda/virtual environment
+# Example for conda:
+# source /home/robin/miniconda3/etc/profile.d/conda.sh
+# conda activate lerobot_env
+
+# Example for venv:
+# source /path/to/your/venv/bin/activate
 
 # Set CUDA environment variables
 export CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES
 export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
 
+# Set up local model and dataset paths for cluster
+export TORCH_HOME=$BIGWORK/torch_models
+export HF_HOME=$BIGWORK/huggingface_cache
+export TRANSFORMERS_CACHE=$BIGWORK/huggingface_cache
+export HF_DATASETS_CACHE=$BIGWORK/datasets_cache
+
+# Create directories if they don't exist
+mkdir -p $TORCH_HOME
+mkdir -p $HF_HOME
+mkdir -p $TRANSFORMERS_CACHE
+mkdir -p $HF_DATASETS_CACHE
+
+# Local dataset path
+export LOCAL_DATASET_PATH=$BIGWORK/LargeFiles/g1_cubes_s_fixed
+
 # Run the ablation study
 echo "Starting ablation study..."
+echo "Using local dataset: $LOCAL_DATASET_PATH"
+echo "Using torch cache: $TORCH_HOME"
+
 python unitree_lerobot/scripts/run_ablation_study.py \
-    --config_file ablation_config.yaml \
-    --dataset_repo kuehnrobin/g1_cubes_box_no_hover \
+    --config_file unitree_lerobot/examples/cluster_run_config.yaml \
+    --dataset_repo "$LOCAL_DATASET_PATH" \
     --wandb_project "dinov2_ablation_luis" \
     --steps 50000 \
     --eval_freq 10000 \
@@ -43,3 +71,5 @@ python unitree_lerobot/scripts/run_ablation_study.py \
 
 echo "Job completed at: $(date)"
 
+# Optional: Clean up temporary files
+# rm -f ablation_config.yaml
