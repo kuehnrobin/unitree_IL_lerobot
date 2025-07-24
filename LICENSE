@@ -1,4 +1,4 @@
-Copyright [2024] [HangZhou YuShu TECHNOLOGY CO.,LTD. ("Unitree Robotics")]
+Copyright [2025] [Robin Kühn]
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.
@@ -16,7 +16,8 @@ limitations under the License.
 
 This code builds upon following open-source code-bases. Please visit the URLs to see the respective LICENSES:
 
-1. https://github.com/huggingface/lerobot
-2. https://github.com/unitreerobotics/unitree_dds_wrapper
+1. https://github.com/unitreerobotics/unitree_IL_lerobot
+2. https://github.com/huggingface/lerobot
+3. https://github.com/unitreerobotics/unitree_dds_wrapper
 
 ---
