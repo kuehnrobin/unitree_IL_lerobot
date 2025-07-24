@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --job-name=dinov2_ablation_study
+#SBATCH --job-name=act_parameter_study
 #SBATCH --partition=gpu
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
@@ -10,7 +10,7 @@
 #SBATCH --output=%x_%j.out
 #SBATCH --error=%x_%j.err
 #SBATCH --mail-type=BEGIN,END,FAIL
-#SBATCH --mail-user=your.email@uni-hannover.de
+#SBATCH --mail-user=robin.kuhn@stud.uni-hannover.de
 
 # Set up environment
 echo "Job started at: $(date)"
@@ -20,60 +20,14 @@ echo "Partition: $SLURM_JOB_PARTITION"
 echo "Number of GPUs: $CUDA_VISIBLE_DEVICES"
 
 # Navigate to your project directory
-cd /home/robin/humanoid/humanoid_ws/src/unitree_IL_lerobot
+cd $BIGWORK/unitree_IL_lerobot
 
-# Load necessary modules (adjust based on your cluster's module system)
-# module load Python/3.9.6-GCCcore-11.2.0
-# module load CUDA/11.7.0
-# module load PyTorch/1.12.1-foss-2022a-CUDA-11.7.0
-
-# Activate your conda/virtual environment
-# Example for conda:
-# source /home/robin/miniconda3/etc/profile.d/conda.sh
-# conda activate lerobot_env
-
-# Example for venv:
-# source /path/to/your/venv/bin/activate
+# Activate conda environment
+conda activate $SOFTWARE/humanoid/IL_env
 
 # Set CUDA environment variables
 export CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES
 export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
-
-# Create a simple ablation config if it doesn't exist
-if [ ! -f "ablation_config.yaml" ]; then
-    cat > ablation_config.yaml << EOF
-experiments:
-  - name: "resnet18_baseline"
-    config:
-      vision_backbone: "resnet18"
-      chunk_size: 100
-      n_action_steps: 10
-      
-  - name: "dinov2_small"
-    config:
-      vision_backbone: "dinov2_vits14"
-      chunk_size: 100
-      n_action_steps: 10
-      
-  - name: "dinov2_small_registers"
-    config:
-      vision_backbone: "dinov2_vits14_registers"
-      chunk_size: 100
-      n_action_steps: 10
-      
-  - name: "dinov2_base"
-    config:
-      vision_backbone: "dinov2_vitb14"
-      chunk_size: 100
-      n_action_steps: 10
-      
-  - name: "dinov2_base_registers"
-    config:
-      vision_backbone: "dinov2_vitb14_registers"
-      chunk_size: 100
-      n_action_steps: 10
-EOF
-fi
 
 # Run the ablation study
 echo "Starting ablation study..."
@@ -89,5 +43,3 @@ python unitree_lerobot/scripts/run_ablation_study.py \
 
 echo "Job completed at: $(date)"
 
-# Optional: Clean up temporary files
-# rm -f ablation_config.yaml
