@@ -7,16 +7,28 @@ from collections import deque
 from multiprocessing import shared_memory
 
 class ImageClient:
-    def __init__(self, tv_img_shape = None, tv_img_shm_name = None, wrist_img_shape = None, wrist_img_shm_name = None, 
-                       image_show = False, server_address = "192.168.123.164", port = 5555, Unit_Test = False):
+    def __init__(self, vr_img_shape = None, vr_img_shm_name = None, wrist_img_shape = None, wrist_img_shm_name = None,
+                 head_cam_img_shape = None, head_cam_img_shm_name = None, use_active_camera = True,
+                 active_cam_img_shape = None, active_cam_img_shm_name = None,
+                 image_show = False, server_address = "192.168.123.164", port = 5555, Unit_Test = False):
         """
-        tv_img_shape: User's expected head camera resolution shape (H, W, C). It should match the output of the image service terminal.
+        vr_img_shape: User's expected VR display resolution shape (H, W, C). Can be full active camera or cropped head camera.
 
-        tv_img_shm_name: Shared memory is used to easily transfer images across processes to the Vuer.
+        vr_img_shm_name: Shared memory for VR display images.
+        
+        head_cam_img_shape: Head camera resolution shape (H, W, C). Always 480x1280 for dataset compatibility.
+        
+        head_cam_img_shm_name: Shared memory for head cam images.
 
-        wrist_img_shape: User's expected wrist camera resolution shape (H, W, C). It should maintain the same shape as tv_img_shape.
+        active_cam_img_shape: Active head camera resolution shape (H, W, C). Always 480x1280 for dataset compatibility.
+        
+        active_cam_img_shm_name: Shared memory for active head cam images.
+
+        wrist_img_shape: User's expected wrist camera resolution shape (H, W, C).
 
         wrist_img_shm_name: Shared memory is used to easily transfer images.
+        
+        use_active_camera: Whether to use active camera (True) or head camera (False).
         
         image_show: Whether to display received images in real time.
 
@@ -31,21 +43,40 @@ class ImageClient:
         self._image_show = image_show
         self._server_address = server_address
         self._port = port
+        self.use_active_camera = use_active_camera
 
-        self.tv_img_shape = tv_img_shape
+        self.vr_img_shape = vr_img_shape
+        self.head_cam_img_shape = head_cam_img_shape
         self.wrist_img_shape = wrist_img_shape
+        self.active_cam_img_shape = active_cam_img_shape
 
-        self.tv_enable_shm = False
-        if self.tv_img_shape is not None and tv_img_shm_name is not None:
-            self.tv_image_shm = shared_memory.SharedMemory(name=tv_img_shm_name)
-            self.tv_img_array = np.ndarray(tv_img_shape, dtype = np.uint8, buffer = self.tv_image_shm.buf)
-            self.tv_enable_shm = True
+        # Set up TV/VR display shared memory
+        self.vr_enable_shm = False
+        if self.vr_img_shape is not None and vr_img_shm_name is not None:
+            self.vr_image_shm = shared_memory.SharedMemory(name=vr_img_shm_name)
+            self.vr_img_array = np.ndarray(vr_img_shape, dtype = np.uint8, buffer = self.vr_image_shm.buf)
+            self.vr_enable_shm = True
         
+        # Set up head_cam shared memory
+        self.head_cam_enable_shm = False
+        if self.head_cam_img_shape is not None and head_cam_img_shm_name is not None:
+            self.head_camimage_shm = shared_memory.SharedMemory(name=head_cam_img_shm_name)
+            self.head_cam_img_array = np.ndarray(head_cam_img_shape, dtype = np.uint8, buffer = self.head_camimage_shm.buf)
+            self.head_cam_enable_shm = True
+        
+        # Set up wrist shared memory
         self.wrist_enable_shm = False
         if self.wrist_img_shape is not None and wrist_img_shm_name is not None:
             self.wrist_image_shm = shared_memory.SharedMemory(name=wrist_img_shm_name)
             self.wrist_img_array = np.ndarray(wrist_img_shape, dtype = np.uint8, buffer = self.wrist_image_shm.buf)
             self.wrist_enable_shm = True
+
+        # Set up active camera shared memory (separate from recording)
+        self.active_cam_enable_shm = False
+        if self.active_cam_img_shape is not None and active_cam_img_shm_name is not None:
+            self.active_cam_image_shm = shared_memory.SharedMemory(name=active_cam_img_shm_name)
+            self.active_cam_img_array = np.ndarray(active_cam_img_shape, dtype = np.uint8, buffer = self.active_cam_image_shm.buf)
+            self.active_cam_enable_shm = True
 
         # Performance evaluation parameters
         self._enable_performance_eval = Unit_Test
@@ -116,6 +147,8 @@ class ImageClient:
     
     def _close(self):
         self._socket.close()
+        if hasattr(self, '_active_socket'):
+            self._active_socket.close()
         self._context.term()
         if self._image_show:
             cv2.destroyAllWindows()
@@ -123,13 +156,21 @@ class ImageClient:
 
     
     def receive_process(self):
+        """Main receive process that handles both single and dual stream modes."""
+        if self.use_active_camera:
+            self._receive_dual_streams()
+        else:
+            self._receive_single_stream()
+
+    def _receive_single_stream(self):
+        """Receive head camera + wrist concatenated stream."""
         # Set up ZeroMQ context and socket
         self._context = zmq.Context()
         self._socket = self._context.socket(zmq.SUB)
         self._socket.connect(f"tcp://{self._server_address}:{self._port}")
         self._socket.setsockopt_string(zmq.SUBSCRIBE, "")
 
-        print("\nImage client has started, waiting to receive data...")
+        print("\n[Image Client] Single stream mode - waiting for head/wrist data...")
         try:
             while self.running:
                 # Receive message
@@ -156,12 +197,31 @@ class ImageClient:
                     print("[Image Client] Failed to decode image.")
                     continue
 
-                if self.tv_enable_shm:
-                    np.copyto(self.tv_img_array, np.array(current_image[:, :self.tv_img_shape[1]]))
+                # Process head camera image (already cropped on server side to 480x1280)
+                height, width = current_image.shape[:2]
                 
-                if self.wrist_enable_shm:
-                    np.copyto(self.wrist_img_array, np.array(current_image[:, -self.wrist_img_shape[1]:]))
-                
+                # Extract head/wrist parts
+                if self.wrist_enable_shm and width > 1280: # TODO Was genau passiert hier?
+                    # Image contains both head (480x1280) and wrist cameras
+                    head_image = current_image[:, :1280]  # First 1280 pixels are head
+                    wrist_image = current_image[:, 1280:]  # Remaining pixels are wrist
+                    np.copyto(self.wrist_img_array, wrist_image)
+                else:
+                    # Only head camera
+                    head_image = current_image
+
+                # Copy to VR shm for display
+                if self.vr_enable_shm:
+                    if head_image.shape[:2] != (self.vr_img_shape[0], self.vr_img_shape[1]):
+                        head_image = cv2.resize(head_image, (self.vr_img_shape[1], self.vr_img_shape[0]))
+                    np.copyto(self.vr_img_array, head_image)
+
+                # Copy to head cam shm for recording
+                if self.head_cam_enable_shm:
+                    if head_image.shape[:2] != (self.head_cam_img_shape[0], self.head_cam_img_shape[1]):
+                        head_image = cv2.resize(head_image, (self.head_cam_img_shape[1], self.head_cam_img_shape[0]))
+                    np.copyto(self.head_cam_img_array, head_image)
+
                 if self._image_show:
                     height, width = current_image.shape[:2]
                     resized_image = cv2.resize(current_image, (width // 2, height // 2))
@@ -180,6 +240,150 @@ class ImageClient:
         finally:
             self._close()
 
+    def _receive_dual_streams(self):
+        """Receive both full resolution active camera stream and concatenated stream."""
+        # Set up ZeroMQ context and sockets
+        self._context = zmq.Context()
+        
+        # Socket for concatenated stream (port)
+        self._socket = self._context.socket(zmq.SUB)
+        self._socket.connect(f"tcp://{self._server_address}:{self._port}")
+        self._socket.setsockopt_string(zmq.SUBSCRIBE, "")
+        
+        # Socket for full resolution active camera stream (port+1)
+        self._active_socket = self._context.socket(zmq.SUB)
+        self._active_socket.connect(f"tcp://{self._server_address}:{self._port + 1}")
+        self._active_socket.setsockopt_string(zmq.SUBSCRIBE, "")
+
+        # Set up poller for non-blocking receive
+        poller = zmq.Poller()
+        poller.register(self._socket, zmq.POLLIN)
+        poller.register(self._active_socket, zmq.POLLIN)
+
+        print(f"\n[Image Client] Dual stream mode - waiting for active camera (port {self._port + 1}) and concatenated data (port {self._port})...")
+        
+        # Add small delay to allow connections to establish
+        time.sleep(1.0)
+
+        try:
+            while self.running:
+                # Poll for messages with longer timeout
+                socks = dict(poller.poll(timeout=1000))  # 1 second timeout
+                
+                if not socks:
+                    print("[Image Client] No data received in 1 second, continuing...")
+                    continue
+                
+                # Handle full resolution active camera stream (for VR display)
+                if self._active_socket in socks:
+
+                    message = self._active_socket.recv(zmq.NOBLOCK)
+                    receive_time = time.time()
+
+                    if self._enable_performance_eval:
+                        header_size = struct.calcsize('dI')
+                        try:
+                            header = message[:header_size]
+                            jpg_bytes = message[header_size:]
+                            timestamp, frame_id = struct.unpack('dI', header)
+                        except struct.error as e:
+                            print(f"[Image Client] Error unpacking active camera header: {e}")
+                            continue
+                    else:
+                        jpg_bytes = message
+
+                    # Decode full resolution active camera image
+                    np_img = np.frombuffer(jpg_bytes, dtype=np.uint8)
+                    active_image = cv2.imdecode(np_img, cv2.IMREAD_COLOR)
+                    if active_image is not None:
+                        # Store for VR display at full resolution
+                        if self.vr_enable_shm:
+                            # Use full resolution for VR display
+                            if active_image.shape[:2] != (self.vr_img_shape[0], self.vr_img_shape[1]):
+                                processed_active_image = cv2.resize(active_image, (self.vr_img_shape[1], self.vr_img_shape[0]))
+                            else:
+                                processed_active_image = active_image
+                            np.copyto(self.vr_img_array, processed_active_image)
+                        
+                        # Downscale active camera for recording and put in separate active camera shared memory
+                        if self.active_cam_enable_shm:
+                            # Downscale from 720x2560 to 480x1280 for recording
+                            active_downscaled = cv2.resize(active_image, (1280, 480))
+                            np.copyto(self.active_cam_img_array, active_downscaled)
+                        
+                        # Display active camera in standalone mode
+                        if self._image_show:
+                            height, width = active_image.shape[:2]
+                            resized_active = cv2.resize(active_image, (width // 2, height // 2))
+                            cv2.imshow('Image Client Active Camera', resized_active)
+                            if cv2.waitKey(1) & 0xFF == ord('q'):
+                                self.running = False
+
+                # Handle concatenated stream (for recording and wrist cameras)
+                if self._socket in socks:
+                    
+                    message = self._socket.recv(zmq.NOBLOCK)
+                    receive_time = time.time()
+
+                    if self._enable_performance_eval:
+                        header_size = struct.calcsize('dI')
+                        try:
+                            header = message[:header_size]
+                            jpg_bytes = message[header_size:]
+                            timestamp, frame_id = struct.unpack('dI', header)
+                        except struct.error as e:
+                            print(f"[Image Client] Error unpacking concatenated header: {e}")
+                            continue
+                    else:
+                        jpg_bytes = message
+
+                    # Decode concatenated image
+                    np_img = np.frombuffer(jpg_bytes, dtype=np.uint8)
+                    concat_image = cv2.imdecode(np_img, cv2.IMREAD_COLOR)
+                    if concat_image is None:
+                        continue
+
+                    height, width = concat_image.shape[:2]
+                    
+
+                    # Concatenated stream contains head + wrist
+                    if self.wrist_enable_shm and width > 1280:
+                        # Image contains both head (480x1280) and wrist cameras
+                        head_image = concat_image[:, :1280]  # First 1280 pixels are head
+                        wrist_image = concat_image[:, 1280:]  # Remaining pixels are wrist
+                        np.copyto(self.wrist_img_array, wrist_image)
+                        
+                        # Put head camera in recording shared memory
+                        if self.head_cam_enable_shm:
+                            if head_image.shape[:2] != (self.head_cam_img_shape[0], self.head_cam_img_shape[1]):
+                                head_image = cv2.resize(head_image, (self.head_cam_img_shape[1], self.head_cam_img_shape[0]))
+                            np.copyto(self.head_cam_img_array, head_image)
+                    else:
+                        # Only head camera
+                        head_image = concat_image
+                        if self.head_cam_enable_shm:
+                            if head_image.shape[:2] != (self.head_cam_shape[0], self.head_cam_img_shape[1]):
+                                head_image = cv2.resize(head_image, (self.head_cam_img_shape[1], self.head_cam_img_shape[0]))
+                            np.copyto(self.head_cam_img_array, head_image)
+
+                    if self._image_show:
+                        height, width = concat_image.shape[:2]
+                        resized_image = cv2.resize(concat_image, (width // 2, height // 2))
+                        cv2.imshow('Image Client Concatenated Stream', resized_image)
+                        if cv2.waitKey(1) & 0xFF == ord('q'):
+                            self.running = False
+
+                    if self._enable_performance_eval:
+                        self._update_performance_metrics(timestamp, frame_id, receive_time)
+                        self._print_performance_metrics(receive_time)
+
+        except KeyboardInterrupt:
+            print("Image client interrupted by user.")
+        except Exception as e:
+            print(f"[Image Client] An error occurred while receiving dual streams: {e}")
+        finally:
+            self._close()
+
 if __name__ == "__main__":
     # example1
     # tv_img_shape = (480, 1280, 3)
@@ -191,5 +395,5 @@ if __name__ == "__main__":
     # example2
     # Initialize the client with performance evaluation enabled
     # client = ImageClient(image_show = True, server_address='127.0.0.1', Unit_Test=True) # local test
-    client = ImageClient(image_show = True, server_address='192.168.123.164', Unit_Test=False) # deployment test
+    client = ImageClient(image_show = True, server_address='192.168.123.164', Unit_Test=False, use_active_camera=True) # deployment test with active camera
     client.receive_process()
