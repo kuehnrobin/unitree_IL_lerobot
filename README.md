@@ -360,11 +360,11 @@ python unitree_lerobot/eval_robot/eval_g1/eval_g1.py  \
 # IMPORTANT: Use the same feature selection parameters that were used during training
 python unitree_lerobot/eval_robot/eval_g1/eval_g1.py  \
     --policy.path=outputs/train/2025-07-20/16-44-06_dinov2_backbone/checkpoints/last/pretrained_model/ \
-    --repo_id=kuehnrobin/g1_cubes_box_242 \
+    --repo_id=kuehnrobin/g1_cubes_no_hover_fixed \
     --arm_speed 10.0 \
     --no_gradual_speed=true \
     --cyclonedds_uri enxa0cec8616f27 \
-    --feature_selection.exclude_cameras='["cam_left_active", "cam_right_active"]' \
+    #--feature_selection.exclude_cameras='["cam_left_active", "cam_right_active"]' \
     --feature_selection.use_joint_velocities=false \
     --feature_selection.use_joint_torques=false
 
