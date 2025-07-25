@@ -1,4 +1,5 @@
 ''''
+Copyright Robin Kühn 2025
 Refer to:   lerobot/lerobot/scripts/eval.py
             lerobot/lerobot/scripts/econtrol_robot.py
             lerobot/common/robot_devices/control_utils.py
@@ -11,14 +12,15 @@ import threading
 import numpy as np
 import signal
 import sys
-import termios
-import tty
+
+import json
 from copy import copy
 from pprint import pformat
 from dataclasses import asdict
 from torch import nn
 from contextlib import nullcontext
 from multiprocessing import shared_memory, Array, Lock
+from pathlib import Path
 
 from lerobot.common.policies.factory import make_policy
 from lerobot.common.policies.utils import get_device_from_parameters
@@ -497,9 +499,6 @@ def eval_policy(
                 # Build observation dict using individual camera variables
                 observation = {}
                 
-                # Only include cameras that are in the policy config
-                policy_cameras = policy_config_info.get('cameras', [])
-                
                 # Get images from available shared memory arrays
                 current_head_image = head_cam_img_array.copy() if head_cam_img_array is not None else None
                 current_wrist_image = wrist_img_array.copy() if wrist_img_array is not None else None
@@ -525,17 +524,57 @@ def eval_policy(
                     available_images['cam_left_active'] = current_active_image[:, :active_cam_img_shape[1] // 2]
                     available_images['cam_right_active'] = current_active_image[:, active_cam_img_shape[1] // 2:]
                 
-                # Add only cameras that are in policy config and have valid data
-                for camera_name in policy_cameras:
+                # Apply training-based camera filtering (matching training pipeline)
+                filtered_cameras = []
+                all_available_cameras = list(available_images.keys())
+                
+                if cfg.feature_selection.cameras is not None:
+                    # Use only specified cameras (include list from training config)
+                    filtered_cameras = [cam for cam in cfg.feature_selection.cameras if cam in all_available_cameras]
+                    if len(filtered_cameras) != len(cfg.feature_selection.cameras):
+                        missing = set(cfg.feature_selection.cameras) - set(all_available_cameras)
+                        logging.warning(f"Training-specified cameras not available: {missing}")
+                elif cfg.feature_selection.exclude_cameras is not None:
+                    # Use all cameras except excluded ones (from training config)
+                    filtered_cameras = [cam for cam in all_available_cameras if cam not in cfg.feature_selection.exclude_cameras]
+                    logging.info(f"Excluding cameras per training config: {cfg.feature_selection.exclude_cameras}")
+                else:
+                    # Use all available cameras
+                    filtered_cameras = all_available_cameras
+                
+                # Cross-check with policy expectations
+                policy_cameras = policy_config_info.get('cameras', [])
+                if policy_cameras:
+                    # Ensure our filtered cameras match what the policy expects
+                    expected_but_missing = set(policy_cameras) - set(filtered_cameras)
+                    filtered_but_unexpected = set(filtered_cameras) - set(policy_cameras)
+                    
+                    if expected_but_missing:
+                        logging.warning(f"Policy expects cameras that are filtered out: {expected_but_missing}")
+                    if filtered_but_unexpected:
+                        logging.warning(f"Training config includes cameras that policy doesn't expect: {filtered_but_unexpected}")
+                        
+                    # Use intersection to be safe
+                    final_cameras = [cam for cam in filtered_cameras if cam in policy_cameras]
+                else:
+                    # No policy camera info, trust training config filtering
+                    final_cameras = filtered_cameras
+                
+                logging.info(f"Camera selection: available={all_available_cameras}, CLI-filtered={filtered_cameras}, final={final_cameras}")
+                
+                # Add filtered cameras to observation
+                for camera_name in final_cameras:
                     if camera_name in available_images and available_images[camera_name] is not None:
                         observation[f"observation.images.{camera_name}"] = torch.from_numpy(available_images[camera_name])
                         logging.debug(f"Added camera: {camera_name}")
                     else:
-                        logging.warning(f"Camera {camera_name} required by policy but not available!")
+                        logging.warning(f"Camera {camera_name} selected but not available!")
                 
                 # Log which cameras are being used
                 if len(observation) == 0:
                     logging.error("No cameras added to observation!")
+                    logging.error(f"Available images: {list(available_images.keys())}")
+                    logging.error(f"Training camera settings: cameras={cfg.feature_selection.cameras}, exclude_cameras={cfg.feature_selection.exclude_cameras}")
                     raise RuntimeError("No valid camera observations available!")
                 else:
                     logging.debug(f"Using cameras: {list(observation.keys())}")
@@ -550,58 +589,79 @@ def eval_policy(
                 else:
                     current_camera_q = None
 
-                # Build observation state: depends on whether camera is included in training data
+                # Build observation state using training feature selection (loaded from train_config.json)
                 current_lr_arm_q = arm_ctrl.get_current_dual_arm_q()  # 14D
                 current_lr_arm_dq = arm_ctrl.get_current_dual_arm_dq()  # 14D velocity
                 
                 state_components = []
+                feature_log = []
                 
-                # 1. Always include arm positions
+                # 1. Always include arm positions (first 14 dimensions)
                 state_components.append(current_lr_arm_q)  # 14D
+                feature_log.append(f"arm_positions: {current_lr_arm_q.shape[0]}D")
                 
-                # 2. Get hand state data
+                # 2. Get hand state data (next 14 or 2 dimensions depending on hand type)
                 if robot_config['hand_type'] == "dex3":
                     with dual_hand_data_lock:
                         left_hand_state = np.array(dual_hand_state_array[0:7])   # 7D
                         right_hand_state = np.array(dual_hand_state_array[7:14]) # 7D
                     state_components.extend([left_hand_state, right_hand_state])  # +14D
+                    feature_log.append(f"hand_positions (dex3): {left_hand_state.shape[0] + right_hand_state.shape[0]}D")
                 elif robot_config['hand_type'] == "gripper":
                     with dual_gripper_data_lock:
                         left_hand_state = np.array([dual_gripper_state_array[1]])   # 1D
                         right_hand_state = np.array([dual_gripper_state_array[0]])  # 1D
                     state_components.extend([left_hand_state, right_hand_state])  # +2D
+                    feature_log.append(f"hand_positions (gripper): {left_hand_state.shape[0] + right_hand_state.shape[0]}D")
                 
                 # 3. Add camera positions if active camera is used in policy
                 if current_camera_q is not None:
                     state_components.append(current_camera_q)  # +2D
+                    feature_log.append(f"camera_positions: {current_camera_q.shape[0]}D")
                 
-                # 4. Add velocities if enabled in CLI
+                # 4. Add velocities if enabled in training configuration
                 if cfg.feature_selection.use_joint_velocities:
                     state_components.append(current_lr_arm_dq)  # +14D arm velocities
+                    feature_log.append(f"arm_velocities: {current_lr_arm_dq.shape[0]}D")
                     
                     if robot_config['hand_type'] == "dex3":
                         # For now using zeros for hand velocities since not available in simple mode
                         left_hand_vel = np.zeros(7)
                         right_hand_vel = np.zeros(7)
                         state_components.extend([left_hand_vel, right_hand_vel])  # +14D
+                        feature_log.append(f"hand_velocities (dex3): {left_hand_vel.shape[0] + right_hand_vel.shape[0]}D")
                     elif robot_config['hand_type'] == "gripper":
                         left_hand_vel = np.array([0.0])
                         right_hand_vel = np.array([0.0])  
                         state_components.extend([left_hand_vel, right_hand_vel])  # +2D
+                        feature_log.append(f"hand_velocities (gripper): {left_hand_vel.shape[0] + right_hand_vel.shape[0]}D")
                 
-                # 5. Add pressure sensors if enabled in CLI
+                # 5. Add pressure sensors if enabled in training configuration
                 if cfg.feature_selection.use_pressure_sensors and robot_config['hand_type'] == "dex3":
                     if cfg.pressure and hand_ctrl:
-                        pressure_data = hand_ctrl.get_pressure_data()
-                        left_pressure = np.array(pressure_data['left_pressure'])  # 12D
-                        right_pressure = np.array(pressure_data['right_pressure']) # 12D
+                        try:
+                            pressure_data = hand_ctrl.get_pressure_data()
+                            left_pressure = np.array(pressure_data['left_pressure'])  # 12D
+                            right_pressure = np.array(pressure_data['right_pressure']) # 12D
+                        except Exception as e:
+                            left_pressure = np.zeros(12)
+                            right_pressure = np.zeros(12)
+                            logging.warning(f"Failed to get pressure data, using zeros: {e}")
                     else:
                         left_pressure = np.zeros(12)
                         right_pressure = np.zeros(12)
                     state_components.extend([left_pressure, right_pressure])  # +24D
+                    feature_log.append(f"pressure_sensors: {left_pressure.shape[0] + right_pressure.shape[0]}D")
                 
                 # Concatenate all state components
                 observation_state = np.concatenate(state_components)
+                
+                # Log feature breakdown
+                total_dim = sum(comp.shape[0] for comp in state_components)
+                logging.info(f"State vector construction:")
+                for feature in feature_log:
+                    logging.info(f"  + {feature}")
+                logging.info(f"  = Total: {total_dim}D")
                 
                 # Verify state dimension matches policy expectation
                 expected_state_dim = policy_config_info.get('state_dim')
@@ -610,12 +670,23 @@ def eval_policy(
                 if expected_state_dim and actual_state_dim != expected_state_dim:
                     logging.error(f"State dimension mismatch! Expected: {expected_state_dim}, Got: {actual_state_dim}")
                     logging.error(f"State components: {[comp.shape for comp in state_components]}")
-                    logging.error(f"Policy cameras: {policy_cameras}")
-                    logging.error(f"Use velocities: {cfg.feature_selection.use_joint_velocities}")
-                    logging.error(f"Use pressure: {cfg.feature_selection.use_pressure_sensors}")
-                    logging.error(f"Use active camera: {use_active_camera}")
+                    logging.error(f"Training feature selection settings:")
+                    logging.error(f"  - cameras: {cfg.feature_selection.cameras}")
+                    logging.error(f"  - exclude_cameras: {cfg.feature_selection.exclude_cameras}")
+                    logging.error(f"  - use_joint_positions: {cfg.feature_selection.use_joint_positions}")
+                    logging.error(f"  - use_joint_velocities: {cfg.feature_selection.use_joint_velocities}")
+                    logging.error(f"  - use_joint_torques: {cfg.feature_selection.use_joint_torques}")
+                    logging.error(f"  - use_pressure_sensors: {cfg.feature_selection.use_pressure_sensors}")
+                    logging.error(f"These settings were automatically loaded from train_config.json!")
+                    logging.error(f"Check the train_config.json file in the policy directory for the exact configuration.")
+                    raise RuntimeError(f"State dimension mismatch: expected {expected_state_dim}, got {actual_state_dim}")
                 else:
-                    logging.debug(f"State dimension correct: {actual_state_dim}")
+                    logging.info(f"✓ State dimension correct: {actual_state_dim}")
+                    logging.info(f"✓ Training feature selection: cameras={len([k for k in observation.keys() if 'images' in k])}, "
+                               f"velocities={cfg.feature_selection.use_joint_velocities}, "
+                               f"torques={cfg.feature_selection.use_joint_torques}, "
+                               f"pressure={cfg.feature_selection.use_pressure_sensors}")
+                    logging.debug(f"State components breakdown: {[comp.shape for comp in state_components]}")
                 
                 observation["observation.state"] = torch.from_numpy(observation_state).float()
 
@@ -911,13 +982,94 @@ def extract_config_from_policy(policy):
         if 'action' in output_features:
             config_info['action_dim'] = output_features['action']['shape'][0]
     
-    # Log detected configuration
+    # Log detected configuration with state breakdown analysis
     logging.info(f"Detected cameras: {config_info['cameras']}")
     logging.info(f"Camera types in use: {config_info['camera_types']}")
     logging.info(f"Expected state dimension: {config_info['state_dim']}")
     logging.info(f"Expected action dimension: {config_info['action_dim']}")
     
+    # Analyze expected state composition
+    if config_info['state_dim']:
+        expected_dim = config_info['state_dim']
+        logging.info(f"State dimension analysis for {expected_dim}D:")
+        
+        # Base components
+        arm_dim = 14
+        hand_dim = 14  # Assuming dex3, will be adjusted if gripper
+        camera_dim = 2 if config_info['camera_types']['active'] else 0
+        base_dim = arm_dim + hand_dim + camera_dim
+        
+        logging.info(f"  - Base (arm + hand + camera): {base_dim}D ({arm_dim} + {hand_dim} + {camera_dim})")
+        
+        remaining = expected_dim - base_dim
+        if remaining == 28:  # velocities for dex3
+            logging.info(f"  - Velocities (arm + hand): {remaining}D")
+        elif remaining == 16:  # velocities for gripper
+            logging.info(f"  - Velocities (arm + gripper): {remaining}D")  
+        elif remaining == 14:  # arm velocities only
+            logging.info(f"  - Velocities (arm only): {remaining}D")
+        elif remaining == 24:  # pressure sensors
+            logging.info(f"  - Pressure sensors: {remaining}D")
+        elif remaining == 52:  # velocities + pressure for dex3
+            logging.info(f"  - Velocities (28D) + Pressure (24D): {remaining}D")
+        else:
+            logging.info(f"  - Additional features: {remaining}D")
+    
     return config_info
+
+def load_training_feature_config(policy_path: str):
+    """
+    Load the feature selection configuration from the training config file.
+    
+    Args:
+        policy_path: Path to the policy directory
+        
+    Returns:
+        Dict containing the feature_selection configuration used during training
+    """
+    # Construct path to train_config.json
+    train_config_path = Path(policy_path) / "train_config.json"
+    
+    if not train_config_path.exists():
+        logging.warning(f"Training config not found at {train_config_path}")
+        logging.warning("Using default feature selection settings")
+        return {
+            'cameras': None,
+            'exclude_cameras': None,
+            'use_joint_positions': True,
+            'use_joint_velocities': True,
+            'use_joint_torques': False,
+            'use_pressure_sensors': True,
+            'joint_groups': None,
+            'exclude_joint_groups': None,
+            'custom_state_indices': None
+        }
+    
+    try:
+        with open(train_config_path, 'r') as f:
+            train_config = json.load(f)
+        
+        feature_config = train_config.get('feature_selection', {})
+        logging.info(f"Loaded training feature configuration from {train_config_path}")
+        logging.info(f"Training feature selection: {feature_config}")
+        
+        return feature_config
+        
+    except Exception as e:
+        logging.error(f"Failed to load training config from {train_config_path}: {e}")
+        logging.warning("Using default feature selection settings")
+        return {
+            'cameras': None,
+            'exclude_cameras': None,
+            'use_joint_positions': True,
+            'use_joint_velocities': True,
+            'use_joint_torques': False,
+            'use_pressure_sensors': True,
+            'joint_groups': None,
+            'exclude_joint_groups': None,
+            'custom_state_indices': None
+        }
+
 
 @parser.wrap()
 def eval_main(cfg: EvalRealConfig):
@@ -941,6 +1093,29 @@ def eval_main(cfg: EvalRealConfig):
     # Extract configuration from policy
     policy_config_info = extract_config_from_policy(policy)
     logging.info(f"Policy configuration: {policy_config_info}")
+    
+    # Load training feature configuration from train_config.json
+    training_feature_config = load_training_feature_config(cfg.policy.pretrained_path)
+    logging.info(f"Training feature configuration: {training_feature_config}")
+    
+    # Override CLI feature selection with training configuration
+    cfg.feature_selection.cameras = training_feature_config.get('cameras')
+    cfg.feature_selection.exclude_cameras = training_feature_config.get('exclude_cameras')
+    cfg.feature_selection.use_joint_positions = training_feature_config.get('use_joint_positions', True)
+    cfg.feature_selection.use_joint_velocities = training_feature_config.get('use_joint_velocities', True)
+    cfg.feature_selection.use_joint_torques = training_feature_config.get('use_joint_torques', False)
+    cfg.feature_selection.use_pressure_sensors = training_feature_config.get('use_pressure_sensors', True)
+    cfg.feature_selection.joint_groups = training_feature_config.get('joint_groups')
+    cfg.feature_selection.exclude_joint_groups = training_feature_config.get('exclude_joint_groups')
+    cfg.feature_selection.custom_state_indices = training_feature_config.get('custom_state_indices')
+    
+    logging.info("Feature selection configuration synchronized with training:")
+    logging.info(f"  - cameras: {cfg.feature_selection.cameras}")
+    logging.info(f"  - exclude_cameras: {cfg.feature_selection.exclude_cameras}")
+    logging.info(f"  - use_joint_positions: {cfg.feature_selection.use_joint_positions}")
+    logging.info(f"  - use_joint_velocities: {cfg.feature_selection.use_joint_velocities}")
+    logging.info(f"  - use_joint_torques: {cfg.feature_selection.use_joint_torques}")
+    logging.info(f"  - use_pressure_sensors: {cfg.feature_selection.use_pressure_sensors}")
     
     policy.eval()
 
