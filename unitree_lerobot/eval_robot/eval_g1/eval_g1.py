@@ -570,7 +570,8 @@ def eval_policy(
                 for camera_name in final_cameras:
                     if camera_name in available_images and available_images[camera_name] is not None:
                         observation[f"observation.images.{camera_name}"] = torch.from_numpy(available_images[camera_name])
-                        logging.debug(f"Added camera: {camera_name}")
+                        if frame_counter % 300 == 0:  # Log every 10 seconds
+                            logging.debug(f"Added camera: {camera_name}")
                     else:
                         logging.warning(f"Camera {camera_name} selected but not available!")
                 
@@ -581,7 +582,8 @@ def eval_policy(
                     logging.error(f"Training camera settings: cameras={cfg.feature_selection.cameras}, exclude_cameras={cfg.feature_selection.exclude_cameras}")
                     raise RuntimeError("No valid camera observations available!")
                 else:
-                    logging.debug(f"Using cameras: {list(observation.keys())}")
+                    if frame_counter % 300 == 0:  # Log every 10 seconds instead of every frame
+                        logging.info(f"Using cameras: {list(observation.keys())}")
 
                 # Get camera positions if active camera is enabled by policy
                 if use_active_camera and camera_controller and camera_controller.connected:
@@ -650,7 +652,8 @@ def eval_policy(
                         except Exception as e:
                             left_pressure = np.zeros(12)
                             right_pressure = np.zeros(12)
-                            logging.warning(f"Failed to get pressure data, using zeros: {e}")
+                            if frame_counter % 300 == 0:  # Log only occasionally
+                                logging.warning(f"Failed to get pressure data, using zeros: {e}")
                     else:
                         left_pressure = np.zeros(12)
                         right_pressure = np.zeros(12)
@@ -660,12 +663,13 @@ def eval_policy(
                 # Concatenate all state components
                 observation_state = np.concatenate(state_components)
                 
-                # Log feature breakdown
-                total_dim = sum(comp.shape[0] for comp in state_components)
-                logging.info(f"State vector construction:")
-                for feature in feature_log:
-                    logging.info(f"  + {feature}")
-                logging.info(f"  = Total: {total_dim}D")
+                # Log feature breakdown only occasionally
+                if frame_counter % 300 == 0:  # Every 10 seconds at 30fps
+                    total_dim = sum(comp.shape[0] for comp in state_components)
+                    logging.info(f"State vector construction:")
+                    for feature in feature_log:
+                        logging.info(f"  + {feature}")
+                    logging.info(f"  = Total: {total_dim}D")
                 
                 # Verify state dimension matches policy expectation
                 expected_state_dim = policy_config_info.get('state_dim')
@@ -685,12 +689,13 @@ def eval_policy(
                     logging.error(f"Check the train_config.json file in the policy directory for the exact configuration.")
                     raise RuntimeError(f"State dimension mismatch: expected {expected_state_dim}, got {actual_state_dim}")
                 else:
-                    logging.info(f"✓ State dimension correct: {actual_state_dim}")
-                    logging.info(f"✓ Training feature selection: cameras={len([k for k in observation.keys() if 'images' in k])}, "
-                               f"velocities={cfg.feature_selection.use_joint_velocities}, "
-                               f"torques={cfg.feature_selection.use_joint_torques}, "
-                               f"pressure={cfg.feature_selection.use_pressure_sensors}")
-                    logging.debug(f"State components breakdown: {[comp.shape for comp in state_components]}")
+                    if frame_counter % 300 == 0:  # Log every 10 seconds
+                        logging.info(f"✓ State dimension correct: {actual_state_dim}")
+                        logging.info(f"✓ Training feature selection: cameras={len([k for k in observation.keys() if 'images' in k])}, "
+                                   f"velocities={cfg.feature_selection.use_joint_velocities}, "
+                                   f"torques={cfg.feature_selection.use_joint_torques}, "
+                                   f"pressure={cfg.feature_selection.use_pressure_sensors}")
+                        logging.debug(f"State components breakdown: {[comp.shape for comp in state_components]}")
                 
                 observation["observation.state"] = torch.from_numpy(observation_state).float()
 
