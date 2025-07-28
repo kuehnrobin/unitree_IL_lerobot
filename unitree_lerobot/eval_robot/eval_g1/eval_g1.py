@@ -979,12 +979,20 @@ def extract_config_from_policy(policy):
         
         # Extract state and action dimensions
         if 'observation.state' in input_features:
-            config_info['state_dim'] = input_features['observation.state']['shape'][0]
+            state_feature = input_features['observation.state']
+            if hasattr(state_feature, 'shape'):
+                config_info['state_dim'] = state_feature.shape[0]
+            elif isinstance(state_feature, dict) and 'shape' in state_feature:
+                config_info['state_dim'] = state_feature['shape'][0]
             
     if hasattr(policy, 'config') and hasattr(policy.config, 'output_features'):
         output_features = policy.config.output_features
         if 'action' in output_features:
-            config_info['action_dim'] = output_features['action']['shape'][0]
+            action_feature = output_features['action']
+            if hasattr(action_feature, 'shape'):
+                config_info['action_dim'] = action_feature.shape[0]
+            elif isinstance(action_feature, dict) and 'shape' in action_feature:
+                config_info['action_dim'] = action_feature['shape'][0]
     
     # Log detected configuration with state breakdown analysis
     logging.info(f"Detected cameras: {config_info['cameras']}")
