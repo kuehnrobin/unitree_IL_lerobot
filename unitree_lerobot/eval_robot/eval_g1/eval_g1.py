@@ -39,6 +39,10 @@ from unitree_lerobot.eval_robot.eval_g1.robot_control.active_head_cam import Act
 from unitree_lerobot.eval_robot.eval_g1.eval_real_config import EvalRealConfig
 from unitree_lerobot.eval_robot.eval_g1.utils import EpisodeWriter
 
+# Apply feature filtering to get the correct metadata dimensions
+from unitree_lerobot.lerobot.lerobot.common.datasets.feature_filter import create_filtered_dataset_wrapper
+from unitree_lerobot.lerobot.lerobot.configs.train import FeatureSelectionConfig
+
 # Global flag for graceful shutdown
 shutdown_requested = False
 
@@ -1081,24 +1085,12 @@ def eval_main(cfg: EvalRealConfig):
     torch.backends.cudnn.benchmark = True
     torch.backends.cuda.matmul.allow_tf32 = True
 
-    logging.info("Making policy.")
-
-    dataset = LeRobotDataset(repo_id = cfg.repo_id)
-
-    policy = make_policy(
-        cfg=cfg.policy,
-        ds_meta=dataset.meta
-    )
-    
-    # Extract configuration from policy
-    policy_config_info = extract_config_from_policy(policy)
-    logging.info(f"Policy configuration: {policy_config_info}")
-    
-    # Load training feature configuration from train_config.json
+    # Load training feature configuration from train_config.json BEFORE creating policy
+    logging.info("Loading training feature configuration from train_config.json...")
     training_feature_config = load_training_feature_config(cfg.policy.pretrained_path)
     logging.info(f"Training feature configuration: {training_feature_config}")
     
-    # Override CLI feature selection with training configuration
+    # Override CLI feature selection with training configuration BEFORE creating policy
     cfg.feature_selection.cameras = training_feature_config.get('cameras')
     cfg.feature_selection.exclude_cameras = training_feature_config.get('exclude_cameras')
     cfg.feature_selection.use_joint_positions = training_feature_config.get('use_joint_positions', True)
@@ -1116,11 +1108,47 @@ def eval_main(cfg: EvalRealConfig):
     logging.info(f"  - use_joint_velocities: {cfg.feature_selection.use_joint_velocities}")
     logging.info(f"  - use_joint_torques: {cfg.feature_selection.use_joint_torques}")
     logging.info(f"  - use_pressure_sensors: {cfg.feature_selection.use_pressure_sensors}")
+
+    logging.info("Making policy with training feature configuration...")
+
+    # Load the original dataset
+    original_dataset = LeRobotDataset(repo_id = cfg.repo_id)
+    
+    
+    
+    # Create FeatureSelectionConfig from the loaded training config
+    feature_selection_config = FeatureSelectionConfig(
+        cameras=training_feature_config.get('cameras'),
+        exclude_cameras=training_feature_config.get('exclude_cameras'),
+        use_joint_positions=training_feature_config.get('use_joint_positions', True),
+        use_joint_velocities=training_feature_config.get('use_joint_velocities', True),
+        use_joint_torques=training_feature_config.get('use_joint_torques', False),
+        use_pressure_sensors=training_feature_config.get('use_pressure_sensors', True),
+        joint_groups=training_feature_config.get('joint_groups'),
+        exclude_joint_groups=training_feature_config.get('exclude_joint_groups'),
+        custom_state_indices=training_feature_config.get('custom_state_indices')
+    )
+    
+    # Create filtered dataset with the same feature selection used during training
+    filtered_dataset = create_filtered_dataset_wrapper(original_dataset, feature_selection_config)
+    
+    logging.info(f"Original dataset state shape: {original_dataset.meta.features['observation.state']['shape']}")
+    logging.info(f"Filtered dataset state shape: {filtered_dataset.meta.features['observation.state']['shape']}")
+    
+    # Use the filtered dataset metadata for policy creation
+    policy = make_policy(
+        cfg=cfg.policy,
+        ds_meta=filtered_dataset.meta
+    )
+    
+    # Extract configuration from policy
+    policy_config_info = extract_config_from_policy(policy)
+    logging.info(f"Policy configuration: {policy_config_info}")
     
     policy.eval()
 
     with torch.no_grad(), torch.autocast(device_type=device.type) if cfg.policy.use_amp else nullcontext():
-        eval_policy(policy, dataset, cfg, policy_config_info)
+        eval_policy(policy, filtered_dataset, cfg, policy_config_info)
 
     logging.info("End of eval")
 
