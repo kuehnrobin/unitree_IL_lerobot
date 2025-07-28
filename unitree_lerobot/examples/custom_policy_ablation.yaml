@@ -15,6 +15,9 @@ experiments:
 
   # ===== ARCHITECTURE ABLATIONS =====
   # Test different vision backbones
+
+   # !!!!!!!
+   # Gewichte für dinov2 sehr klein einstellen, da dinov2 eigentlich out of the box funktioniert!!!!
       
   - name: "dinov2_backbone_just_active_cam"
     config:
@@ -23,7 +26,7 @@ experiments:
       pretrained_backbone_weights: null
       batch_size: 1   # Smaller batch size for DINOv2 due to memory requirements
       optimizer_lr: 5e-6  # Lower learning rate often works better with DINOv2
-      optimizer_lr_backbone: 1e-6  # Even lower for backbone
+      optimizer_lr_backbone: 1e-7  # Even lower for backbone
       use_joint_velocities: false
       use_joint_torques: false
       dataset_repo: "kuehnrobin/g1_cubes_no_hover_fixed"
