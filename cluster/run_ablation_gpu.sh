@@ -20,7 +20,7 @@ echo "Partition: $SLURM_JOB_PARTITION"
 echo "Number of GPUs: $CUDA_VISIBLE_DEVICES"
 
 # Navigate to your project directory
-cd $BIGWORK
+cd $BIGWORK/unitree_IL_lerobot
 
 # Load necessary modules 
 module load Miniforge3
@@ -38,13 +38,22 @@ export HF_HOME=$BIGWORK/huggingface_cache
 export TRANSFORMERS_CACHE=$BIGWORK/huggingface_cache
 export HF_DATASETS_CACHE=$BIGWORK/datasets_cache
 
+# Disable internet access for offline training
+export WANDB_MODE=offline
+export HF_HUB_OFFLINE=1
+export TRANSFORMERS_OFFLINE=1
+export TORCH_HUB_OFFLINE=1
+
+# W&B local logging directory
+export WANDB_DIR=$BIGWORK/wandb_logs
+
 # Local dataset path
 export LOCAL_DATASET_PATH=$BIGWORK/LargeFiles/g1_cubes_s_fixed
 
 # Run the ablation study
 echo "Starting ablation study..."
 echo "Using local dataset: $LOCAL_DATASET_PATH"
-echo "Using torch cache: $TORCH_HOME"
+
 
 srun python unitree_lerobot/scripts/run_ablation_study.py \
         --config_file unitree_lerobot/examples/cluster_run_config.yaml \
@@ -54,7 +63,7 @@ srun python unitree_lerobot/scripts/run_ablation_study.py \
         --eval_freq 10000 \
         --save_freq 10000 \
         --log_freq 1000 \
-        --batch_size 15
+        --batch_size 12
 
 echo "Job completed at: $(date)"
 

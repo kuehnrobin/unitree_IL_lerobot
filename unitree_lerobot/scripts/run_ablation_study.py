@@ -64,7 +64,7 @@ class AblationStudy:
         
     def run_experiment(self, name: str, feature_overrides: Dict[str, Any], 
                       steps: int = 10000, eval_freq: int = 10000, save_freq: int = 10000, 
-                      log_freq: int = 1000, batch_size: int = 12):
+                      log_freq: int = 1000, batch_size: int = 12, enable_wandb: bool = False):
         """Run a single ablation experiment."""
         
         # Determine the correct path to train.py based on current working directory
@@ -96,8 +96,38 @@ class AblationStudy:
             f"--job_name={name}",  # This will be used in the output directory naming
             f"--wandb.project={self.base_config.get('wandb_project', 'ablation_study')}",
             f"--wandb.notes={name}",  # Use notes to identify the experiment
-            "--wandb.enable=true"
         ]
+        
+        # Configure output directory from environment or default
+        outputs_dir = os.environ.get('OUTPUTS_DIR')
+        if outputs_dir:
+            cmd.append(f"--output_dir={outputs_dir}")
+            logger.info(f"Using custom output directory: {outputs_dir}")
+        
+        # Configure W&B based on enable_wandb parameter
+        if enable_wandb:
+            cmd.extend([
+                "--wandb.enable=true",
+                "--wandb.mode=online"
+            ])
+            logger.info("W&B logging enabled - will sync to wandb.ai")
+        else:
+            # Check if we're in offline cluster mode (WANDB_MODE=offline)
+            wandb_mode = os.environ.get('WANDB_MODE', 'disabled')
+            if wandb_mode == 'offline':
+                cmd.extend([
+                    "--wandb.enable=true",
+                    "--wandb.mode=offline",
+                    "--wandb.disable_artifact=false"  # Allow artifacts to be saved locally
+                ])
+                logger.info("W&B logging enabled in OFFLINE mode - logs will be saved locally for later analysis")
+            else:
+                cmd.extend([
+                    "--wandb.enable=false",
+                    "--wandb.mode=disabled",
+                    "--wandb.disable_artifact=true"
+                ])
+                logger.info("W&B logging disabled - running without any logging")
         
         # Add base config overrides
         for key, value in self.base_config.get('base_overrides', {}).items():
@@ -182,7 +212,9 @@ def main():
     parser.add_argument('--log_freq', type=int, default=1000, help='Logging frequency')
     parser.add_argument('--batch_size', type=int, default=12, help='Batch size for training')
     parser.add_argument('--base_config', help='Base training configuration overrides (YAML)')
-    
+    parser.add_argument('--enable_wandb', action='store_true', default=True, 
+                        help='Enable W&B logging (enabled by default for offline cluster runs)')
+
     args = parser.parse_args()
     
     # Load base configuration
@@ -214,7 +246,8 @@ def main():
             eval_freq=args.eval_freq,
             save_freq=args.save_freq,
             log_freq=args.log_freq,
-            batch_size=args.batch_size
+            batch_size=args.batch_size,
+            enable_wandb=args.enable_wandb
         )
         results[name] = success
         
