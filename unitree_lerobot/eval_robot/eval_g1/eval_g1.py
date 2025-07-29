@@ -12,6 +12,7 @@ import threading
 import numpy as np
 import signal
 import sys
+import cv2
 
 import json
 from copy import copy
@@ -395,6 +396,11 @@ def eval_policy(
         frequency = 50.0
         frame_counter = 0
         last_instruction_time = time.time()
+        
+        # Add debugging variables
+        camera_selection_logged = False  # Track if camera selection has been logged once
+        last_state_log_time = time.time()  # For periodic state vector logging
+        opencv_windows_created = False  # Track if OpenCV windows have been created
 
         # Add terminal input thread for recording controls
         if cfg.record:
@@ -564,7 +570,10 @@ def eval_policy(
                     # No policy camera info, trust training config filtering
                     final_cameras = filtered_cameras
                 
-                logging.info(f"Camera selection: available={all_available_cameras}, CLI-filtered={filtered_cameras}, final={final_cameras}")
+                # Log camera selection only once
+                if not camera_selection_logged:
+                    logging.info(f"🔍 CAMERA SELECTION: available={all_available_cameras}, CLI-filtered={filtered_cameras}, final={final_cameras}")
+                    camera_selection_logged = True
                 
                 # Add filtered cameras to observation
                 for camera_name in final_cameras:
@@ -574,6 +583,75 @@ def eval_policy(
                             logging.debug(f"Added camera: {camera_name}")
                     else:
                         logging.warning(f"Camera {camera_name} selected but not available!")
+                
+                # OpenCV visualization for debugging camera inputs
+                if final_cameras and available_images:
+                    # Create OpenCV windows on first frame
+                    if not opencv_windows_created:
+                        try:
+                            cv2.namedWindow("Policy Camera Inputs", cv2.WINDOW_NORMAL)
+                            cv2.resizeWindow("Policy Camera Inputs", 1280, 720)
+                            opencv_windows_created = True
+                            logging.info(f"🖼️  Created OpenCV window for camera debugging: {final_cameras}")
+                        except cv2.error as e:
+                            logging.warning(f"Failed to create OpenCV window: {e}")
+                            opencv_windows_created = False
+                    
+                    # Display current camera inputs in a combined view
+                    if opencv_windows_created:
+                        try:
+                            display_images = []
+                            for camera_name in final_cameras:
+                                if camera_name in available_images and available_images[camera_name] is not None:
+                                    # Get the image and resize for display
+                                    display_img = available_images[camera_name].copy()
+                                    
+                                    # Resize to a standard display size
+                                    display_img = cv2.resize(display_img, (320, 240))
+                                    
+                                    # Convert from RGB to BGR for OpenCV display
+                                    if len(display_img.shape) == 3 and display_img.shape[2] == 3:
+                                        display_img = cv2.cvtColor(display_img, cv2.COLOR_RGB2BGR)
+                                    
+                                    # Add camera name overlay
+                                    cv2.putText(display_img, f"{camera_name}", (10, 30), 
+                                               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                                    cv2.putText(display_img, f"Frame: {frame_counter}", (10, 60), 
+                                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
+                                    
+                                    display_images.append(display_img)
+                            
+                            # Arrange images in a grid
+                            if display_images:
+                                # Arrange in 2x3 grid (or adjust based on number of cameras)
+                                rows = []
+                                for i in range(0, len(display_images), 3):
+                                    row_images = display_images[i:i+3]
+                                    # Pad row with black images if needed
+                                    while len(row_images) < 3:
+                                        black_img = np.zeros((240, 320, 3), dtype=np.uint8)
+                                        row_images.append(black_img)
+                                    row = np.hstack(row_images)
+                                    rows.append(row)
+                                
+                                # If we have rows, combine them vertically
+                                if rows:
+                                    combined_img = np.vstack(rows)
+                                    cv2.imshow("Policy Camera Inputs", combined_img)
+                                    cv2.waitKey(1)  # Non-blocking update
+                        except cv2.error as e:
+                            logging.warning(f"OpenCV display error: {e}")
+                    else:
+                        # Alternative: Log camera info periodically when OpenCV is not available
+                        if frame_counter % 300 == 0:  # Every 10 seconds
+                            logging.info(f"📷 CAMERA DEBUG (OpenCV N/A): {len(final_cameras)} cameras active")
+                            for camera_name in final_cameras:
+                                if camera_name in available_images and available_images[camera_name] is not None:
+                                    img_shape = available_images[camera_name].shape
+                                    img_mean = np.mean(available_images[camera_name])
+                                    logging.info(f"  - {camera_name}: shape={img_shape}, mean_intensity={img_mean:.1f}")
+                if OPENCV_AVAILABLE and OPENCV_GUI_AVAILABLE and opencv_windows_created:
+                    cv2.waitKey(1)
                 
                 # Log which cameras are being used
                 if len(observation) == 0:
@@ -662,6 +740,14 @@ def eval_policy(
                 
                 # Concatenate all state components
                 observation_state = np.concatenate(state_components)
+                
+                # Log state vector every 30 seconds (more frequent than 60s)
+                if time.time() - last_state_log_time > 30:
+                    logging.info(f"📊 STATE VECTOR (every 30s): shape={observation_state.shape}")
+                    logging.info(f"  First 10 values: {observation_state[:10]}")
+                    logging.info(f"  Last 10 values: {observation_state[-10:]}")
+                    logging.info(f"  Min/Max/Mean: {observation_state.min():.3f}/{observation_state.max():.3f}/{observation_state.mean():.3f}")
+                    last_state_log_time = time.time()
                 
                 # Log feature breakdown only occasionally
                 if frame_counter % 300 == 0:  # Every 10 seconds at 30fps
@@ -917,6 +1003,13 @@ def eval_policy(
                 except Exception as e:
                     logging.error(f"Error disconnecting camera controller: {e}")
             
+            # Cleanup OpenCV windows
+            try:
+                cv2.destroyAllWindows()
+                logging.info("OpenCV windows closed")
+            except Exception as e:
+                logging.error(f"Error closing OpenCV windows: {e}")
+            
             arm_ctrl.ctrl_dual_arm_go_home()
             logging.info("Arms returned to home position")
             
@@ -1051,15 +1144,18 @@ def load_training_feature_config(policy_path: str):
         logging.warning(f"Training config not found at {train_config_path}")
         logging.warning("Using default feature selection settings")
         return {
-            'cameras': None,
-            'exclude_cameras': None,
-            'use_joint_positions': True,
-            'use_joint_velocities': True,
-            'use_joint_torques': False,
-            'use_pressure_sensors': True,
-            'joint_groups': None,
-            'exclude_joint_groups': None,
-            'custom_state_indices': None
+            'feature_selection': {
+                'cameras': None,
+                'exclude_cameras': None,
+                'use_joint_positions': True,
+                'use_joint_velocities': True,
+                'use_joint_torques': False,
+                'use_pressure_sensors': True,
+                'joint_groups': None,
+                'exclude_joint_groups': None,
+                'custom_state_indices': None
+            },
+            'policy': {}
         }
     
     try:
@@ -1067,24 +1163,48 @@ def load_training_feature_config(policy_path: str):
             train_config = json.load(f)
         
         feature_config = train_config.get('feature_selection', {})
+        policy_config = train_config.get('policy', {})
+        
         logging.info(f"Loaded training feature configuration from {train_config_path}")
         logging.info(f"Training feature selection: {feature_config}")
         
-        return feature_config
+        # Extract ACT-specific policy parameters that may differ from defaults
+        policy_overrides = {}
+        act_specific_params = [
+            'chunk_size', 'n_action_steps', 'vision_backbone', 'pretrained_backbone_weights',
+            'n_decoder_layers', 'n_encoder_layers', 'dim_model', 'n_heads', 'dim_feedforward',
+            'temporal_ensemble_coeff', 'use_vae', 'latent_dim', 'n_vae_encoder_layers',
+            'kl_weight', 'dropout', 'feedforward_activation', 'pre_norm',
+            'replace_final_stride_with_dilation', 'optimizer_lr', 'optimizer_weight_decay',
+            'optimizer_lr_backbone'
+        ]
+        
+        for param in act_specific_params:
+            if param in policy_config:
+                policy_overrides[param] = policy_config[param]
+                logging.info(f"Found policy override: {param} = {policy_config[param]}")
+        
+        return {
+            'feature_selection': feature_config,
+            'policy': policy_overrides
+        }
         
     except Exception as e:
         logging.error(f"Failed to load training config from {train_config_path}: {e}")
         logging.warning("Using default feature selection settings")
         return {
-            'cameras': None,
-            'exclude_cameras': None,
-            'use_joint_positions': True,
-            'use_joint_velocities': True,
-            'use_joint_torques': False,
-            'use_pressure_sensors': True,
-            'joint_groups': None,
-            'exclude_joint_groups': None,
-            'custom_state_indices': None
+            'feature_selection': {
+                'cameras': None,
+                'exclude_cameras': None,
+                'use_joint_positions': True,
+                'use_joint_velocities': True,
+                'use_joint_torques': False,
+                'use_pressure_sensors': True,
+                'joint_groups': None,
+                'exclude_joint_groups': None,
+                'custom_state_indices': None
+            },
+            'policy': {}
         }
 
 
@@ -1100,8 +1220,12 @@ def eval_main(cfg: EvalRealConfig):
 
     # Load training feature configuration from train_config.json BEFORE creating policy
     logging.info("Loading training feature configuration from train_config.json...")
-    training_feature_config = load_training_feature_config(cfg.policy.pretrained_path)
+    training_config = load_training_feature_config(cfg.policy.pretrained_path)
+    training_feature_config = training_config['feature_selection']
+    training_policy_config = training_config['policy']
+    
     logging.info(f"Training feature configuration: {training_feature_config}")
+    logging.info(f"Training policy configuration: {training_policy_config}")
     
     # Override CLI feature selection with training configuration BEFORE creating policy
     cfg.feature_selection.cameras = training_feature_config.get('cameras')
@@ -1114,6 +1238,14 @@ def eval_main(cfg: EvalRealConfig):
     cfg.feature_selection.exclude_joint_groups = training_feature_config.get('exclude_joint_groups')
     cfg.feature_selection.custom_state_indices = training_feature_config.get('custom_state_indices')
     
+    # Apply training policy configuration to override defaults
+    for param, value in training_policy_config.items():
+        if hasattr(cfg.policy, param):
+            setattr(cfg.policy, param, value)
+            logging.info(f"Applied policy override: {param} = {value}")
+        else:
+            logging.warning(f"Policy parameter {param} not found in config, skipping")
+    
     logging.info("Feature selection configuration synchronized with training:")
     logging.info(f"  - cameras: {cfg.feature_selection.cameras}")
     logging.info(f"  - exclude_cameras: {cfg.feature_selection.exclude_cameras}")
@@ -1122,7 +1254,7 @@ def eval_main(cfg: EvalRealConfig):
     logging.info(f"  - use_joint_torques: {cfg.feature_selection.use_joint_torques}")
     logging.info(f"  - use_pressure_sensors: {cfg.feature_selection.use_pressure_sensors}")
 
-    logging.info("Making policy with training feature configuration...")
+    logging.info("Making policy with training configuration...")
 
     # Load the original dataset
     original_dataset = LeRobotDataset(repo_id = cfg.repo_id)
