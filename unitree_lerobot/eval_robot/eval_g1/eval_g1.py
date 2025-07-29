@@ -1286,6 +1286,19 @@ def eval_main(cfg: EvalRealConfig):
         else:
             logging.warning(f"Policy parameter {param} not found in config, skipping")
     
+    # Verify critical parameters are properly set
+    logging.info("=== POLICY CONFIGURATION VERIFICATION ===")
+    logging.info(f"✓ Vision backbone: {cfg.policy.vision_backbone}")
+    logging.info(f"✓ Chunk size: {cfg.policy.chunk_size}")
+    logging.info(f"✓ N action steps: {cfg.policy.n_action_steps}")
+    logging.info(f"✓ N decoder layers: {cfg.policy.n_decoder_layers}")
+    logging.info(f"✓ Temporal ensemble coeff: {cfg.policy.temporal_ensemble_coeff}")
+    if cfg.policy.temporal_ensemble_coeff is not None:
+        logging.info("🔄 Temporal ensembling ENABLED")
+    else:
+        logging.info("⚠️  Temporal ensembling DISABLED")
+    logging.info("==========================================")
+    
     logging.info("Feature selection configuration synchronized with training:")
     logging.info(f"  - cameras: {cfg.feature_selection.cameras}")
     logging.info(f"  - exclude_cameras: {cfg.feature_selection.exclude_cameras}")
@@ -1325,6 +1338,37 @@ def eval_main(cfg: EvalRealConfig):
         cfg=cfg.policy,
         ds_meta=filtered_dataset.meta
     )
+    
+    # Post-policy creation verification
+    logging.info("=== POST-POLICY CREATION VERIFICATION ===")
+    logging.info(f"✓ Policy type: {type(policy).__name__}")
+    logging.info(f"✓ Policy config type: {type(policy.config).__name__}")
+    logging.info(f"✓ Vision backbone in use: {policy.config.vision_backbone}")
+    logging.info(f"✓ Temporal ensemble coeff: {policy.config.temporal_ensemble_coeff}")
+    
+    # Check if temporal ensembler is properly initialized
+    if hasattr(policy, 'temporal_ensembler'):
+        if policy.temporal_ensembler is not None:
+            logging.info("🔄 Temporal ensembler SUCCESSFULLY initialized")
+            logging.info(f"   - Ensemble coeff: {policy.temporal_ensembler.temporal_ensemble_coeff}")
+            logging.info(f"   - Chunk size: {policy.temporal_ensembler.chunk_size}")
+        else:
+            logging.info("⚠️  Temporal ensembler is None")
+    else:
+        logging.info("⚠️  No temporal_ensembler attribute found")
+    
+    # Check if DINOv2 backbone is properly loaded
+    if hasattr(policy, 'act') and hasattr(policy.act, 'backbone'):
+        backbone = policy.act.backbone
+        logging.info(f"✓ Backbone type: {type(backbone).__name__}")
+        if hasattr(backbone, 'dinov2_model'):
+            logging.info("🖼️  DINOv2 backbone SUCCESSFULLY loaded")
+            logging.info(f"   - Feature dim: {backbone.feature_dim}")
+            logging.info(f"   - Patch size: {backbone.patch_size}")
+        else:
+            logging.info("📷 ResNet backbone detected")
+    
+    logging.info("===========================================")
     
     # Extract configuration from policy
     policy_config_info = extract_config_from_policy(policy)
