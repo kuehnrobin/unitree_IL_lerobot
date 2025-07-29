@@ -8,7 +8,6 @@ experiments:
       optimizer_lr: 5e-5 
       use_joint_velocities: false
       use_joint_torques: false
-      dataset_repo: "kuehnrobin/g1_cubes_s_fixed"
       cameras: '["cam_right_active", "cam_left_active", "cam_left_wrist", "cam_right_wrist", "cam_left_high"]'
 
       chunk_size: 60
@@ -26,7 +25,6 @@ experiments:
       optimizer_lr_backbone: 5e-6 
       use_joint_velocities: false
       use_joint_torques: false
-      dataset_repo: "kuehnrobin/g1_cubes_s_fixed"
       chunk_size: 60
       n_action_steps: 1
       temporal_ensemble_coeff: 0.005
