@@ -120,52 +120,6 @@ def main():
     print(f"Downloaded {dinov2_success}/{len(args.dinov2_models) if not args.skip_dinov2 else 0} DINOv2 models successfully")
     print(f"Downloaded {resnet_success}/{len(args.resnet_models) if not args.skip_resnet else 0} ResNet models successfully")
     
-    # Create a verification script
-    verify_script = output_dir / "verify_models.py"
-    with open(verify_script, 'w') as f:
-        f.write(f"""#!/usr/bin/env python3
-'''Verify downloaded models'''
-import torch
-import torchvision
-import os
-
-dinov2_models = {args.dinov2_models if not args.skip_dinov2 else []}
-resnet_models = {args.resnet_models if not args.skip_resnet else []}
-model_dir = "{output_dir}"
-
-print("Verifying downloaded models...")
-
-# Check DINOv2 models
-for model_name in dinov2_models:
-    model_path = os.path.join(model_dir, f"{{model_name}}.pth")
-    if os.path.exists(model_path):
-        try:
-            model = torch.load(model_path, map_location='cpu')
-            print(f"✓ DINOv2 {{model_name}}: OK")
-        except Exception as e:
-            print(f"✗ DINOv2 {{model_name}}: Error - {{e}}")
-    else:
-        print(f"✗ DINOv2 {{model_name}}: File not found")
-
-# Check ResNet models  
-for model_name in resnet_models:
-    model_path = os.path.join(model_dir, f"{{model_name}}_pretrained.pth")
-    if os.path.exists(model_path):
-        try:
-            state_dict = torch.load(model_path, map_location='cpu')
-            print(f"✓ ResNet {{model_name}}: OK")
-        except Exception as e:
-            print(f"✗ ResNet {{model_name}}: Error - {{e}}")
-    else:
-        print(f"✗ ResNet {{model_name}}: File not found")
-""")
-    
-    print(f"Created verification script: {verify_script}")
-    print("\nTo verify models on cluster, run:")
-    print(f"python {verify_script}")
-    
-    print("\nTo transfer to cluster:")
-    print(f"scp -r {output_dir} username@cluster:$BIGWORK/")
 
 
 if __name__ == "__main__":
