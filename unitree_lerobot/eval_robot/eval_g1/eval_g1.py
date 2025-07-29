@@ -588,86 +588,86 @@ def eval_policy(
                 
                 # Log camera selection only once
                 if not camera_selection_logged:
-                    logging.info(f"🔍 CAMERA SELECTION: available={all_available_cameras}, CLI-filtered={filtered_cameras}, final={final_cameras}")
+                    # logging.info(f"🔍 CAMERA SELECTION: available={all_available_cameras}, CLI-filtered={filtered_cameras}, final={final_cameras}")
                     camera_selection_logged = True
                 
                 # Add filtered cameras to observation
                 for camera_name in final_cameras:
                     if camera_name in available_images and available_images[camera_name] is not None:
                         observation[f"observation.images.{camera_name}"] = torch.from_numpy(available_images[camera_name])
-                        if frame_counter % 300 == 0:  # Log every 10 seconds
-                            logging.debug(f"Added camera: {camera_name}")
+                        # if frame_counter % 300 == 0:  # Log every 10 seconds
+                        #     logging.debug(f"Added camera: {camera_name}")
                     else:
                         logging.warning(f"Camera {camera_name} selected but not available!")
                 
-                # OpenCV visualization for debugging camera inputs
-                if final_cameras and available_images:
-                    # Create OpenCV windows on first frame
-                    if not opencv_windows_created:
-                        try:
-                            cv2.namedWindow("Policy Camera Inputs", cv2.WINDOW_NORMAL)
-                            cv2.resizeWindow("Policy Camera Inputs", 1280, 720)
-                            opencv_windows_created = True
-                            logging.info(f"🖼️  Created OpenCV window for camera debugging: {final_cameras}")
-                        except cv2.error as e:
-                            logging.warning(f"Failed to create OpenCV window: {e}")
-                            opencv_windows_created = False
-                    
-                    # Display current camera inputs in a combined view
-                    if opencv_windows_created:
-                        try:
-                            display_images = []
-                            for camera_name in final_cameras:
-                                if camera_name in available_images and available_images[camera_name] is not None:
-                                    # Get the image and resize for display
-                                    display_img = available_images[camera_name].copy()
-                                    
-                                    # Resize to a standard display size
-                                    display_img = cv2.resize(display_img, (320, 240))
-                                    
-                                    # Convert from RGB to BGR for OpenCV display
-                                    if len(display_img.shape) == 3 and display_img.shape[2] == 3:
-                                        display_img = cv2.cvtColor(display_img, cv2.COLOR_RGB2BGR)
-                                    
-                                    # Add camera name overlay
-                                    cv2.putText(display_img, f"{camera_name}", (10, 30), 
-                                               cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-                                    cv2.putText(display_img, f"Frame: {frame_counter}", (10, 60), 
-                                               cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
-                                    
-                                    display_images.append(display_img)
-                            
-                            # Arrange images in a grid
-                            if display_images:
-                                # Arrange in 2x3 grid (or adjust based on number of cameras)
-                                rows = []
-                                for i in range(0, len(display_images), 3):
-                                    row_images = display_images[i:i+3]
-                                    # Pad row with black images if needed
-                                    while len(row_images) < 3:
-                                        black_img = np.zeros((240, 320, 3), dtype=np.uint8)
-                                        row_images.append(black_img)
-                                    row = np.hstack(row_images)
-                                    rows.append(row)
-                                
-                                # If we have rows, combine them vertically
-                                if rows:
-                                    combined_img = np.vstack(rows)
-                                    cv2.imshow("Policy Camera Inputs", combined_img)
-                                    cv2.waitKey(1)  # Non-blocking update
-                        except cv2.error as e:
-                            logging.warning(f"OpenCV display error: {e}")
-                    else:
-                        # Alternative: Log camera info periodically when OpenCV is not available
-                        if frame_counter % 300 == 0:  # Every 10 seconds
-                            logging.info(f"📷 CAMERA DEBUG (OpenCV N/A): {len(final_cameras)} cameras active")
-                            for camera_name in final_cameras:
-                                if camera_name in available_images and available_images[camera_name] is not None:
-                                    img_shape = available_images[camera_name].shape
-                                    img_mean = np.mean(available_images[camera_name])
-                                    logging.info(f"  - {camera_name}: shape={img_shape}, mean_intensity={img_mean:.1f}")
-                if OPENCV_AVAILABLE and OPENCV_GUI_AVAILABLE and opencv_windows_created:
-                    cv2.waitKey(1)
+                # OpenCV visualization for debugging camera inputs - DISABLED FOR PERFORMANCE
+                # if final_cameras and available_images:
+                #     # Create OpenCV windows on first frame
+                #     if not opencv_windows_created:
+                #         try:
+                #             cv2.namedWindow("Policy Camera Inputs", cv2.WINDOW_NORMAL)
+                #             cv2.resizeWindow("Policy Camera Inputs", 1280, 720)
+                #             opencv_windows_created = True
+                #             logging.info(f"🖼️  Created OpenCV window for camera debugging: {final_cameras}")
+                #         except cv2.error as e:
+                #             logging.warning(f"Failed to create OpenCV window: {e}")
+                #             opencv_windows_created = False
+                #     
+                #     # Display current camera inputs in a combined view
+                #     if opencv_windows_created:
+                #         try:
+                #             display_images = []
+                #             for camera_name in final_cameras:
+                #                 if camera_name in available_images and available_images[camera_name] is not None:
+                #                     # Get the image and resize for display
+                #                     display_img = available_images[camera_name].copy()
+                #                     
+                #                     # Resize to a standard display size
+                #                     display_img = cv2.resize(display_img, (320, 240))
+                #                     
+                #                     # Convert from RGB to BGR for OpenCV display
+                #                     if len(display_img.shape) == 3 and display_img.shape[2] == 3:
+                #                         display_img = cv2.cvtColor(display_img, cv2.COLOR_RGB2BGR)
+                #                     
+                #                     # Add camera name overlay
+                #                     cv2.putText(display_img, f"{camera_name}", (10, 30), 
+                #                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                #                     cv2.putText(display_img, f"Frame: {frame_counter}", (10, 60), 
+                #                                cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
+                #                     
+                #                     display_images.append(display_img)
+                #             
+                #             # Arrange images in a grid
+                #             if display_images:
+                #                 # Arrange in 2x3 grid (or adjust based on number of cameras)
+                #                 rows = []
+                #                 for i in range(0, len(display_images), 3):
+                #                     row_images = display_images[i:i+3]
+                #                     # Pad row with black images if needed
+                #                     while len(row_images) < 3:
+                #                         black_img = np.zeros((240, 320, 3), dtype=np.uint8)
+                #                         row_images.append(black_img)
+                #                     row = np.hstack(row_images)
+                #                     rows.append(row)
+                #                 
+                #                 # If we have rows, combine them vertically
+                #                 if rows:
+                #                     combined_img = np.vstack(rows)
+                #                     cv2.imshow("Policy Camera Inputs", combined_img)
+                #                     cv2.waitKey(1)  # Non-blocking update
+                #         except cv2.error as e:
+                #             logging.warning(f"OpenCV display error: {e}")
+                #     else:
+                #         # Alternative: Log camera info periodically when OpenCV is not available
+                #         if frame_counter % 300 == 0:  # Every 10 seconds
+                #             logging.info(f"📷 CAMERA DEBUG (OpenCV N/A): {len(final_cameras)} cameras active")
+                #             for camera_name in final_cameras:
+                #                 if camera_name in available_images and available_images[camera_name] is not None:
+                #                     img_shape = available_images[camera_name].shape
+                #                     img_mean = np.mean(available_images[camera_name])
+                #                     logging.info(f"  - {camera_name}: shape={img_shape}, mean_intensity={img_mean:.1f}")
+                # if OPENCV_AVAILABLE and OPENCV_GUI_AVAILABLE and opencv_windows_created:
+                #     cv2.waitKey(1)
                 
                 # Log which cameras are being used
                 if len(observation) == 0:
@@ -676,7 +676,7 @@ def eval_policy(
                     logging.error(f"Training camera settings: cameras={cfg.feature_selection.cameras}, exclude_cameras={cfg.feature_selection.exclude_cameras}")
                     raise RuntimeError("No valid camera observations available!")
                 else:
-                    if frame_counter % 300 == 0:  # Log every 10 seconds instead of every frame
+                    if frame_counter % 600 == 0:  # Log every 20 seconds instead of every frame
                         logging.info(f"Using cameras: {list(observation.keys())}")
 
                 # Get camera positions if active camera is enabled by policy
@@ -757,34 +757,34 @@ def eval_policy(
                 # Concatenate all state components
                 observation_state = np.concatenate(state_components)
                 
-                # Log state vector every 30 seconds (more frequent than 60s)
-                if time.time() - last_state_log_time > 30:
-                    logging.info(f"📊 STATE VECTOR (every 30s): shape={observation_state.shape}")
-                    logging.info(f"  First 10 values: {observation_state[:10]}")
-                    logging.info(f"  Last 10 values: {observation_state[-10:]}")
-                    logging.info(f"  Min/Max/Mean: {observation_state.min():.3f}/{observation_state.max():.3f}/{observation_state.mean():.3f}")
+                # Log state vector every 60 seconds (less frequent for performance) - DISABLED FOR PERFORMANCE
+                if time.time() - last_state_log_time > 60:
+                    # logging.info(f"📊 STATE VECTOR (every 60s): shape={observation_state.shape}")
+                    # logging.info(f"  First 10 values: {observation_state[:10]}")
+                    # logging.info(f"  Last 10 values: {observation_state[-10:]}")
+                    # logging.info(f"  Min/Max/Mean: {observation_state.min():.3f}/{observation_state.max():.3f}/{observation_state.mean():.3f}")
                     
-                    # Also log camera status
-                    logging.info(f"📷 CAMERA STATUS:")
-                    for camera_name in final_cameras:
-                        if camera_name in available_images and available_images[camera_name] is not None:
-                            img_shape = available_images[camera_name].shape
-                            img_mean = np.mean(available_images[camera_name])
-                            img_min = np.min(available_images[camera_name])
-                            img_max = np.max(available_images[camera_name])
-                            logging.info(f"  - {camera_name}: shape={img_shape}, intensity={img_min:.1f}-{img_max:.1f} (mean={img_mean:.1f})")
-                        else:
-                            logging.info(f"  - {camera_name}: NOT AVAILABLE")
+                    # Also log camera status (reduced for performance)
+                    # logging.info(f"📷 CAMERA STATUS:")
+                    # for camera_name in final_cameras:
+                    #     if camera_name in available_images and available_images[camera_name] is not None:
+                    #         img_shape = available_images[camera_name].shape
+                    #         img_mean = np.mean(available_images[camera_name])
+                    #         img_min = np.min(available_images[camera_name])
+                    #         img_max = np.max(available_images[camera_name])
+                    #         logging.info(f"  - {camera_name}: shape={img_shape}, intensity={img_min:.1f}-{img_max:.1f} (mean={img_mean:.1f})")
+                    #     else:
+                    #         logging.info(f"  - {camera_name}: NOT AVAILABLE")
                     
                     last_state_log_time = time.time()
                 
-                # Log feature breakdown only occasionally
-                if frame_counter % 300 == 0:  # Every 10 seconds at 30fps
+                # Log feature breakdown only occasionally (reduced frequency for performance)
+                if frame_counter % 600 == 0:  # Every 20 seconds at 30fps instead of every 10 seconds
                     total_dim = sum(comp.shape[0] for comp in state_components)
-                    logging.info(f"State vector construction:")
-                    for feature in feature_log:
-                        logging.info(f"  + {feature}")
-                    logging.info(f"  = Total: {total_dim}D")
+                    # logging.info(f"State vector construction:")
+                    # for feature in feature_log:
+                    #     logging.info(f"  + {feature}")
+                    # logging.info(f"  = Total: {total_dim}D")
                 
                 # Verify state dimension matches policy expectation
                 expected_state_dim = policy_config_info.get('state_dim')
@@ -804,13 +804,14 @@ def eval_policy(
                     logging.error(f"Check the train_config.json file in the policy directory for the exact configuration.")
                     raise RuntimeError(f"State dimension mismatch: expected {expected_state_dim}, got {actual_state_dim}")
                 else:
-                    if frame_counter % 300 == 0:  # Log every 10 seconds
-                        logging.info(f"✓ State dimension correct: {actual_state_dim}")
-                        logging.info(f"✓ Training feature selection: cameras={len([k for k in observation.keys() if 'images' in k])}, "
-                                   f"velocities={cfg.feature_selection.use_joint_velocities}, "
-                                   f"torques={cfg.feature_selection.use_joint_torques}, "
-                                   f"pressure={cfg.feature_selection.use_pressure_sensors}")
-                        logging.debug(f"State components breakdown: {[comp.shape for comp in state_components]}")
+                    if frame_counter % 600 == 0:  # Log every 20 seconds for performance - DISABLED FOR PERFORMANCE
+                        # logging.info(f"✓ State dimension correct: {actual_state_dim}")
+                        # logging.info(f"✓ Training feature selection: cameras={len([k for k in observation.keys() if 'images' in k])}, "
+                        #            f"velocities={cfg.feature_selection.use_joint_velocities}, "
+                        #            f"torques={cfg.feature_selection.use_joint_torques}, "
+                        #            f"pressure={cfg.feature_selection.use_pressure_sensors}")
+                        # logging.debug(f"State components breakdown: {[comp.shape for comp in state_components]}")
+                        pass
                 
                 observation["observation.state"] = torch.from_numpy(observation_state).float()
 
@@ -823,11 +824,12 @@ def eval_policy(
                 )
                 action = action.cpu().numpy()
                 
-                # Log policy action every 5 seconds for debugging
-                if frame_counter % 150 == 0:  # Every 5 seconds at 30fps
-                    logging.info(f"🤖 POLICY ACTION (frame {frame_counter}): shape={action.shape}")
-                    logging.info(f"  Action values: {action[:10]}...{action[-10:] if len(action) > 10 else action}")
-                    logging.info(f"  Action range: {action.min():.3f} to {action.max():.3f}")
+                # Log policy action every 20 seconds for debugging (reduced frequency for performance) - DISABLED FOR PERFORMANCE
+                if frame_counter % 600 == 0:  # Every 20 seconds at 30fps
+                    # logging.info(f"🤖 POLICY ACTION (frame {frame_counter}): shape={action.shape}")
+                    # logging.info(f"  Action values: {action[:10]}...{action[-10:] if len(action) > 10 else action}")
+                    # logging.info(f"  Action range: {action.min():.3f} to {action.max():.3f}")
+                    pass
                 
                 # Show periodic instructions for terminal controls (every 60 seconds instead of 30)
                 if cfg.record and time.time() - last_instruction_time > 60:
@@ -991,8 +993,8 @@ def eval_policy(
                         try:
                             target_pitch, target_yaw = camera_action
                             camera_controller._set_target_positions(target_pitch, target_yaw)
-                            if frame_counter % 150 == 0:  # Log every 5 seconds
-                                logging.info(f"Camera targets: Pitch={np.rad2deg(target_pitch):.1f}°, Yaw={np.rad2deg(target_yaw):.1f}°")
+                            # if frame_counter % 150 == 0:  # Log every 5 seconds
+                            #     logging.info(f"Camera targets: Pitch={np.rad2deg(target_pitch):.1f}°, Yaw={np.rad2deg(target_yaw):.1f}°")
                         except Exception as e:
                             logging.error(f"Error controlling camera: {e}")
                     else:
@@ -1013,8 +1015,8 @@ def eval_policy(
             
                 frame_counter += 1
             
-            # Log performance info periodically
-            if frame_counter % 300 == 0:  # Every ~6 seconds at 50fps
+            # Log performance info periodically (reduced frequency for performance)
+            if frame_counter % 600 == 0:  # Every ~12 seconds at 50fps instead of every 6 seconds
                 logging.info(f"Evaluation running - frame {frame_counter}, arm velocity limit: {arm_ctrl.arm_velocity_limit:.2f}")
         
             time.sleep(1/frequency)
