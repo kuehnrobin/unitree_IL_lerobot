@@ -12,7 +12,23 @@ import threading
 import numpy as np
 import signal
 import sys
-import cv2
+
+# OpenCV availability check
+try:
+    import cv2
+    OPENCV_AVAILABLE = True
+    # Test if GUI functions are available
+    try:
+        cv2.namedWindow("test", cv2.WINDOW_NORMAL)
+        cv2.destroyWindow("test")
+        OPENCV_GUI_AVAILABLE = True
+    except cv2.error:
+        OPENCV_GUI_AVAILABLE = False
+        logging.warning("OpenCV GUI functions not available - visualization will be disabled")
+except ImportError:
+    OPENCV_AVAILABLE = False
+    OPENCV_GUI_AVAILABLE = False
+    logging.warning("OpenCV not available - visualization will be disabled")
 
 import json
 from copy import copy
@@ -161,8 +177,8 @@ def eval_policy(
     tv_img_shape = None
     
     if use_head_cameras:
-        # Head camera setup - binocular side by side
-        tv_img_shape = (camera_types['head']['shape'][0], camera_types['head']['shape'][1] * 2, 3)
+        # Head camera setup - use standard recording resolution like in teleop script
+        tv_img_shape = (480, 1280, 3)  # Standard head camera recording resolution
         head_cam_img_shm = shared_memory.SharedMemory(create=True, size=np.prod(tv_img_shape) * np.uint8().itemsize)
         head_cam_img_array = np.ndarray(tv_img_shape, dtype=np.uint8, buffer=head_cam_img_shm.buf)
         logging.info(f"Initialized head camera shared memory with shape {tv_img_shape}")
@@ -173,8 +189,8 @@ def eval_policy(
     active_cam_img_shape = None
     
     if use_active_camera:
-        # Active camera setup - binocular side by side  
-        active_cam_img_shape = (camera_types['active']['shape'][0], camera_types['active']['shape'][1] * 2, 3)
+        # Active camera setup - use standard recording resolution like in teleop script  
+        active_cam_img_shape = (480, 1280, 3)  # Standard active camera recording resolution
         active_cam_img_shm = shared_memory.SharedMemory(create=True, size=np.prod(active_cam_img_shape) * np.uint8().itemsize)
         active_cam_img_array = np.ndarray(active_cam_img_shape, dtype=np.uint8, buffer=active_cam_img_shm.buf)
         logging.info(f"Initialized active camera shared memory with shape {active_cam_img_shape}")
@@ -185,8 +201,8 @@ def eval_policy(
     wrist_img_shape = None
     
     if use_wrist_cameras:
-        # Wrist camera setup - binocular side by side
-        wrist_img_shape = (camera_types['wrist']['shape'][0], camera_types['wrist']['shape'][1] * 2, 3)
+        # Wrist camera setup - use standard recording resolution like in teleop script
+        wrist_img_shape = (480, 1280, 3)  # Standard wrist camera recording resolution (2 cameras side by side)
         wrist_img_shm = shared_memory.SharedMemory(create=True, size=np.prod(wrist_img_shape) * np.uint8().itemsize)
         wrist_img_array = np.ndarray(wrist_img_shape, dtype=np.uint8, buffer=wrist_img_shm.buf)
         logging.info(f"Initialized wrist camera shared memory with shape {wrist_img_shape}")
@@ -747,6 +763,19 @@ def eval_policy(
                     logging.info(f"  First 10 values: {observation_state[:10]}")
                     logging.info(f"  Last 10 values: {observation_state[-10:]}")
                     logging.info(f"  Min/Max/Mean: {observation_state.min():.3f}/{observation_state.max():.3f}/{observation_state.mean():.3f}")
+                    
+                    # Also log camera status
+                    logging.info(f"📷 CAMERA STATUS:")
+                    for camera_name in final_cameras:
+                        if camera_name in available_images and available_images[camera_name] is not None:
+                            img_shape = available_images[camera_name].shape
+                            img_mean = np.mean(available_images[camera_name])
+                            img_min = np.min(available_images[camera_name])
+                            img_max = np.max(available_images[camera_name])
+                            logging.info(f"  - {camera_name}: shape={img_shape}, intensity={img_min:.1f}-{img_max:.1f} (mean={img_mean:.1f})")
+                        else:
+                            logging.info(f"  - {camera_name}: NOT AVAILABLE")
+                    
                     last_state_log_time = time.time()
                 
                 # Log feature breakdown only occasionally
@@ -793,6 +822,12 @@ def eval_policy(
                     observation, policy, get_safe_torch_device(policy.config.device), policy.config.use_amp
                 )
                 action = action.cpu().numpy()
+                
+                # Log policy action every 5 seconds for debugging
+                if frame_counter % 150 == 0:  # Every 5 seconds at 30fps
+                    logging.info(f"🤖 POLICY ACTION (frame {frame_counter}): shape={action.shape}")
+                    logging.info(f"  Action values: {action[:10]}...{action[-10:] if len(action) > 10 else action}")
+                    logging.info(f"  Action range: {action.min():.3f} to {action.max():.3f}")
                 
                 # Show periodic instructions for terminal controls (every 60 seconds instead of 30)
                 if cfg.record and time.time() - last_instruction_time > 60:
@@ -1004,11 +1039,14 @@ def eval_policy(
                     logging.error(f"Error disconnecting camera controller: {e}")
             
             # Cleanup OpenCV windows
-            try:
-                cv2.destroyAllWindows()
-                logging.info("OpenCV windows closed")
-            except Exception as e:
-                logging.error(f"Error closing OpenCV windows: {e}")
+            if OPENCV_AVAILABLE:
+                try:
+                    cv2.destroyAllWindows()
+                    logging.info("OpenCV windows closed")
+                except Exception as e:
+                    logging.error(f"Error closing OpenCV windows: {e}")
+            else:
+                logging.debug("OpenCV cleanup skipped (not available)")
             
             arm_ctrl.ctrl_dual_arm_go_home()
             logging.info("Arms returned to home position")

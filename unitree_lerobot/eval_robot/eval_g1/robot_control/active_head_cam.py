@@ -24,7 +24,7 @@ class ActiveCameraController:
     """Controller for the active camera servo system using DynamixelAgent with threaded head tracking."""
     
     def __init__(self, port="/dev/serial/by-id/usb-FTDI_USB__-__Serial_Converter_FT3R4A5A-if00-port0", 
-                 pitch_id=1, yaw_id=2, safe_mode=False, max_movement_deg=60.0, 
+                 pitch_id=1, yaw_id=2, safe_mode=False, max_movement_deg=90.0, 
                  tv_wrapper=None, logger=None):
         """Initialize the camera controller with two servos for pitch and yaw.
         
