@@ -38,14 +38,17 @@ export HF_HOME=$BIGWORK/huggingface_cache
 export TRANSFORMERS_CACHE=$BIGWORK/huggingface_cache
 export HF_DATASETS_CACHE=$BIGWORK/datasets_cache
 
-# Disable internet access for offline training
+# Configure cache directories to avoid filling home directory
+export PIP_CACHE_DIR=$SOFTWARE/humanoid/.cache/pip
+
+# Configure for offline W&B logging (cluster branch - always offline)
 export WANDB_MODE=offline
+export WANDB_DIR=$BIGWORK/wandb_logs
+
+# Ensure offline operation
 export HF_HUB_OFFLINE=1
 export TRANSFORMERS_OFFLINE=1
 export TORCH_HUB_OFFLINE=1
-
-# W&B local logging directory
-export WANDB_DIR=$BIGWORK/wandb_logs
 
 # Local dataset path
 export LOCAL_DATASET_PATH=$BIGWORK/LargeFiles/g1_cubes_s_fixed
@@ -55,15 +58,10 @@ export OUTPUTS_DIR=$BIGWORK/outputs
 
 
 # Run the ablation study
-echo "Starting ablation study..."
-echo "Using local dataset: $LOCAL_DATASET_PATH"
-echo "Using torch cache: $TORCH_HOME"
-echo "W&B logs directory: $WANDB_DIR"
-echo "Running in OFFLINE mode - W&B logs saved locally"
-echo ""
-echo "Environment variables:"
-echo "WANDB_MODE=$WANDB_MODE"
-echo "HF_HUB_OFFLINE=$HF_HUB_OFFLINE"
+echo "=== Starting Cluster Training ==="
+echo "W&B logs will be saved to: $WANDB_DIR"
+echo "Training outputs will be saved to: $OUTPUTS_DIR"
+echo "Running in OFFLINE mode - no internet required"
 echo ""
 
 # Verify local paths exist
@@ -83,6 +81,7 @@ echo "✓ Found dataset: $LOCAL_DATASET_PATH"
 echo "✓ Found torch models: $TORCH_HOME"
 echo ""
 
+# Run the ablation study (cluster branch - simplified)
 srun python unitree_lerobot/scripts/run_ablation_study.py \
         --config_file unitree_lerobot/examples/cluster_run_config.yaml \
         --dataset_repo "$LOCAL_DATASET_PATH" \
@@ -94,15 +93,7 @@ srun python unitree_lerobot/scripts/run_ablation_study.py \
         --batch_size 12
 
 echo ""
-echo "Training completed!"
-echo "Training outputs saved to: $OUTPUTS_DIR"
-echo "W&B logs saved to: $WANDB_DIR"
-echo ""
-echo "To view W&B logs after training:"
-echo "1. Copy logs to local machine: scp -r username@luis:$WANDB_DIR ."
-echo "2. Install wandb locally: pip install wandb"
-echo "3. Sync offline logs: wandb sync wandb_logs/"
-echo "4. View in browser: wandb server"
-
 echo "Job completed at: $(date)"
+echo "Check results in: $OUTPUTS_DIR"
+echo "Check W&B logs in: $WANDB_DIR"
 
