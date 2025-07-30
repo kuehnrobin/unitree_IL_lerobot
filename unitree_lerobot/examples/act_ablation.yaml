@@ -7,51 +7,43 @@ experiments:
   #   config:
   #     use_joint_velocities: false
   #     use_joint_torques: false
-  #     exclude_cameras: '["cam_left_head"]'
   #     dataset_repo: "kuehnrobin/g1_cubes_s_fixed"
-  #     n_decoder_layers: 3
+  #     n_decoder_layers: 7
   #     n_action_steps: 1
   #     temporal_ensemble_coeff: 0.005
 
-  # ===== ARCHITECTURE ABLATIONS =====
-  # Test different vision backbones
-      
-  - name: "dinov2_backbone_just_active_cam"
-    config:
-      # Based on Open Television parametersTest DINOv2 backbone with specific settings
-      vision_backbone: "dinov2_vits14"
-      pretrained_backbone_weights: null
-      batch_size: 1   # Smaller batch size for DINOv2 due to memory requirements
-      optimizer_lr: 5e-6  # Lower learning rate often works better with DINOv2
-      optimizer_lr_backbone: 1e-6  # Even lower for backbone
-      use_joint_velocities: false
-      use_joint_torques: false
-      dataset_repo: "kuehnrobin/g1_cubes_no_hover_fixed"
-      cameras: '["cam_right_active", "cam_left_active"]'
-      # DINOv2ACTConfig settings
-      chunk_size: 60
-      n_action_steps: 1
-      temporal_ensemble_coeff: 0.005
-      dim_model: 512
-      n_heads: 8
-      n_encoder_layers: 4
-      n_decoder_layers: 2
-      # Additional VAE settings for stability
-      use_vae: true
-      latent_dim: 32
-      n_vae_encoder_layers: 4
-      kl_weight: 10.0
-      dropout: 0.1
-      use_amp: true
+  # # ===== ARCHITECTURE ABLATIONS =====
+  # # Test different vision backbones
+
+  # - name: "open_tv_resnet"
+  #   config:
+  #     chunk_size: 60
+  #     use_joint_velocities: false
+  #     use_joint_torques: false
+  #     exclude_cameras: '["cam_left_head"]'
+  #     dataset_repo: "kuehnrobin/g1_cubes_no_hover_fixed"
+  #     n_decoder_layers: 7
+  #     n_action_steps: 1
+  #     temporal_ensemble_coeff: 0.005
+  #     batch_size: 8
+
+  # - name: "open_tv_resnet"
+  #   config:
+  #     chunk_size: 60
+  #     use_joint_velocities: false
+  #     use_joint_torques: false
+  #     exclude_cameras: '["cam_left_head"]'
+  #     dataset_repo: "kuehnrobin/g1_cubes_s_fixed"
+  #     n_decoder_layers: 7
+  #     n_action_steps: 1
+  #     temporal_ensemble_coeff: 0.005
+  #     batch_size: 8
     
-  - name: "dinov2_backbone_active__wrist_cam"
+    
+  - name: "wrist_active"
     config:
       # Based on Open Television parametersTest DINOv2 backbone with specific settings
-      vision_backbone: "dinov2_vits14"
-      pretrained_backbone_weights: null
-      batch_size: 1   # Smaller batch size for DINOv2 due to memory requirements
-      optimizer_lr: 5e-6  # Lower learning rate often works better with DINOv2
-      optimizer_lr_backbone: 1e-6  # Even lower for backbone
+      batch_size: 4   # Smaller batch size for DINOv2 due to memory requirements
       use_joint_velocities: false
       use_joint_torques: false
       dataset_repo: "kuehnrobin/g1_cubes_no_hover_fixed"
@@ -60,17 +52,95 @@ experiments:
       chunk_size: 60
       n_action_steps: 1
       temporal_ensemble_coeff: 0.005
-      dim_model: 512
-      n_heads: 8
       n_encoder_layers: 4
-      n_decoder_layers: 2
-      # Additional VAE settings for stability
-      use_vae: true
-      latent_dim: 32
-      n_vae_encoder_layers: 4
-      kl_weight: 10.0
-      dropout: 0.1
-      use_amp: true
+      n_decoder_layers: 7
+  
+  - name: "just_active"
+    config:
+      # Based on Open Television parametersTest DINOv2 backbone with specific settings
+      batch_size: 5   # Smaller batch size for DINOv2 due to memory requirements
+      optimizer_lr: 5e-6  # Lower learning rate often works better with DINOv2
+      use_joint_velocities: false
+      use_joint_torques: false
+      dataset_repo: "kuehnrobin/g1_cubes_no_hover_fixed"
+      cameras: '["cam_right_active", "cam_left_active"]'
+      # DINOv2ACTConfig settings
+      chunk_size: 60
+      n_action_steps: 1
+      temporal_ensemble_coeff: 0.005
+      n_decoder_layers: 7
+
+  - name: "active_wrist_one_high"
+    config:
+      # Based on Open Television parametersTest DINOv2 backbone with specific settings
+      batch_size: 5   # Smaller batch size for DINOv2 due to memory requirements
+      optimizer_lr: 5e-6  # Lower learning rate often works better with DINOv2
+      use_joint_velocities: false
+      use_joint_torques: false
+      dataset_repo: "kuehnrobin/g1_cubes_no_hover_fixed"
+      cameras: '["cam_right_active", "cam_left_active", "cam_left_wrist", "cam_right_wrist"]'
+      # DINOv2ACTConfig settings
+      chunk_size: 60
+      n_action_steps: 1
+      temporal_ensemble_coeff: 0.005
+      n_decoder_layers: 7
+
+    
+  # - name: "dinov2_backbone_just_active_cam"
+  #   config:
+  #     # Based on Open Television parametersTest DINOv2 backbone with specific settings
+  #     vision_backbone: "dinov2_vits14"
+  #     pretrained_backbone_weights: null
+  #     batch_size: 1   # Smaller batch size for DINOv2 due to memory requirements
+  #     optimizer_lr: 5e-6  # Lower learning rate often works better with DINOv2
+  #     optimizer_lr_backbone: 1e-6  # Even lower for backbone
+  #     use_joint_velocities: false
+  #     use_joint_torques: false
+  #     dataset_repo: "kuehnrobin/g1_cubes_no_hover_fixed"
+  #     cameras: '["cam_right_active", "cam_left_active"]'
+  #     # DINOv2ACTConfig settings
+  #     chunk_size: 60
+  #     n_action_steps: 1
+  #     temporal_ensemble_coeff: 0.005
+  #     dim_model: 512
+  #     n_heads: 8
+  #     n_encoder_layers: 4
+  #     n_decoder_layers: 2
+  #     # Additional VAE settings for stability
+  #     use_vae: true
+  #     latent_dim: 32
+  #     n_vae_encoder_layers: 4
+  #     kl_weight: 10.0
+  #     dropout: 0.1
+  #     use_amp: true
+    
+  # - name: "dinov2_backbone_active__wrist_cam"
+  #   config:
+  #     # Based on Open Television parametersTest DINOv2 backbone with specific settings
+  #     vision_backbone: "dinov2_vits14"
+  #     pretrained_backbone_weights: null
+  #     batch_size: 1   # Smaller batch size for DINOv2 due to memory requirements
+  #     optimizer_lr: 5e-6  # Lower learning rate often works better with DINOv2
+  #     optimizer_lr_backbone: 1e-6  # Even lower for backbone
+  #     use_joint_velocities: false
+  #     use_joint_torques: false
+  #     dataset_repo: "kuehnrobin/g1_cubes_no_hover_fixed"
+  #     cameras: '["cam_right_active", "cam_left_active", "cam_left_wrist", "cam_right_wrist"]'
+  #     # DINOv2ACTConfig settings
+  #     chunk_size: 60
+  #     n_action_steps: 1
+  #     temporal_ensemble_coeff: 0.005
+  #     dim_model: 512
+  #     n_heads: 8
+  #     n_encoder_layers: 4
+  #     n_decoder_layers: 2
+  #     # Additional VAE settings for stability
+  #     use_vae: true
+  #     latent_dim: 32
+  #     n_vae_encoder_layers: 4
+  #     kl_weight: 10.0
+  #     dropout: 0.1
+  #     use_amp: true
 
   # - name: "dinov2_backbone"
   #   config:
