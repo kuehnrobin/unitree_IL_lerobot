@@ -4,7 +4,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --ntasks-per-node=8
-#SBATCH --gres=gpu:1
+#SBATCH --gres=gpu:a100m40:1
 #SBATCH --mem=40G
 #SBATCH --time=24:00:00
 #SBATCH --output=%x_%j.out
@@ -50,10 +50,38 @@ export WANDB_DIR=$BIGWORK/wandb_logs
 # Local dataset path
 export LOCAL_DATASET_PATH=$BIGWORK/LargeFiles/g1_cubes_s_fixed
 
+# Set output directory for training results
+export OUTPUTS_DIR=$BIGWORK/outputs
+
+
 # Run the ablation study
 echo "Starting ablation study..."
 echo "Using local dataset: $LOCAL_DATASET_PATH"
+echo "Using torch cache: $TORCH_HOME"
+echo "W&B logs directory: $WANDB_DIR"
+echo "Running in OFFLINE mode - W&B logs saved locally"
+echo ""
+echo "Environment variables:"
+echo "WANDB_MODE=$WANDB_MODE"
+echo "HF_HUB_OFFLINE=$HF_HUB_OFFLINE"
+echo ""
 
+# Verify local paths exist
+if [[ ! -d "$LOCAL_DATASET_PATH" ]]; then
+    echo "ERROR: Dataset path does not exist: $LOCAL_DATASET_PATH"
+    echo "Please ensure the dataset is copied to the cluster first."
+    exit 1
+fi
+
+if [[ ! -d "$TORCH_HOME" ]]; then
+    echo "ERROR: Torch models path does not exist: $TORCH_HOME"
+    echo "Please run the download_dinov2_models.py script first."
+    exit 1
+fi
+
+echo "✓ Found dataset: $LOCAL_DATASET_PATH"
+echo "✓ Found torch models: $TORCH_HOME"
+echo ""
 
 srun python unitree_lerobot/scripts/run_ablation_study.py \
         --config_file unitree_lerobot/examples/cluster_run_config.yaml \
@@ -64,6 +92,17 @@ srun python unitree_lerobot/scripts/run_ablation_study.py \
         --save_freq 10000 \
         --log_freq 1000 \
         --batch_size 12
+
+echo ""
+echo "Training completed!"
+echo "Training outputs saved to: $OUTPUTS_DIR"
+echo "W&B logs saved to: $WANDB_DIR"
+echo ""
+echo "To view W&B logs after training:"
+echo "1. Copy logs to local machine: scp -r username@luis:$WANDB_DIR ."
+echo "2. Install wandb locally: pip install wandb"
+echo "3. Sync offline logs: wandb sync wandb_logs/"
+echo "4. View in browser: wandb server"
 
 echo "Job completed at: $(date)"
 
