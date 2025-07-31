@@ -806,8 +806,8 @@ def eval_policy(
                 # Execute arm and hand actions
                 arm_ctrl.ctrl_dual_arm(arm_action, np.zeros(14))
                 if robot_config['hand_type'] == "dex3":
-                    left_hand_array[:] = hand_action[:7]
-                    right_hand_array[:] = hand_action[7:]
+                    left_hand_array[:] = action[14:21] #hand_action[:7]
+                    right_hand_array[:] = action[21:28] #hand_action[7:]
                 elif robot_config['hand_type'] == "gripper":
                     left_hand_array[:] = hand_action[0]
                     right_hand_array[:] = hand_action[1]
