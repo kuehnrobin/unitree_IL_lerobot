@@ -51,6 +51,7 @@ import yaml
 from pathlib import Path
 from typing import Dict, List, Any
 import logging
+from datetime import datetime
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -99,15 +100,17 @@ class AblationStudy:
         ]
         
         # Configure output directory - create unique directory for each experiment
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         outputs_dir = os.environ.get('OUTPUTS_DIR')
+        unique_name = f"{name}_{timestamp}"
         if outputs_dir:
-            # Create experiment-specific subdirectory to avoid conflicts
-            experiment_output_dir = os.path.join(outputs_dir, name)
+            # Create experiment-specific subdirectory with timestamp to avoid conflicts
+            experiment_output_dir = os.path.join(outputs_dir, unique_name)
             cmd.append(f"--output_dir={experiment_output_dir}")
             logger.info(f"Using experiment-specific output directory: {experiment_output_dir}")
         else:
             # Fallback to default behavior if no custom directory set
-            cmd.append(f"--output_dir=outputs/{name}")
+            cmd.append(f"--output_dir=outputs/{unique_name}")
         
         # Configure W&B for offline cluster operation (simplified for cluster branch)
         cmd.extend([
