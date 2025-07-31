@@ -519,8 +519,6 @@ def eval_policy(
                     current_lr_arm_dq = arm_ctrl.get_current_dual_arm_dq()  # 14D velocity
                 if cfg.feature_selection.use_joint_torques:
                     current_lr_arm_tau = arm_ctrl.get_current_dual_arm_tau()  # 14D torques
-                if hand_ctrl:
-                    dual_hand_state_array[:] = hand_ctrl.get_current_dual_hand_q()
                 if cfg.feature_selection.use_pressure_sensors and hand_ctrl:
                     try:
                         pressure_data = hand_ctrl.get_pressure_data() # 24 D
@@ -585,6 +583,15 @@ def eval_policy(
                 
                 # Concatenate all state components
                 observation_state = np.concatenate(state_components)
+                # Print observation_state every 30 seconds
+                if time.time() - last_state_log_time > 10:
+                    logging.info(f"Current observation_state: {observation_state}")
+                    logging.info(f"Current observation_state_length: {observation_state.shape[0]}")
+                    logging.info(f"Current left_arm_state: {current_lr_arm_q[:7]}")
+                    logging.info(f"Current right_arm_state: {current_lr_arm_q[7:14]}")
+                    logging.info(f"Current left_hand_state: {dual_hand_state_array[:7]}")
+                    logging.info(f"Current right_hand_state: {dual_hand_state_array[7:14]}")
+                    last_state_log_time = time.time()
                 #------------------
                                 
                 # Verify state dimension matches policy expectation
@@ -615,6 +622,14 @@ def eval_policy(
                     observation, policy, get_safe_torch_device(policy.config.device), policy.config.use_amp
                 )
                 action = action.cpu().numpy()
+                # Print action every 30 seconds
+                if time.time() - last_state_log_time > 10:
+                    logging.info(f"Current action:{action}")
+                    logging.info(f"Current action_length: {action.shape[0]}")
+                    logging.info(f"Current left_arm_action: {action[:7]}")
+                    logging.info(f"Current right_arm_action: {action[7:14]}")
+                    logging.info(f"Current left_hand_action: {action[14:21]}")
+                    logging.info(f"Current right_hand_action: {action[21:28]}")
                                 
                 if cfg.record and time.time() - last_instruction_time > 30:
                     print("\n📝 RECORDING CONTROLS:")
@@ -729,12 +744,12 @@ def eval_policy(
                             "torque": [],       
                         },                         
                         "left_hand": {                                   
-                            "qpos":   left_hand_action,       
+                            "qpos":   left_hand_action.tolist(),       
                             "qvel":   [],       
                             "torque": [],       
                         }, 
                         "right_hand": {                                   
-                            "qpos":   right_hand_action,       
+                            "qpos":   right_hand_action.tolist(),       
                             "qvel":   [],       
                             "torque": [], 
                         },
