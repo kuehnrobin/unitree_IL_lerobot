@@ -586,35 +586,7 @@ def eval_policy(
                 # Concatenate all state components
                 observation_state = np.concatenate(state_components)
                 #------------------
-                # Log state vector every 60 seconds (less frequent for performance) - DISABLED FOR PERFORMANCE
-                if time.time() - last_state_log_time > 60:
-                    # logging.info(f"📊 STATE VECTOR (every 60s): shape={observation_state.shape}")
-                    # logging.info(f"  First 10 values: {observation_state[:10]}")
-                    # logging.info(f"  Last 10 values: {observation_state[-10:]}")
-                    # logging.info(f"  Min/Max/Mean: {observation_state.min():.3f}/{observation_state.max():.3f}/{observation_state.mean():.3f}")
-                    
-                    # Also log camera status (reduced for performance)
-                    # logging.info(f"📷 CAMERA STATUS:")
-                    # for camera_name in final_cameras:
-                    #     if camera_name in available_images and available_images[camera_name] is not None:
-                    #         img_shape = available_images[camera_name].shape
-                    #         img_mean = np.mean(available_images[camera_name])
-                    #         img_min = np.min(available_images[camera_name])
-                    #         img_max = np.max(available_images[camera_name])
-                    #         logging.info(f"  - {camera_name}: shape={img_shape}, intensity={img_min:.1f}-{img_max:.1f} (mean={img_mean:.1f})")
-                    #     else:
-                    #         logging.info(f"  - {camera_name}: NOT AVAILABLE")
-                    
-                    last_state_log_time = time.time()
-                
-                # Log feature breakdown only occasionally (reduced frequency for performance)
-                if frame_counter % 600 == 0:  # Every 20 seconds at 30fps instead of every 10 seconds
-                    total_dim = sum(comp.shape[0] for comp in state_components)
-                    # logging.info(f"State vector construction:")
-                    # for feature in feature_log:
-                    #     logging.info(f"  + {feature}")
-                    # logging.info(f"  = Total: {total_dim}D")
-                
+                                
                 # Verify state dimension matches policy expectation
                 expected_state_dim = policy_config_info.get('state_dim')
                 actual_state_dim = observation_state.shape[0]
@@ -632,16 +604,7 @@ def eval_policy(
                     logging.error(f"These settings were automatically loaded from train_config.json!")
                     logging.error(f"Check the train_config.json file in the policy directory for the exact configuration.")
                     raise RuntimeError(f"State dimension mismatch: expected {expected_state_dim}, got {actual_state_dim}")
-                else:
-                    if frame_counter % 600 == 0:  # Log every 20 seconds for performance - DISABLED FOR PERFORMANCE
-                        # logging.info(f"✓ State dimension correct: {actual_state_dim}")
-                        # logging.info(f"✓ Training feature selection: cameras={len([k for k in observation.keys() if 'images' in k])}, "
-                        #            f"velocities={cfg.feature_selection.use_joint_velocities}, "
-                        #            f"torques={cfg.feature_selection.use_joint_torques}, "
-                        #            f"pressure={cfg.feature_selection.use_pressure_sensors}")
-                        # logging.debug(f"State components breakdown: {[comp.shape for comp in state_components]}")
-                        pass
-                
+                                
                 observation["observation.state"] = torch.from_numpy(observation_state).float()
 
                 observation = {
@@ -652,16 +615,8 @@ def eval_policy(
                     observation, policy, get_safe_torch_device(policy.config.device), policy.config.use_amp
                 )
                 action = action.cpu().numpy()
-                
-                # Log policy action every 20 seconds for debugging (reduced frequency for performance) - DISABLED FOR PERFORMANCE
-                #if frame_counter % 600 == 0:  # Every 20 seconds at 30fps
-                    # logging.info(f"🤖 POLICY ACTION (frame {frame_counter}): shape={action.shape}")
-                    # logging.info(f"  Action values: {action[:10]}...{action[-10:] if len(action) > 10 else action}")
-                    # logging.info(f"  Action range: {action.min():.3f} to {action.max():.3f}")
-
-                
-                # Show periodic instructions for terminal controls (every 60 seconds instead of 30)
-                if cfg.record and time.time() - last_instruction_time > 60:
+                                
+                if cfg.record and time.time() - last_instruction_time > 30:
                     print("\n📝 RECORDING CONTROLS:")
                     print("   s = Start | r = Abort | q = Save optimal | w = Save suboptimal | e = Save recovery | x = Exit")
                     last_instruction_time = time.time()
@@ -701,9 +656,6 @@ def eval_policy(
                     right_arm_state = current_lr_arm_q[-7:]
                     left_arm_action = action[:7]
                     right_arm_action = action[7:14]
-                    
-                    # hand state
-                    if 
 
                     # hand action and camera action (split based on hand type and camera availability)
                     if use_active_camera:
@@ -745,14 +697,14 @@ def eval_policy(
                             "torque": [],                         
                         },                        
                         "left_hand": {                                                                    
-                            "qpos":   left_hand_state,           
+                            "qpos":   dual_hand_state_array[0:7],           
                             "qvel":   [],                           
                             "torque": [], 
                             "pressures": pressure_data['left_pressure'],
                             #"temperatures": pressure_data['left_temp'],  TODO: Testen, denke aber nicht dass das einen großen einfluss hat           
                         }, 
                         "right_hand": {                                                                    
-                            "qpos":   right_hand_state,       
+                            "qpos":    dual_hand_state_array[7:14],       
                             "qvel":   [],                           
                             "torque": [],
                             "pressures": pressure_data['right_pressure'],
@@ -871,17 +823,7 @@ def eval_policy(
                     logging.info("Camera controller disconnected")
                 except Exception as e:
                     logging.error(f"Error disconnecting camera controller: {e}")
-            
-            # Cleanup OpenCV windows
-            if OPENCV_AVAILABLE:
-                try:
-                    cv2.destroyAllWindows()
-                    logging.info("OpenCV windows closed")
-                except Exception as e:
-                    logging.error(f"Error closing OpenCV windows: {e}")
-            else:
-                logging.debug("OpenCV cleanup skipped (not available)")
-            
+                        
             arm_ctrl.ctrl_dual_arm_go_home()
             logging.info("Arms returned to home position")
             
