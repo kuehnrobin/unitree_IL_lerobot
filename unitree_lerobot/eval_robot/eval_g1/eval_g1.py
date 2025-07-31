@@ -13,22 +13,8 @@ import numpy as np
 import signal
 import sys
 
-# OpenCV availability check
-try:
-    import cv2
-    OPENCV_AVAILABLE = True
-    # Test if GUI functions are available
-    try:
-        cv2.namedWindow("test", cv2.WINDOW_NORMAL)
-        cv2.destroyWindow("test")
-        OPENCV_GUI_AVAILABLE = True
-    except cv2.error:
-        OPENCV_GUI_AVAILABLE = False
-        logging.warning("OpenCV GUI functions not available - visualization will be disabled")
-except ImportError:
-    OPENCV_AVAILABLE = False
-    OPENCV_GUI_AVAILABLE = False
-    logging.warning("OpenCV not available - visualization will be disabled")
+import tty
+import termios
 
 import json
 from copy import copy
@@ -80,34 +66,6 @@ signal_handler.call_count = 0
 # Set up signal handler for Ctrl+C
 signal.signal(signal.SIGINT, signal_handler)
 
-# TODO Remove if code works with correct import
-# copy from lerobot.common.robot_devices.control_utils import predict_action
-# def predict_action(observation, policy, device, use_amp):
-#     observation = copy(observation)
-#     with (
-#         torch.inference_mode(),
-#         torch.autocast(device_type=device.type) if device.type == "cuda" and use_amp else nullcontext(),
-#     ):
-#         # Convert to pytorch format: channel first and float32 in [0,1] with batch dimension
-#         for name in observation:
-#             if "images" in name:
-#                 observation[name] = observation[name].type(torch.float32) / 255
-#                 observation[name] = observation[name].permute(2, 0, 1).contiguous()
-#             observation[name] = observation[name].unsqueeze(0)
-#             observation[name] = observation[name].to(device)
-
-#         # Compute the next action with the policy
-#         # based on the current observation
-#         action = policy.select_action(observation)
-
-#         # Remove batch dimension
-#         action = action.squeeze(0)
-
-#         # Move to cpu, if not already the case
-#         action = action.to("cpu")
-
-#     return action
-
 
 def eval_policy(
     policy: torch.nn.Module,
@@ -124,38 +82,7 @@ def eval_policy(
 
     # Check which cameras are needed based on policy config - uniform handling
     policy_cameras = policy_config_info.get('cameras', [])
-    
-    # Define camera type mappings uniformly with their configurations
-    camera_types = {
-        'head': {
-            'cameras': ['cam_left_high', 'cam_right_high'],
-            'type': 'opencv',
-            'shape': [480, 1280],
-            'ids': [6],
-            'binocular': True,
-            'shm_name': 'head_cam_img_shm',
-            'array_name': 'head_cam_img_array'
-        },
-        'wrist': {
-            'cameras': ['cam_left_wrist', 'cam_right_wrist'],
-            'type': 'opencv', 
-            'shape': [480, 640],
-            'ids': [8, 10],
-            'binocular': False,
-            'shm_name': 'wrist_img_shm',
-            'array_name': 'wrist_img_array'
-        },
-        'active': {
-            'cameras': ['cam_left_active', 'cam_right_active'],
-            'type': 'opencv',
-            'shape': [480, 1280],
-            'ids': [12],
-            'binocular': True,
-            'shm_name': 'active_cam_img_shm',
-            'array_name': 'active_cam_img_array'
-        }
-    }
-    
+  
     # Check which camera types are required by the policy uniformly
     required_camera_types = policy_config_info.get('camera_types', {})
     
@@ -273,9 +200,9 @@ def eval_policy(
         dual_hand_data_lock = Lock()
         dual_hand_state_array = Array('d', 14, lock = False)  # [output] current left, right hand state(14) data.
         dual_hand_action_array = Array('d', 14, lock = False) # [output] current left, right hand action(14) data.
-        # Enable force mode to get pressure sensor data when pressure is enabled
         hand_ctrl = Dex3_1_Controller(left_hand_array, right_hand_array, dual_hand_data_lock, dual_hand_state_array, dual_hand_action_array, networkInterface=cfg.cyclonedds_uri, force=cfg.force)
         # For 80D state (qpos+qvel+pressure), extract hand poses from qpos portion (first 28 dims)
+        # TODO Was macht das hier?
         init_left_hand_pose = step['observation.state'][14:21].cpu().numpy()
         init_right_hand_pose = step['observation.state'][21:28].cpu().numpy()
 
@@ -306,45 +233,13 @@ def eval_policy(
                 max_movement_deg=cfg.camera_max_movement,
                 logger=logging.getLogger('ActiveCameraController')
             )
-            
-            # Connect to servos
-            logging.info("Connecting to camera servos...")
-            if not camera_controller.connect():
-                logging.error("Failed to connect to camera servos")
-                camera_controller = None
-            else:
-                logging.info("Camera controller connected successfully")
-                # Extract initial camera positions from dataset if available
-                state_dim = step['observation.state'].shape[0]
-                logging.info(f"Dataset state dimension: {state_dim}")
-                # TODO Fall active und head camera handeln
-                
-                # Calculate where camera positions should be in the state vector
-                # Based on: arm(14) + hand(14 for dex3, 2 for gripper) + camera(2 if active)
-                if robot_config['hand_type'] == "dex3":
-                    camera_start_idx = 14 + 14  # arm + dex3 hands = 28
-                elif robot_config['hand_type'] == "gripper":
-                    camera_start_idx = 14 + 2   # arm + gripper = 16
-                else:
-                    camera_start_idx = 14       # arm only = 14
-                
-                camera_end_idx = camera_start_idx + 2
-                
-                if state_dim >= camera_end_idx:
-                    init_camera_pose = step['observation.state'][camera_start_idx:camera_end_idx].cpu().numpy()
-                    logging.info(f"Initial camera positions from dataset: Pitch={np.rad2deg(init_camera_pose[0]):.2f}°, Yaw={np.rad2deg(init_camera_pose[1]):.2f}°")
-                else:
-                    init_camera_pose = camera_controller.start_positions
-                    logging.info(f"Using default camera positions: Pitch={np.rad2deg(init_camera_pose[0]):.2f}°, Yaw={np.rad2deg(init_camera_pose[1]):.2f}°")
+            init_camera_pose = np.array([195.0 * np.pi / 180, 90.0 * np.pi / 180])
+            logging.info(f"Initial camera positions from dataset: Pitch={np.rad2deg(init_camera_pose[0]):.2f}°, Yaw={np.rad2deg(init_camera_pose[1]):.2f}°")
         except Exception as e:
             logging.error(f"Failed to initialize active camera: {e}")
             camera_controller = None
     else:
         logging.info("Policy doesn't use active camera - camera controller disabled")
-    
-    # Set default camera pose if not initialized but needed
-    if use_active_camera and init_camera_pose is None:
-        init_camera_pose = np.array([195.0 * np.pi / 180, 90.0 * np.pi / 180])  # Default safe positions
 
     #===============init robot=====================
     # Initialize recorder only if recording is enabled
@@ -354,18 +249,15 @@ def eval_policy(
         logging.info("Recording will use terminal controls - press 's' to start recording episodes")
         
     if cfg.pressure and hand_ctrl and robot_config['hand_type'] == "dex3":
-        force_mode = "enabled" if cfg.force else "disabled"
-        logging.info(f"Pressure sensor data collection enabled via hand controller (force mode: {force_mode})")
+        # TODO force in hand_torque umbenennen. Aktuell irreführend.
+        hand_torque_mode = "enabled" if cfg.force else "disabled"
+        logging.info(f"Pressure sensor data collection enabled via hand controller (torque mode: {hand_torque_mode})")
     else:
         logging.info("Pressure sensor data collection disabled")
     
     print("Please press 's' to start the subsequent program (no Enter needed):")
     
     # Non-blocking input for initial start
-    import sys
-    import tty
-    import termios
-    
     old_settings = termios.tcgetattr(sys.stdin)
     try:
         tty.setraw(sys.stdin.fileno())
@@ -416,7 +308,6 @@ def eval_policy(
         # Add debugging variables
         camera_selection_logged = False  # Track if camera selection has been logged once
         last_state_log_time = time.time()  # For periodic state vector logging
-        opencv_windows_created = False  # Track if OpenCV windows have been created
 
         # Add terminal input thread for recording controls
         if cfg.record:
@@ -599,76 +490,7 @@ def eval_policy(
                         #     logging.debug(f"Added camera: {camera_name}")
                     else:
                         logging.warning(f"Camera {camera_name} selected but not available!")
-                
-                # OpenCV visualization for debugging camera inputs - DISABLED FOR PERFORMANCE
-                # if final_cameras and available_images:
-                #     # Create OpenCV windows on first frame
-                #     if not opencv_windows_created:
-                #         try:
-                #             cv2.namedWindow("Policy Camera Inputs", cv2.WINDOW_NORMAL)
-                #             cv2.resizeWindow("Policy Camera Inputs", 1280, 720)
-                #             opencv_windows_created = True
-                #             logging.info(f"🖼️  Created OpenCV window for camera debugging: {final_cameras}")
-                #         except cv2.error as e:
-                #             logging.warning(f"Failed to create OpenCV window: {e}")
-                #             opencv_windows_created = False
-                #     
-                #     # Display current camera inputs in a combined view
-                #     if opencv_windows_created:
-                #         try:
-                #             display_images = []
-                #             for camera_name in final_cameras:
-                #                 if camera_name in available_images and available_images[camera_name] is not None:
-                #                     # Get the image and resize for display
-                #                     display_img = available_images[camera_name].copy()
-                #                     
-                #                     # Resize to a standard display size
-                #                     display_img = cv2.resize(display_img, (320, 240))
-                #                     
-                #                     # Convert from RGB to BGR for OpenCV display
-                #                     if len(display_img.shape) == 3 and display_img.shape[2] == 3:
-                #                         display_img = cv2.cvtColor(display_img, cv2.COLOR_RGB2BGR)
-                #                     
-                #                     # Add camera name overlay
-                #                     cv2.putText(display_img, f"{camera_name}", (10, 30), 
-                #                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
-                #                     cv2.putText(display_img, f"Frame: {frame_counter}", (10, 60), 
-                #                                cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
-                #                     
-                #                     display_images.append(display_img)
-                #             
-                #             # Arrange images in a grid
-                #             if display_images:
-                #                 # Arrange in 2x3 grid (or adjust based on number of cameras)
-                #                 rows = []
-                #                 for i in range(0, len(display_images), 3):
-                #                     row_images = display_images[i:i+3]
-                #                     # Pad row with black images if needed
-                #                     while len(row_images) < 3:
-                #                         black_img = np.zeros((240, 320, 3), dtype=np.uint8)
-                #                         row_images.append(black_img)
-                #                     row = np.hstack(row_images)
-                #                     rows.append(row)
-                #                 
-                #                 # If we have rows, combine them vertically
-                #                 if rows:
-                #                     combined_img = np.vstack(rows)
-                #                     cv2.imshow("Policy Camera Inputs", combined_img)
-                #                     cv2.waitKey(1)  # Non-blocking update
-                #         except cv2.error as e:
-                #             logging.warning(f"OpenCV display error: {e}")
-                #     else:
-                #         # Alternative: Log camera info periodically when OpenCV is not available
-                #         if frame_counter % 300 == 0:  # Every 10 seconds
-                #             logging.info(f"📷 CAMERA DEBUG (OpenCV N/A): {len(final_cameras)} cameras active")
-                #             for camera_name in final_cameras:
-                #                 if camera_name in available_images and available_images[camera_name] is not None:
-                #                     img_shape = available_images[camera_name].shape
-                #                     img_mean = np.mean(available_images[camera_name])
-                #                     logging.info(f"  - {camera_name}: shape={img_shape}, mean_intensity={img_mean:.1f}")
-                # if OPENCV_AVAILABLE and OPENCV_GUI_AVAILABLE and opencv_windows_created:
-                #     cv2.waitKey(1)
-                
+            
                 # Log which cameras are being used
                 if len(observation) == 0:
                     logging.error("No cameras added to observation!")
@@ -690,73 +512,80 @@ def eval_policy(
                     current_camera_q = None
 
                 # Build observation state using training feature selection (loaded from train_config.json)
+                # --------------------------------------
+                # Get state_data
                 current_lr_arm_q = arm_ctrl.get_current_dual_arm_q()  # 14D
-                current_lr_arm_dq = arm_ctrl.get_current_dual_arm_dq()  # 14D velocity
-                
+                if cfg.feature_selection.use_joint_velocities:
+                    current_lr_arm_dq = arm_ctrl.get_current_dual_arm_dq()  # 14D velocity
+                if cfg.feature_selection.use_joint_torques:
+                    current_lr_arm_tau = arm_ctrl.get_current_dual_arm_tau()  # 14D torques
+                if hand_ctrl:
+                    dual_hand_state_array[:] = hand_ctrl.get_current_dual_hand_q()
+                if cfg.feature_selection.use_pressure_sensors and hand_ctrl:
+                    try:
+                        pressure_data = hand_ctrl.get_pressure_data() # 24 D
+                        left_hand_pressure = np.array(pressure_data['left_pressure'])  # 12D
+                        right_hand_pressure = np.array(pressure_data['right_pressure'])  # 12D
+                    except Exception as e:
+                        logging.error(f"Failed to get pressure data: {e}")
+                        left_hand_pressure = np.zeros(12)
+                        right_hand_pressure = np.zeros(12)
+
                 state_components = []
                 feature_log = []
-                
-                # 1. Always include arm positions (first 14 dimensions)
-                state_components.append(current_lr_arm_q)  # 14D
+                # --------------
+                # 1. left_arm_qpos 0-7
+                state_components.append(current_lr_arm_q[0:7])  # 7D
                 feature_log.append(f"arm_positions: {current_lr_arm_q.shape[0]}D")
+                # 2. left_arm_qvel 7-14 if enabled in training config
+                if cfg.feature_selection.use_joint_velocities:
+                    state_components.append(current_lr_arm_dq[0:7])  # +7D arm velocities
+                    feature_log.append(f"arm_velocities: {current_lr_arm_dq.shape[0]}D")
+
+                # 3. left_arm_torques 14-21 if enabled in training config
+                if cfg.feature_selection.use_joint_torques:
+                    state_components.append(current_lr_arm_tau[0:7])  # +7D arm torques
+                    feature_log.append(f"arm_torques: {current_lr_arm_tau.shape[0]}D")
                 
-                # 2. Get hand state data (next 14 or 2 dimensions depending on hand type)
+                # 4. right_arm_qpos 21-28
+                state_components.append(current_lr_arm_q[7:14])  # 7D
+
+                # 5. right_arm_qvel 28-35 if enabled in training config
+                if cfg.feature_selection.use_joint_velocities:
+                    state_components.append(current_lr_arm_dq[7:14])
+                
+                # 6. right_arm_torques 35-42 if enabled in training config
+                if cfg.feature_selection.use_joint_torques:
+                    state_components.append(current_lr_arm_tau[7:14])
+                
+                # 7. left_hand_qpos 42-49
                 if robot_config['hand_type'] == "dex3":
-                    with dual_hand_data_lock:
-                        left_hand_state = np.array(dual_hand_state_array[0:7])   # 7D
-                        right_hand_state = np.array(dual_hand_state_array[7:14]) # 7D
-                    state_components.extend([left_hand_state, right_hand_state])  # +14D
-                    feature_log.append(f"hand_positions (dex3): {left_hand_state.shape[0] + right_hand_state.shape[0]}D")
+                    state_components.append(np.array(dual_hand_state_array[0:7]))  # 7D
                 elif robot_config['hand_type'] == "gripper":
-                    with dual_gripper_data_lock:
-                        left_hand_state = np.array([dual_gripper_state_array[1]])   # 1D
-                        right_hand_state = np.array([dual_gripper_state_array[0]])  # 1D
-                    state_components.extend([left_hand_state, right_hand_state])  # +2D
-                    feature_log.append(f"hand_positions (gripper): {left_hand_state.shape[0] + right_hand_state.shape[0]}D")
+                    state_components.append(np.array([dual_gripper_state_array[1]]))  # 1D
                 
-                # 3. Add camera positions if active camera is used in policy
+                # 8. left_hand_pressure 49-61 if enabled in training config
+                if cfg.feature_selection.use_pressure_sensors and robot_config['hand_type'] == "dex3":
+                    state_components.append(np.array(left_hand_pressure))  # 12D
+                
+                # 9. right_hand_qpos 61-68
+                if robot_config['hand_type'] == "dex3":
+                    state_components.append(np.array(dual_hand_state_array[7:14]))
+                elif robot_config['hand_type'] == "gripper":
+                    state_components.append(np.array([dual_gripper_state_array[0]]))    
+                # 10. right_hand_pressure 68-80 if enabled in training config
+                if cfg.feature_selection.use_pressure_sensors and robot_config['hand_type'] == "dex3":
+                    state_components.append(np.array(right_hand_pressure))  # 12D
+                
+                # 11. camera positions 80-82 if active camera is used in policy
                 if current_camera_q is not None:
-                    state_components.append(current_camera_q)  # +2D
+                    state_components.append(current_camera_q)  # 2D
                     feature_log.append(f"camera_positions: {current_camera_q.shape[0]}D")
                 
-                # 4. Add velocities if enabled in training configuration
-                if cfg.feature_selection.use_joint_velocities:
-                    state_components.append(current_lr_arm_dq)  # +14D arm velocities
-                    feature_log.append(f"arm_velocities: {current_lr_arm_dq.shape[0]}D")
-                    
-                    if robot_config['hand_type'] == "dex3":
-                        # For now using zeros for hand velocities since not available in simple mode
-                        left_hand_vel = np.zeros(7)
-                        right_hand_vel = np.zeros(7)
-                        state_components.extend([left_hand_vel, right_hand_vel])  # +14D
-                        feature_log.append(f"hand_velocities (dex3): {left_hand_vel.shape[0] + right_hand_vel.shape[0]}D")
-                    elif robot_config['hand_type'] == "gripper":
-                        left_hand_vel = np.array([0.0])
-                        right_hand_vel = np.array([0.0])  
-                        state_components.extend([left_hand_vel, right_hand_vel])  # +2D
-                        feature_log.append(f"hand_velocities (gripper): {left_hand_vel.shape[0] + right_hand_vel.shape[0]}D")
-                
-                # 5. Add pressure sensors if enabled in training configuration
-                if cfg.feature_selection.use_pressure_sensors and robot_config['hand_type'] == "dex3":
-                    if cfg.pressure and hand_ctrl:
-                        try:
-                            pressure_data = hand_ctrl.get_pressure_data()
-                            left_pressure = np.array(pressure_data['left_pressure'])  # 12D
-                            right_pressure = np.array(pressure_data['right_pressure']) # 12D
-                        except Exception as e:
-                            left_pressure = np.zeros(12)
-                            right_pressure = np.zeros(12)
-                            if frame_counter % 300 == 0:  # Log only occasionally
-                                logging.warning(f"Failed to get pressure data, using zeros: {e}")
-                    else:
-                        left_pressure = np.zeros(12)
-                        right_pressure = np.zeros(12)
-                    state_components.extend([left_pressure, right_pressure])  # +24D
-                    feature_log.append(f"pressure_sensors: {left_pressure.shape[0] + right_pressure.shape[0]}D")
                 
                 # Concatenate all state components
                 observation_state = np.concatenate(state_components)
-                
+                #------------------
                 # Log state vector every 60 seconds (less frequent for performance) - DISABLED FOR PERFORMANCE
                 if time.time() - last_state_log_time > 60:
                     # logging.info(f"📊 STATE VECTOR (every 60s): shape={observation_state.shape}")
@@ -825,11 +654,11 @@ def eval_policy(
                 action = action.cpu().numpy()
                 
                 # Log policy action every 20 seconds for debugging (reduced frequency for performance) - DISABLED FOR PERFORMANCE
-                if frame_counter % 600 == 0:  # Every 20 seconds at 30fps
+                #if frame_counter % 600 == 0:  # Every 20 seconds at 30fps
                     # logging.info(f"🤖 POLICY ACTION (frame {frame_counter}): shape={action.shape}")
                     # logging.info(f"  Action values: {action[:10]}...{action[-10:] if len(action) > 10 else action}")
                     # logging.info(f"  Action range: {action.min():.3f} to {action.max():.3f}")
-                    pass
+
                 
                 # Show periodic instructions for terminal controls (every 60 seconds instead of 30)
                 if cfg.record and time.time() - last_instruction_time > 60:
@@ -873,6 +702,9 @@ def eval_policy(
                     left_arm_action = action[:7]
                     right_arm_action = action[7:14]
                     
+                    # hand state
+                    if 
+
                     # hand action and camera action (split based on hand type and camera availability)
                     if use_active_camera:
                         if robot_config['hand_type'] == "dex3":
@@ -1350,8 +1182,6 @@ def eval_main(cfg: EvalRealConfig):
     if hasattr(policy, 'temporal_ensembler'):
         if policy.temporal_ensembler is not None:
             logging.info("🔄 Temporal ensembler SUCCESSFULLY initialized")
-            logging.info(f"   - Ensemble coeff: {policy.temporal_ensembler.temporal_ensemble_coeff}")
-            logging.info(f"   - Chunk size: {policy.temporal_ensembler.chunk_size}")
         else:
             logging.info("⚠️  Temporal ensembler is None")
     else:
