@@ -13,6 +13,23 @@ import numpy as np
 import signal
 import sys
 
+# OpenCV availability check
+try:
+    import cv2
+    OPENCV_AVAILABLE = True
+    # Test if GUI functions are available
+    try:
+        cv2.namedWindow("test", cv2.WINDOW_NORMAL)
+        cv2.destroyWindow("test")
+        OPENCV_GUI_AVAILABLE = True
+    except cv2.error:
+        OPENCV_GUI_AVAILABLE = False
+        logging.warning("OpenCV GUI functions not available - visualization will be disabled")
+except ImportError:
+    OPENCV_AVAILABLE = False
+    OPENCV_GUI_AVAILABLE = False
+    logging.warning("OpenCV not available - visualization will be disabled")
+
 import json
 from copy import copy
 from pprint import pformat
@@ -160,8 +177,8 @@ def eval_policy(
     tv_img_shape = None
     
     if use_head_cameras:
-        # Head camera setup - binocular side by side
-        tv_img_shape = (camera_types['head']['shape'][0], camera_types['head']['shape'][1] * 2, 3)
+        # Head camera setup - use standard recording resolution like in teleop script
+        tv_img_shape = (480, 1280, 3)  # Standard head camera recording resolution
         head_cam_img_shm = shared_memory.SharedMemory(create=True, size=np.prod(tv_img_shape) * np.uint8().itemsize)
         head_cam_img_array = np.ndarray(tv_img_shape, dtype=np.uint8, buffer=head_cam_img_shm.buf)
         logging.info(f"Initialized head camera shared memory with shape {tv_img_shape}")
@@ -172,8 +189,8 @@ def eval_policy(
     active_cam_img_shape = None
     
     if use_active_camera:
-        # Active camera setup - binocular side by side  
-        active_cam_img_shape = (camera_types['active']['shape'][0], camera_types['active']['shape'][1] * 2, 3)
+        # Active camera setup - use standard recording resolution like in teleop script  
+        active_cam_img_shape = (480, 1280, 3)  # Standard active camera recording resolution
         active_cam_img_shm = shared_memory.SharedMemory(create=True, size=np.prod(active_cam_img_shape) * np.uint8().itemsize)
         active_cam_img_array = np.ndarray(active_cam_img_shape, dtype=np.uint8, buffer=active_cam_img_shm.buf)
         logging.info(f"Initialized active camera shared memory with shape {active_cam_img_shape}")
@@ -184,8 +201,8 @@ def eval_policy(
     wrist_img_shape = None
     
     if use_wrist_cameras:
-        # Wrist camera setup - binocular side by side
-        wrist_img_shape = (camera_types['wrist']['shape'][0], camera_types['wrist']['shape'][1] * 2, 3)
+        # Wrist camera setup - use standard recording resolution like in teleop script
+        wrist_img_shape = (480, 1280, 3)  # Standard wrist camera recording resolution (2 cameras side by side)
         wrist_img_shm = shared_memory.SharedMemory(create=True, size=np.prod(wrist_img_shape) * np.uint8().itemsize)
         wrist_img_array = np.ndarray(wrist_img_shape, dtype=np.uint8, buffer=wrist_img_shm.buf)
         logging.info(f"Initialized wrist camera shared memory with shape {wrist_img_shape}")
@@ -395,6 +412,11 @@ def eval_policy(
         frequency = 50.0
         frame_counter = 0
         last_instruction_time = time.time()
+        
+        # Add debugging variables
+        camera_selection_logged = False  # Track if camera selection has been logged once
+        last_state_log_time = time.time()  # For periodic state vector logging
+        opencv_windows_created = False  # Track if OpenCV windows have been created
 
         # Add terminal input thread for recording controls
         if cfg.record:
@@ -564,16 +586,88 @@ def eval_policy(
                     # No policy camera info, trust training config filtering
                     final_cameras = filtered_cameras
                 
-                logging.info(f"Camera selection: available={all_available_cameras}, CLI-filtered={filtered_cameras}, final={final_cameras}")
+                # Log camera selection only once
+                if not camera_selection_logged:
+                    # logging.info(f"🔍 CAMERA SELECTION: available={all_available_cameras}, CLI-filtered={filtered_cameras}, final={final_cameras}")
+                    camera_selection_logged = True
                 
                 # Add filtered cameras to observation
                 for camera_name in final_cameras:
                     if camera_name in available_images and available_images[camera_name] is not None:
                         observation[f"observation.images.{camera_name}"] = torch.from_numpy(available_images[camera_name])
-                        if frame_counter % 300 == 0:  # Log every 10 seconds
-                            logging.debug(f"Added camera: {camera_name}")
+                        # if frame_counter % 300 == 0:  # Log every 10 seconds
+                        #     logging.debug(f"Added camera: {camera_name}")
                     else:
                         logging.warning(f"Camera {camera_name} selected but not available!")
+                
+                # OpenCV visualization for debugging camera inputs - DISABLED FOR PERFORMANCE
+                # if final_cameras and available_images:
+                #     # Create OpenCV windows on first frame
+                #     if not opencv_windows_created:
+                #         try:
+                #             cv2.namedWindow("Policy Camera Inputs", cv2.WINDOW_NORMAL)
+                #             cv2.resizeWindow("Policy Camera Inputs", 1280, 720)
+                #             opencv_windows_created = True
+                #             logging.info(f"🖼️  Created OpenCV window for camera debugging: {final_cameras}")
+                #         except cv2.error as e:
+                #             logging.warning(f"Failed to create OpenCV window: {e}")
+                #             opencv_windows_created = False
+                #     
+                #     # Display current camera inputs in a combined view
+                #     if opencv_windows_created:
+                #         try:
+                #             display_images = []
+                #             for camera_name in final_cameras:
+                #                 if camera_name in available_images and available_images[camera_name] is not None:
+                #                     # Get the image and resize for display
+                #                     display_img = available_images[camera_name].copy()
+                #                     
+                #                     # Resize to a standard display size
+                #                     display_img = cv2.resize(display_img, (320, 240))
+                #                     
+                #                     # Convert from RGB to BGR for OpenCV display
+                #                     if len(display_img.shape) == 3 and display_img.shape[2] == 3:
+                #                         display_img = cv2.cvtColor(display_img, cv2.COLOR_RGB2BGR)
+                #                     
+                #                     # Add camera name overlay
+                #                     cv2.putText(display_img, f"{camera_name}", (10, 30), 
+                #                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+                #                     cv2.putText(display_img, f"Frame: {frame_counter}", (10, 60), 
+                #                                cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
+                #                     
+                #                     display_images.append(display_img)
+                #             
+                #             # Arrange images in a grid
+                #             if display_images:
+                #                 # Arrange in 2x3 grid (or adjust based on number of cameras)
+                #                 rows = []
+                #                 for i in range(0, len(display_images), 3):
+                #                     row_images = display_images[i:i+3]
+                #                     # Pad row with black images if needed
+                #                     while len(row_images) < 3:
+                #                         black_img = np.zeros((240, 320, 3), dtype=np.uint8)
+                #                         row_images.append(black_img)
+                #                     row = np.hstack(row_images)
+                #                     rows.append(row)
+                #                 
+                #                 # If we have rows, combine them vertically
+                #                 if rows:
+                #                     combined_img = np.vstack(rows)
+                #                     cv2.imshow("Policy Camera Inputs", combined_img)
+                #                     cv2.waitKey(1)  # Non-blocking update
+                #         except cv2.error as e:
+                #             logging.warning(f"OpenCV display error: {e}")
+                #     else:
+                #         # Alternative: Log camera info periodically when OpenCV is not available
+                #         if frame_counter % 300 == 0:  # Every 10 seconds
+                #             logging.info(f"📷 CAMERA DEBUG (OpenCV N/A): {len(final_cameras)} cameras active")
+                #             for camera_name in final_cameras:
+                #                 if camera_name in available_images and available_images[camera_name] is not None:
+                #                     img_shape = available_images[camera_name].shape
+                #                     img_mean = np.mean(available_images[camera_name])
+                #                     logging.info(f"  - {camera_name}: shape={img_shape}, mean_intensity={img_mean:.1f}")
+                # if OPENCV_AVAILABLE and OPENCV_GUI_AVAILABLE and opencv_windows_created:
+                #     cv2.waitKey(1)
                 
                 # Log which cameras are being used
                 if len(observation) == 0:
@@ -582,7 +676,7 @@ def eval_policy(
                     logging.error(f"Training camera settings: cameras={cfg.feature_selection.cameras}, exclude_cameras={cfg.feature_selection.exclude_cameras}")
                     raise RuntimeError("No valid camera observations available!")
                 else:
-                    if frame_counter % 300 == 0:  # Log every 10 seconds instead of every frame
+                    if frame_counter % 600 == 0:  # Log every 20 seconds instead of every frame
                         logging.info(f"Using cameras: {list(observation.keys())}")
 
                 # Get camera positions if active camera is enabled by policy
@@ -663,13 +757,34 @@ def eval_policy(
                 # Concatenate all state components
                 observation_state = np.concatenate(state_components)
                 
-                # Log feature breakdown only occasionally
-                if frame_counter % 300 == 0:  # Every 10 seconds at 30fps
+                # Log state vector every 60 seconds (less frequent for performance) - DISABLED FOR PERFORMANCE
+                if time.time() - last_state_log_time > 60:
+                    # logging.info(f"📊 STATE VECTOR (every 60s): shape={observation_state.shape}")
+                    # logging.info(f"  First 10 values: {observation_state[:10]}")
+                    # logging.info(f"  Last 10 values: {observation_state[-10:]}")
+                    # logging.info(f"  Min/Max/Mean: {observation_state.min():.3f}/{observation_state.max():.3f}/{observation_state.mean():.3f}")
+                    
+                    # Also log camera status (reduced for performance)
+                    # logging.info(f"📷 CAMERA STATUS:")
+                    # for camera_name in final_cameras:
+                    #     if camera_name in available_images and available_images[camera_name] is not None:
+                    #         img_shape = available_images[camera_name].shape
+                    #         img_mean = np.mean(available_images[camera_name])
+                    #         img_min = np.min(available_images[camera_name])
+                    #         img_max = np.max(available_images[camera_name])
+                    #         logging.info(f"  - {camera_name}: shape={img_shape}, intensity={img_min:.1f}-{img_max:.1f} (mean={img_mean:.1f})")
+                    #     else:
+                    #         logging.info(f"  - {camera_name}: NOT AVAILABLE")
+                    
+                    last_state_log_time = time.time()
+                
+                # Log feature breakdown only occasionally (reduced frequency for performance)
+                if frame_counter % 600 == 0:  # Every 20 seconds at 30fps instead of every 10 seconds
                     total_dim = sum(comp.shape[0] for comp in state_components)
-                    logging.info(f"State vector construction:")
-                    for feature in feature_log:
-                        logging.info(f"  + {feature}")
-                    logging.info(f"  = Total: {total_dim}D")
+                    # logging.info(f"State vector construction:")
+                    # for feature in feature_log:
+                    #     logging.info(f"  + {feature}")
+                    # logging.info(f"  = Total: {total_dim}D")
                 
                 # Verify state dimension matches policy expectation
                 expected_state_dim = policy_config_info.get('state_dim')
@@ -689,13 +804,14 @@ def eval_policy(
                     logging.error(f"Check the train_config.json file in the policy directory for the exact configuration.")
                     raise RuntimeError(f"State dimension mismatch: expected {expected_state_dim}, got {actual_state_dim}")
                 else:
-                    if frame_counter % 300 == 0:  # Log every 10 seconds
-                        logging.info(f"✓ State dimension correct: {actual_state_dim}")
-                        logging.info(f"✓ Training feature selection: cameras={len([k for k in observation.keys() if 'images' in k])}, "
-                                   f"velocities={cfg.feature_selection.use_joint_velocities}, "
-                                   f"torques={cfg.feature_selection.use_joint_torques}, "
-                                   f"pressure={cfg.feature_selection.use_pressure_sensors}")
-                        logging.debug(f"State components breakdown: {[comp.shape for comp in state_components]}")
+                    if frame_counter % 600 == 0:  # Log every 20 seconds for performance - DISABLED FOR PERFORMANCE
+                        # logging.info(f"✓ State dimension correct: {actual_state_dim}")
+                        # logging.info(f"✓ Training feature selection: cameras={len([k for k in observation.keys() if 'images' in k])}, "
+                        #            f"velocities={cfg.feature_selection.use_joint_velocities}, "
+                        #            f"torques={cfg.feature_selection.use_joint_torques}, "
+                        #            f"pressure={cfg.feature_selection.use_pressure_sensors}")
+                        # logging.debug(f"State components breakdown: {[comp.shape for comp in state_components]}")
+                        pass
                 
                 observation["observation.state"] = torch.from_numpy(observation_state).float()
 
@@ -707,6 +823,13 @@ def eval_policy(
                     observation, policy, get_safe_torch_device(policy.config.device), policy.config.use_amp
                 )
                 action = action.cpu().numpy()
+                
+                # Log policy action every 20 seconds for debugging (reduced frequency for performance) - DISABLED FOR PERFORMANCE
+                if frame_counter % 600 == 0:  # Every 20 seconds at 30fps
+                    # logging.info(f"🤖 POLICY ACTION (frame {frame_counter}): shape={action.shape}")
+                    # logging.info(f"  Action values: {action[:10]}...{action[-10:] if len(action) > 10 else action}")
+                    # logging.info(f"  Action range: {action.min():.3f} to {action.max():.3f}")
+                    pass
                 
                 # Show periodic instructions for terminal controls (every 60 seconds instead of 30)
                 if cfg.record and time.time() - last_instruction_time > 60:
@@ -870,8 +993,8 @@ def eval_policy(
                         try:
                             target_pitch, target_yaw = camera_action
                             camera_controller._set_target_positions(target_pitch, target_yaw)
-                            if frame_counter % 150 == 0:  # Log every 5 seconds
-                                logging.info(f"Camera targets: Pitch={np.rad2deg(target_pitch):.1f}°, Yaw={np.rad2deg(target_yaw):.1f}°")
+                            # if frame_counter % 150 == 0:  # Log every 5 seconds
+                            #     logging.info(f"Camera targets: Pitch={np.rad2deg(target_pitch):.1f}°, Yaw={np.rad2deg(target_yaw):.1f}°")
                         except Exception as e:
                             logging.error(f"Error controlling camera: {e}")
                     else:
@@ -892,8 +1015,8 @@ def eval_policy(
             
                 frame_counter += 1
             
-            # Log performance info periodically
-            if frame_counter % 300 == 0:  # Every ~6 seconds at 50fps
+            # Log performance info periodically (reduced frequency for performance)
+            if frame_counter % 600 == 0:  # Every ~12 seconds at 50fps instead of every 6 seconds
                 logging.info(f"Evaluation running - frame {frame_counter}, arm velocity limit: {arm_ctrl.arm_velocity_limit:.2f}")
         
             time.sleep(1/frequency)
@@ -916,6 +1039,16 @@ def eval_policy(
                     logging.info("Camera controller disconnected")
                 except Exception as e:
                     logging.error(f"Error disconnecting camera controller: {e}")
+            
+            # Cleanup OpenCV windows
+            if OPENCV_AVAILABLE:
+                try:
+                    cv2.destroyAllWindows()
+                    logging.info("OpenCV windows closed")
+                except Exception as e:
+                    logging.error(f"Error closing OpenCV windows: {e}")
+            else:
+                logging.debug("OpenCV cleanup skipped (not available)")
             
             arm_ctrl.ctrl_dual_arm_go_home()
             logging.info("Arms returned to home position")
@@ -1051,15 +1184,18 @@ def load_training_feature_config(policy_path: str):
         logging.warning(f"Training config not found at {train_config_path}")
         logging.warning("Using default feature selection settings")
         return {
-            'cameras': None,
-            'exclude_cameras': None,
-            'use_joint_positions': True,
-            'use_joint_velocities': True,
-            'use_joint_torques': False,
-            'use_pressure_sensors': True,
-            'joint_groups': None,
-            'exclude_joint_groups': None,
-            'custom_state_indices': None
+            'feature_selection': {
+                'cameras': None,
+                'exclude_cameras': None,
+                'use_joint_positions': True,
+                'use_joint_velocities': True,
+                'use_joint_torques': False,
+                'use_pressure_sensors': True,
+                'joint_groups': None,
+                'exclude_joint_groups': None,
+                'custom_state_indices': None
+            },
+            'policy': {}
         }
     
     try:
@@ -1067,24 +1203,48 @@ def load_training_feature_config(policy_path: str):
             train_config = json.load(f)
         
         feature_config = train_config.get('feature_selection', {})
+        policy_config = train_config.get('policy', {})
+        
         logging.info(f"Loaded training feature configuration from {train_config_path}")
         logging.info(f"Training feature selection: {feature_config}")
         
-        return feature_config
+        # Extract ACT-specific policy parameters that may differ from defaults
+        policy_overrides = {}
+        act_specific_params = [
+            'chunk_size', 'n_action_steps', 'vision_backbone', 'pretrained_backbone_weights',
+            'n_decoder_layers', 'n_encoder_layers', 'dim_model', 'n_heads', 'dim_feedforward',
+            'temporal_ensemble_coeff', 'use_vae', 'latent_dim', 'n_vae_encoder_layers',
+            'kl_weight', 'dropout', 'feedforward_activation', 'pre_norm',
+            'replace_final_stride_with_dilation', 'optimizer_lr', 'optimizer_weight_decay',
+            'optimizer_lr_backbone'
+        ]
+        
+        for param in act_specific_params:
+            if param in policy_config:
+                policy_overrides[param] = policy_config[param]
+                logging.info(f"Found policy override: {param} = {policy_config[param]}")
+        
+        return {
+            'feature_selection': feature_config,
+            'policy': policy_overrides
+        }
         
     except Exception as e:
         logging.error(f"Failed to load training config from {train_config_path}: {e}")
         logging.warning("Using default feature selection settings")
         return {
-            'cameras': None,
-            'exclude_cameras': None,
-            'use_joint_positions': True,
-            'use_joint_velocities': True,
-            'use_joint_torques': False,
-            'use_pressure_sensors': True,
-            'joint_groups': None,
-            'exclude_joint_groups': None,
-            'custom_state_indices': None
+            'feature_selection': {
+                'cameras': None,
+                'exclude_cameras': None,
+                'use_joint_positions': True,
+                'use_joint_velocities': True,
+                'use_joint_torques': False,
+                'use_pressure_sensors': True,
+                'joint_groups': None,
+                'exclude_joint_groups': None,
+                'custom_state_indices': None
+            },
+            'policy': {}
         }
 
 
@@ -1100,8 +1260,12 @@ def eval_main(cfg: EvalRealConfig):
 
     # Load training feature configuration from train_config.json BEFORE creating policy
     logging.info("Loading training feature configuration from train_config.json...")
-    training_feature_config = load_training_feature_config(cfg.policy.pretrained_path)
+    training_config = load_training_feature_config(cfg.policy.pretrained_path)
+    training_feature_config = training_config['feature_selection']
+    training_policy_config = training_config['policy']
+    
     logging.info(f"Training feature configuration: {training_feature_config}")
+    logging.info(f"Training policy configuration: {training_policy_config}")
     
     # Override CLI feature selection with training configuration BEFORE creating policy
     cfg.feature_selection.cameras = training_feature_config.get('cameras')
@@ -1114,6 +1278,27 @@ def eval_main(cfg: EvalRealConfig):
     cfg.feature_selection.exclude_joint_groups = training_feature_config.get('exclude_joint_groups')
     cfg.feature_selection.custom_state_indices = training_feature_config.get('custom_state_indices')
     
+    # Apply training policy configuration to override defaults
+    for param, value in training_policy_config.items():
+        if hasattr(cfg.policy, param):
+            setattr(cfg.policy, param, value)
+            logging.info(f"Applied policy override: {param} = {value}")
+        else:
+            logging.warning(f"Policy parameter {param} not found in config, skipping")
+    
+    # Verify critical parameters are properly set
+    logging.info("=== POLICY CONFIGURATION VERIFICATION ===")
+    logging.info(f"✓ Vision backbone: {cfg.policy.vision_backbone}")
+    logging.info(f"✓ Chunk size: {cfg.policy.chunk_size}")
+    logging.info(f"✓ N action steps: {cfg.policy.n_action_steps}")
+    logging.info(f"✓ N decoder layers: {cfg.policy.n_decoder_layers}")
+    logging.info(f"✓ Temporal ensemble coeff: {cfg.policy.temporal_ensemble_coeff}")
+    if cfg.policy.temporal_ensemble_coeff is not None:
+        logging.info("🔄 Temporal ensembling ENABLED")
+    else:
+        logging.info("⚠️  Temporal ensembling DISABLED")
+    logging.info("==========================================")
+    
     logging.info("Feature selection configuration synchronized with training:")
     logging.info(f"  - cameras: {cfg.feature_selection.cameras}")
     logging.info(f"  - exclude_cameras: {cfg.feature_selection.exclude_cameras}")
@@ -1122,7 +1307,7 @@ def eval_main(cfg: EvalRealConfig):
     logging.info(f"  - use_joint_torques: {cfg.feature_selection.use_joint_torques}")
     logging.info(f"  - use_pressure_sensors: {cfg.feature_selection.use_pressure_sensors}")
 
-    logging.info("Making policy with training feature configuration...")
+    logging.info("Making policy with training configuration...")
 
     # Load the original dataset
     original_dataset = LeRobotDataset(repo_id = cfg.repo_id)
@@ -1153,6 +1338,37 @@ def eval_main(cfg: EvalRealConfig):
         cfg=cfg.policy,
         ds_meta=filtered_dataset.meta
     )
+    
+    # Post-policy creation verification
+    logging.info("=== POST-POLICY CREATION VERIFICATION ===")
+    logging.info(f"✓ Policy type: {type(policy).__name__}")
+    logging.info(f"✓ Policy config type: {type(policy.config).__name__}")
+    logging.info(f"✓ Vision backbone in use: {policy.config.vision_backbone}")
+    logging.info(f"✓ Temporal ensemble coeff: {policy.config.temporal_ensemble_coeff}")
+    
+    # Check if temporal ensembler is properly initialized
+    if hasattr(policy, 'temporal_ensembler'):
+        if policy.temporal_ensembler is not None:
+            logging.info("🔄 Temporal ensembler SUCCESSFULLY initialized")
+            logging.info(f"   - Ensemble coeff: {policy.temporal_ensembler.temporal_ensemble_coeff}")
+            logging.info(f"   - Chunk size: {policy.temporal_ensembler.chunk_size}")
+        else:
+            logging.info("⚠️  Temporal ensembler is None")
+    else:
+        logging.info("⚠️  No temporal_ensembler attribute found")
+    
+    # Check if DINOv2 backbone is properly loaded
+    if hasattr(policy, 'act') and hasattr(policy.act, 'backbone'):
+        backbone = policy.act.backbone
+        logging.info(f"✓ Backbone type: {type(backbone).__name__}")
+        if hasattr(backbone, 'dinov2_model'):
+            logging.info("🖼️  DINOv2 backbone SUCCESSFULLY loaded")
+            logging.info(f"   - Feature dim: {backbone.feature_dim}")
+            logging.info(f"   - Patch size: {backbone.patch_size}")
+        else:
+            logging.info("📷 ResNet backbone detected")
+    
+    logging.info("===========================================")
     
     # Extract configuration from policy
     policy_config_info = extract_config_from_policy(policy)

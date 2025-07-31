@@ -1,6 +1,10 @@
 # Custom ablation study configuration
 # This file defines a series of experiments to test different feature combinations and policy architectures
 
+
+# mind. 100k steps damit kovergiert!!!!
+
+
 experiments:
     
   # - name: "expected_optimal_big_cubes"
@@ -98,7 +102,7 @@ experiments:
       use_joint_velocities: false
       use_joint_torques: false
       dataset_repo: "kuehnrobin/g1_cubes_no_hover_fixed"
-      cameras: '["cam_right_active", "cam_left_active", "cam_left_wrist", "cam_right_wrist"]'
+      cameras: '["cam_right_active", "cam_left_active"]'
       # DINOv2ACTConfig settings
       chunk_size: 60
       n_action_steps: 1
