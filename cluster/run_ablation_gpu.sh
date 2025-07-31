@@ -33,13 +33,17 @@ export CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES
 export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
 
 # Set up local model and dataset paths for cluster
-export TORCH_HOME=$BIGWORK/torch_models
-export HF_HOME=$BIGWORK/huggingface_cache
 export TRANSFORMERS_CACHE=$BIGWORK/huggingface_cache
-export HF_DATASETS_CACHE=$BIGWORK/datasets_cache
 
 # Configure cache directories to avoid filling home directory
 export PIP_CACHE_DIR=$SOFTWARE/humanoid/.cache/pip
+export TORCH_HOME=$SOFTWARE/humanoid/.cache/torch
+export HF_HOME=$BIGWORK/LargeFiles/huggingface
+export HF_DATASETS_CACHE=$BIGWORK/LargeFiles/huggingface/datasets
+export HF_HUB_CACHE=$BIGWORK/LargeFiles/huggingface/hub
+export HF_LEROBOT_HOME=$BIGWORK/LageFiles/huggingface/lerobot
+
+
 
 # Configure for offline W&B logging (cluster branch - always offline)
 export WANDB_MODE=offline
