@@ -55,7 +55,7 @@ export TRANSFORMERS_OFFLINE=1
 export TORCH_HUB_OFFLINE=1
 
 # Local dataset path
-export LOCAL_DATASET_PATH=$BIGWORK/LargeFiles/g1_cubes_s_fixed
+export LOCAL_DATASET_PATH=$BIGWORK/LargeFiles/huggingface/lerobot/kuehnrobin/g1_cubes_s_fixed
 
 # Set output directory for training results
 export OUTPUTS_DIR=$BIGWORK/outputs
