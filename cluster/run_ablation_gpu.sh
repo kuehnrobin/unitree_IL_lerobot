@@ -55,7 +55,7 @@ export TRANSFORMERS_OFFLINE=1
 export TORCH_HUB_OFFLINE=1
 
 # Local dataset path
-#export LOCAL_DATASET_PATH=$BIGWORK/LargeFiles/g1_cubes_s_fixed
+export LOCAL_DATASET_PATH=$BIGWORK/LargeFiles/g1_cubes_s_fixed
 
 # Set output directory for training results
 export OUTPUTS_DIR=$BIGWORK/outputs
@@ -83,11 +83,12 @@ fi
 
 echo "✓ Found dataset: $LOCAL_DATASET_PATH"
 echo "✓ Found torch models: $TORCH_HOME"
+echo ""
 
 # Run the ablation study (cluster branch - simplified)
 srun python unitree_lerobot/scripts/run_ablation_study.py \
         --config_file unitree_lerobot/examples/cluster_run_config.yaml \
-        --dataset_repo "kuehnrobin/g1_cubes_s_fixed" \
+        --dataset_repo "$LOCAL_DATASET_PATH" \
         --wandb_project "act_ablation_luis" \
         --steps 100000 \
         --eval_freq 10000 \
