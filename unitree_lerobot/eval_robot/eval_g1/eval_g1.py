@@ -585,12 +585,8 @@ def eval_policy(
                 observation_state = np.concatenate(state_components)
                 # Print observation_state every 30 seconds
                 if time.time() - last_state_log_time > 10:
-                    logging.info(f"Current observation_state: {observation_state}")
-                    logging.info(f"Current observation_state_length: {observation_state.shape[0]}")
-                    logging.info(f"Current left_arm_state: {current_lr_arm_q[:7]}")
-                    logging.info(f"Current right_arm_state: {current_lr_arm_q[7:14]}")
-                    logging.info(f"Current left_hand_state: {dual_hand_state_array[:7]}")
-                    logging.info(f"Current right_hand_state: {dual_hand_state_array[7:14]}")
+                    logging.info(f"Current left_hand_state: {observation_state[14:21]}")
+                    logging.info(f"Current right_hand_state: {observation_state[33:40]}")
                     last_state_log_time = time.time()
                 #------------------
                                 
@@ -624,10 +620,6 @@ def eval_policy(
                 action = action.cpu().numpy()
                 # Print action every 30 seconds
                 if time.time() - last_state_log_time > 10:
-                    logging.info(f"Current action:{action}")
-                    logging.info(f"Current action_length: {action.shape[0]}")
-                    logging.info(f"Current left_arm_action: {action[:7]}")
-                    logging.info(f"Current right_arm_action: {action[7:14]}")
                     logging.info(f"Current left_hand_action: {action[14:21]}")
                     logging.info(f"Current right_hand_action: {action[21:28]}")
                                 
