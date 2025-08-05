@@ -308,7 +308,7 @@ python lerobot/scripts/train.py \
   --dataset.repo_id your_username/g1_pour_can_left_hand \
   --policy.path=outputs/train/pouring_unitree_2025-05-09/10-08-45_act/checkpoints/last/pretrained_model/ \
   --optimizer.lr 1e-6 \
-  --steps 25000 \
+  --steps 100000 \
   --wandb.enable True \
   --wandb.project pour_can_domain_adaptation
 ```
