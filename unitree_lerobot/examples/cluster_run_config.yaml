@@ -2,19 +2,19 @@
 
 experiments:
   # Experiment with ResNet and specific camera setup          
-  - name: "resnet_active_wrist_one_high"
-    config:
-      vision_backbone: "resnet18"  # Explicitly set vision backbone
-      pretrained_backbone_weights: "ResNet18_Weights.IMAGENET1K_V1"
-      batch_size: 12
-      optimizer_lr: 5e-5 
-      use_joint_velocities: false
-      use_joint_torques: false
-      cameras: '["cam_right_active", "cam_left_active", "cam_left_wrist", "cam_right_wrist", "cam_left_high"]'
-      chunk_size: 60
-      n_action_steps: 1
-      temporal_ensemble_coeff: 0.005
-      n_decoder_layers: 7
+  # - name: "resnet_active_wrist_one_high"
+  #   config:
+  #     vision_backbone: "resnet18"  # Explicitly set vision backbone
+  #     pretrained_backbone_weights: "ResNet18_Weights.IMAGENET1K_V1"
+  #     batch_size: 12
+  #     optimizer_lr: 5e-5 
+  #     use_joint_velocities: false
+  #     use_joint_torques: false
+  #     cameras: '["cam_right_active", "cam_left_active", "cam_left_wrist", "cam_right_wrist", "cam_left_high"]'
+  #     chunk_size: 60
+  #     n_action_steps: 1
+  #     temporal_ensemble_coeff: 0.005
+  #     n_decoder_layers: 7
 
   - name: "dinov2_backbone"
     config:
