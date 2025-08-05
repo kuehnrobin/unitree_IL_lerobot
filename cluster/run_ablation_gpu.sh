@@ -28,9 +28,18 @@ module load Miniforge3
 # Activate your conda/virtual environment
 conda activate $SOFTWARE/humanoid/IL_env
 
-# Set CUDA environment variables
-export CUDA_VISIBLE_DEVICES=$CUDA_VISIBLE_DEVICES
+
+# Set CUDA environment variables (do not overwrite CUDA_VISIBLE_DEVICES if unset)
+if [[ -z "$CUDA_VISIBLE_DEVICES" ]]; then
+  echo "WARNING: CUDA_VISIBLE_DEVICES is not set by SLURM. Attempting to use all GPUs."
+else
+  echo "CUDA_VISIBLE_DEVICES is set to $CUDA_VISIBLE_DEVICES"
+fi
 export PYTORCH_CUDA_ALLOC_CONF=max_split_size_mb:512
+
+# Print GPU info for debugging
+nvidia-smi || echo "nvidia-smi not found or no GPUs visible"
+python -c "import torch; print('torch.cuda.is_available():', torch.cuda.is_available()); print('CUDA device count:', torch.cuda.device_count())"
 
 # Set up local model and dataset paths for cluster
 export TRANSFORMERS_CACHE=$BIGWORK/huggingface_cache
