@@ -411,14 +411,8 @@ class JsonDataset:
             ]
             if part_data
         )
-        
-        has_active_camera = any(
-            part_data and 'qpos' in part_data and part_data['camera']
-            for part_data in [
-                sample_states.get('camera'),
-            ]
-            if part_data
-        )
+
+        has_active_camera = True
 
         # Load task description
         task = episode_data.get('text', {}).get('goal', "")
