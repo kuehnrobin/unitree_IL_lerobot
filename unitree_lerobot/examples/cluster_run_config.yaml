@@ -20,7 +20,7 @@ experiments:
     config:
       vision_backbone: "resnet18"  # Explicitly set vision backbone
       pretrained_backbone_weights: "ResNet18_Weights.IMAGENET1K_V1"
-      batch_size: 20
+      batch_size: 12
       optimizer_lr: 5e-5 
       chunk_size: 60
       n_action_steps: 1
@@ -31,7 +31,7 @@ experiments:
     config:
       vision_backbone: "dinov2_vits14"
       pretrained_backbone_weights: null
-      batch_size: 3   # Smaller batch size for DINOv2 due to memory requirements
+      batch_size: 1   # Smaller batch size for DINOv2 due to memory requirements
       optimizer_lr: 5e-5
       cameras: '["cam_right_active", "cam_left_active", "cam_left_wrist", "cam_right_wrist", "cam_left_high"]'
       optimizer_lr_backbone: 5e-6 
