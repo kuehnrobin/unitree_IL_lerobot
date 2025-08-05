@@ -412,6 +412,14 @@ class JsonDataset:
             if part_data
         )
         
+        has_active_camera = any(
+            part_data and 'qpos' in part_data and part_data['camera']
+            for part_data in [
+                sample_states.get('camera'),
+            ]
+            if part_data
+        )
+
         # Load task description
         task = episode_data.get('text', {}).get('goal', "")
         
@@ -429,6 +437,7 @@ class JsonDataset:
             'has_velocity': has_velocity,
             'has_pressure': has_pressure,
             'has_torque': has_torque,
+            'has_active_camera': has_active_camera 
         }
         
         print(f"==> Episode {index} configuration:")
@@ -453,6 +462,9 @@ def create_empty_dataset(
     has_velocity: bool = False,
     has_effort: bool = False,
     has_pressure: bool = False,
+    has_torque: bool = False,
+    has_active_camera: bool = False,
+    action_dim: int = None,
     state_dim: int = None,
     dataset_config: DatasetConfig = DEFAULT_DATASET_CONFIG,
 ) -> LeRobotDataset:
@@ -471,7 +483,7 @@ def create_empty_dataset(
         if has_velocity:
             for i in range(7):
                 state_names.append(f"left_arm_qvel_{i}")
-        if has_effort:
+        if has_torque:
             for i in range(7):
                 state_names.append(f"left_arm_torque_{i}")
         
@@ -481,7 +493,7 @@ def create_empty_dataset(
         if has_velocity:
             for i in range(7):
                 state_names.append(f"right_arm_qvel_{i}")
-        if has_effort:
+        if has_torque:
             for i in range(7):
                 state_names.append(f"right_arm_torque_{i}")
         
@@ -491,7 +503,7 @@ def create_empty_dataset(
         if has_velocity:
             for i in range(7):
                 state_names.append(f"left_hand_qvel_{i}")
-        if has_effort:
+        if has_torque:
             for i in range(7):
                 state_names.append(f"left_hand_torque_{i}")
         if has_pressure:
@@ -504,15 +516,15 @@ def create_empty_dataset(
         if has_velocity:
             for i in range(7):
                 state_names.append(f"right_hand_qvel_{i}")
-        if has_effort:
+        if has_torque:
             for i in range(7):
                 state_names.append(f"right_hand_torque_{i}")
         if has_pressure:
             for i in range(12):
                 state_names.append(f"right_hand_pressure_{i}")
         
-        # Camera: qpos (2D) if present
-        if "camera" in ROBOT_CONFIGS[robot_type].json_state_data_name:
+        # Camera: qpos (2D) - always include for G1_Dex3 (110D total)
+        if has_active_camera:
             for i in range(2):
                 state_names.append(f"camera_qpos_{i}")
     else:
@@ -550,7 +562,8 @@ def create_empty_dataset(
             action_names.append(f"left_hand_qpos_{i}")
         for i in range(7):
             action_names.append(f"right_hand_qpos_{i}")
-        if "camera" in ROBOT_CONFIGS[robot_type].json_action_data_name:
+        # Always include camera for G1_Dex3 (30D total)
+        if has_active_camera:
             for i in range(2):
                 action_names.append(f"camera_qpos_{i}")
         action_dim = len(action_names)
@@ -679,9 +692,10 @@ def json_to_lerobot(
     # Detect available features
     has_velocity = data_cfg.get('has_velocity', False)
     has_pressure = data_cfg.get('has_pressure', False)
+    has_torque = data_cfg.get('has_torque', False)
     state_dim = data_cfg.get('state_dim', None)
     
-    print(f"Detected features - Velocity: {has_velocity}, Pressure: {has_pressure}")
+    print(f"Detected features - Velocity: {has_velocity}, Pressure: {has_pressure}, Torque: {has_torque}")
     print(f"State dimension: {state_dim}")
 
     dataset = create_empty_dataset(
@@ -691,6 +705,7 @@ def json_to_lerobot(
         has_effort=False,
         has_velocity=has_velocity,
         has_pressure=has_pressure,
+        has_torque=has_torque,
         state_dim=state_dim,
         dataset_config=dataset_config,
     )
