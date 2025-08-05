@@ -151,13 +151,36 @@ class AblationStudy:
         
         # Run the experiment
         try:
-            result = subprocess.run(cmd, check=True, capture_output=True, text=True)
-            logger.info(f"Experiment {name} completed successfully")
-            return True
-        except subprocess.CalledProcessError as e:
+            # Ensure environment variables are passed to subprocess
+            env = os.environ.copy()
+            
+            # Use Popen for real-time output streaming
+            process = subprocess.Popen(
+                cmd, 
+                stdout=subprocess.PIPE, 
+                stderr=subprocess.STDOUT,  # Redirect stderr to stdout for unified output
+                text=True, 
+                env=env,
+                bufsize=1,  # Line buffered
+                universal_newlines=True
+            )
+            
+            # Stream output in real-time
+            for line in process.stdout:
+                print(line, end='')  # Print each line as it comes
+                
+            # Wait for process to complete
+            return_code = process.wait()
+            
+            if return_code == 0:
+                logger.info(f"Experiment {name} completed successfully")
+                return True
+            else:
+                logger.error(f"Experiment {name} failed with return code {return_code}")
+                return False
+                
+        except Exception as e:
             logger.error(f"Experiment {name} failed: {e}")
-            logger.error(f"stdout: {e.stdout}")
-            logger.error(f"stderr: {e.stderr}")
             return False
 
 
