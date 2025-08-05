@@ -50,7 +50,7 @@ export TORCH_HOME=$SOFTWARE/humanoid/.cache/torch
 export HF_HOME=$BIGWORK/LargeFiles/huggingface
 export HF_DATASETS_CACHE=$BIGWORK/LargeFiles/huggingface/datasets
 export HF_HUB_CACHE=$BIGWORK/LargeFiles/huggingface/hub
-export HF_LEROBOT_HOME=$BIGWORK/LageFiles/huggingface/lerobot
+export HF_LEROBOT_HOME=$BIGWORK/LargeFiles/huggingface/lerobot
 
 
 
