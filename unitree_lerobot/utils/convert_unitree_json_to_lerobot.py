@@ -524,9 +524,8 @@ def create_empty_dataset(
                 state_names.append(f"right_hand_pressure_{i}")
         
         # Camera: qpos (2D) - always include for G1_Dex3 (110D total)
-        if has_active_camera:
-            for i in range(2):
-                state_names.append(f"camera_qpos_{i}")
+        for i in range(2):
+            state_names.append(f"camera_qpos_{i}")
     else:
         # For other robot types, use original logic
         # Add position names (qpos)
@@ -563,9 +562,8 @@ def create_empty_dataset(
         for i in range(7):
             action_names.append(f"right_hand_qpos_{i}")
         # Always include camera for G1_Dex3 (30D total)
-        if has_active_camera:
-            for i in range(2):
-                action_names.append(f"camera_qpos_{i}")
+        for i in range(2):
+            action_names.append(f"camera_qpos_{i}")
         action_dim = len(action_names)
     else:
         # For other robot types, use motor names
@@ -693,9 +691,10 @@ def json_to_lerobot(
     has_velocity = data_cfg.get('has_velocity', False)
     has_pressure = data_cfg.get('has_pressure', False)
     has_torque = data_cfg.get('has_torque', False)
+    has_active_camera = data_cfg.get('has_active_camera', False)  # Always pass for proper feature detection
     state_dim = data_cfg.get('state_dim', None)
     
-    print(f"Detected features - Velocity: {has_velocity}, Pressure: {has_pressure}, Torque: {has_torque}")
+    print(f"Detected features - Velocity: {has_velocity}, Pressure: {has_pressure}, Torque: {has_torque}, Camera: {has_active_camera}")
     print(f"State dimension: {state_dim}")
 
     dataset = create_empty_dataset(
@@ -706,6 +705,7 @@ def json_to_lerobot(
         has_velocity=has_velocity,
         has_pressure=has_pressure,
         has_torque=has_torque,
+        has_active_camera=has_active_camera,
         state_dim=state_dim,
         dataset_config=dataset_config,
     )
