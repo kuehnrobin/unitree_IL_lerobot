@@ -100,68 +100,239 @@ class JsonDataset:
         return self.episodes_data_cached
 
 
-    def _extract_data(self, episode_data: Dict, key: str, parts: List[str], data_type: str = 'qpos') -> np.ndarray:
+    def _extract_ordered_state_data(self, episode_data: Dict) -> np.ndarray:
         """
-        Extract data from episode dictionary for specified parts and data type.
+        Extract state data in the correct order to create a properly structured state vector.
         
         Args:
             episode_data: Dictionary containing episode data
-            key: Data key to extract ('states' or 'actions')
-            parts: List of parts to include ('left_arm', 'right_arm', 'left_hand', 'right_hand')
-            data_type: Type of data to extract ('qpos', 'qvel', 'pressure')
             
         Returns:
-            Concatenated numpy array of the requested data
+            Numpy array with shape (num_frames, state_dim) containing properly ordered state data
         """
         result = []
+        sample_data = episode_data['data'][0]  # Check first frame for debugging
+        
         for sample_data in episode_data['data']:
-            data_array = np.array([], dtype=np.float32)
-            for part in parts:
-                if part in sample_data[key] and sample_data[key][part] is not None:
-                    if data_type == 'pressure':
-                        # Handle pressure data for hands only
-                        if 'hand' in part and 'pressures' in sample_data[key][part]:
-                            pressure_data = np.array(sample_data[key][part]['pressures'], dtype=np.float32)
-                            data_array = np.concatenate([data_array, pressure_data])
-                    else:
-                        # Handle qpos and qvel data
-                        if data_type in sample_data[key][part]:
-                            joint_data = np.array(sample_data[key][part][data_type], dtype=np.float32)
-                            data_array = np.concatenate([data_array, joint_data])
-            result.append(data_array)
-        return np.array(result)
-
-    def _extract_velocity_data(self, episode_data: Dict, key: str, parts: List[str]) -> np.ndarray:
-        """Extract joint velocity data from episode dictionary."""
-        return self._extract_data(episode_data, key, parts, 'qvel')
-
-    def _extract_pressure_data(self, episode_data: Dict, key: str, hand_parts: List[str]) -> np.ndarray:
-        """Extract pressure data from episode dictionary for hand parts only."""
-        return self._extract_data(episode_data, key, hand_parts, 'pressure')
-
-    def _get_enriched_state_data(self, episode_data: Dict) -> Dict[str, np.ndarray]:
-        """
-        Extract all types of state data (positions, velocities, pressures).
+            state_vector = []
+            
+            # Extract in the correct order to match our 108D structure:
+            # 0-6: left_arm qpos (7D)
+            if 'left_arm' in sample_data['states'] and sample_data['states']['left_arm']:
+                left_arm_qpos = sample_data['states']['left_arm'].get('qpos', [])
+                state_vector.extend(left_arm_qpos)
+            
+            # 7-13: left_arm qvel (7D)
+            if 'left_arm' in sample_data['states'] and sample_data['states']['left_arm']:
+                left_arm_qvel = sample_data['states']['left_arm'].get('qvel', [])
+                state_vector.extend(left_arm_qvel)
+            
+            # 14-20: left_arm torque (7D)
+            if 'left_arm' in sample_data['states'] and sample_data['states']['left_arm']:
+                left_arm_torque = sample_data['states']['left_arm'].get('torque', [])
+                state_vector.extend(left_arm_torque)
+            
+            # 21-27: right_arm qpos (7D)
+            if 'right_arm' in sample_data['states'] and sample_data['states']['right_arm']:
+                right_arm_qpos = sample_data['states']['right_arm'].get('qpos', [])
+                state_vector.extend(right_arm_qpos)
+            
+            # 28-34: right_arm qvel (7D)
+            if 'right_arm' in sample_data['states'] and sample_data['states']['right_arm']:
+                right_arm_qvel = sample_data['states']['right_arm'].get('qvel', [])
+                state_vector.extend(right_arm_qvel)
+            
+            # 35-41: right_arm torque (7D)
+            if 'right_arm' in sample_data['states'] and sample_data['states']['right_arm']:
+                right_arm_torque = sample_data['states']['right_arm'].get('torque', [])
+                state_vector.extend(right_arm_torque)
+            
+            # 42-48: left_hand qpos (7D)
+            if 'left_hand' in sample_data['states'] and sample_data['states']['left_hand']:
+                left_hand_qpos = sample_data['states']['left_hand'].get('qpos', [])
+                state_vector.extend(left_hand_qpos)
+            
+            # 49-55: left_hand qvel (7D)
+            if 'left_hand' in sample_data['states'] and sample_data['states']['left_hand']:
+                left_hand_qvel = sample_data['states']['left_hand'].get('qvel', [])
+                state_vector.extend(left_hand_qvel)
+            
+            # 56-62: left_hand torque (7D)
+            if 'left_hand' in sample_data['states'] and sample_data['states']['left_hand']:
+                left_hand_torque = sample_data['states']['left_hand'].get('torque', [])
+                state_vector.extend(left_hand_torque)
+            
+            # 63-74: left_hand pressures (12D)
+            if 'left_hand' in sample_data['states'] and sample_data['states']['left_hand']:
+                left_hand_pressures = sample_data['states']['left_hand'].get('pressures', [])
+                state_vector.extend(left_hand_pressures)
+            
+            # 75-81: right_hand qpos (7D)
+            if 'right_hand' in sample_data['states'] and sample_data['states']['right_hand']:
+                right_hand_qpos = sample_data['states']['right_hand'].get('qpos', [])
+                state_vector.extend(right_hand_qpos)
+            
+            # 82-88: right_hand qvel (7D)
+            if 'right_hand' in sample_data['states'] and sample_data['states']['right_hand']:
+                right_hand_qvel = sample_data['states']['right_hand'].get('qvel', [])
+                state_vector.extend(right_hand_qvel)
+            
+            # 89-95: right_hand torque (7D)
+            if 'right_hand' in sample_data['states'] and sample_data['states']['right_hand']:
+                right_hand_torque = sample_data['states']['right_hand'].get('torque', [])
+                state_vector.extend(right_hand_torque)
+            
+            # 96-107: right_hand pressures (12D)
+            if 'right_hand' in sample_data['states'] and sample_data['states']['right_hand']:
+                right_hand_pressures = sample_data['states']['right_hand'].get('pressures', [])
+                state_vector.extend(right_hand_pressures)
+            
+            # 108-109: camera qpos (2D) - if present
+            if 'camera' in sample_data['states'] and sample_data['states']['camera']:
+                camera_qpos = sample_data['states']['camera'].get('qpos', [])
+                state_vector.extend(camera_qpos)
+            
+            result.append(np.array(state_vector, dtype=np.float32))
         
+        result_array = np.array(result)
+        
+        # Debug print for first episode to verify structure
+        if len(result) > 0:
+            print(f"==> State extraction debug:")
+            print(f"    Episode frames: {len(result)}")
+            print(f"    State dimension: {result_array.shape[1] if len(result_array.shape) > 1 else len(result_array[0])}")
+            
+            # Print breakdown of first frame
+            if len(result) > 0:
+                first_frame = result[0]
+                idx = 0
+                sample = episode_data['data'][0]
+                print(f"    State breakdown (first frame):")
+                
+                if 'left_arm' in sample['states'] and sample['states']['left_arm']:
+                    qpos_len = len(sample['states']['left_arm'].get('qpos', []))
+                    qvel_len = len(sample['states']['left_arm'].get('qvel', []))
+                    torque_len = len(sample['states']['left_arm'].get('torque', []))
+                    print(f"      left_arm: qpos[{idx}:{idx+qpos_len}], qvel[{idx+qpos_len}:{idx+qpos_len+qvel_len}], torque[{idx+qpos_len+qvel_len}:{idx+qpos_len+qvel_len+torque_len}]")
+                    idx += qpos_len + qvel_len + torque_len
+                
+                if 'right_arm' in sample['states'] and sample['states']['right_arm']:
+                    qpos_len = len(sample['states']['right_arm'].get('qpos', []))
+                    qvel_len = len(sample['states']['right_arm'].get('qvel', []))
+                    torque_len = len(sample['states']['right_arm'].get('torque', []))
+                    print(f"      right_arm: qpos[{idx}:{idx+qpos_len}], qvel[{idx+qpos_len}:{idx+qpos_len+qvel_len}], torque[{idx+qpos_len+qvel_len}:{idx+qpos_len+qvel_len+torque_len}]")
+                    idx += qpos_len + qvel_len + torque_len
+                
+                if 'left_hand' in sample['states'] and sample['states']['left_hand']:
+                    qpos_len = len(sample['states']['left_hand'].get('qpos', []))
+                    qvel_len = len(sample['states']['left_hand'].get('qvel', []))
+                    torque_len = len(sample['states']['left_hand'].get('torque', []))
+                    pressure_len = len(sample['states']['left_hand'].get('pressures', []))
+                    print(f"      left_hand: qpos[{idx}:{idx+qpos_len}], qvel[{idx+qpos_len}:{idx+qpos_len+qvel_len}], torque[{idx+qpos_len+qvel_len}:{idx+qpos_len+qvel_len+torque_len}], pressures[{idx+qpos_len+qvel_len+torque_len}:{idx+qpos_len+qvel_len+torque_len+pressure_len}]")
+                    idx += qpos_len + qvel_len + torque_len + pressure_len
+                
+                if 'right_hand' in sample['states'] and sample['states']['right_hand']:
+                    qpos_len = len(sample['states']['right_hand'].get('qpos', []))
+                    qvel_len = len(sample['states']['right_hand'].get('qvel', []))
+                    torque_len = len(sample['states']['right_hand'].get('torque', []))
+                    pressure_len = len(sample['states']['right_hand'].get('pressures', []))
+                    print(f"      right_hand: qpos[{idx}:{idx+qpos_len}], qvel[{idx+qpos_len}:{idx+qpos_len+qvel_len}], torque[{idx+qpos_len+qvel_len}:{idx+qpos_len+qvel_len+torque_len}], pressures[{idx+qpos_len+qvel_len+torque_len}:{idx+qpos_len+qvel_len+torque_len+pressure_len}]")
+                    idx += qpos_len + qvel_len + torque_len + pressure_len
+                
+                if 'camera' in sample['states'] and sample['states']['camera']:
+                    camera_len = len(sample['states']['camera'].get('qpos', []))
+                    print(f"      camera: qpos[{idx}:{idx+camera_len}]")
+                    idx += camera_len
+                
+                print(f"    Total features extracted: {idx}")
+        
+        return result_array
+
+    def _extract_ordered_action_data(self, episode_data: Dict) -> np.ndarray:
+        """
+        Extract action data in the correct order.
+        
+        Args:
+            episode_data: Dictionary containing episode data
+            
         Returns:
-            Dictionary containing different types of state data
+            Numpy array with shape (num_frames, action_dim) containing properly ordered action data
         """
-        # Extract position data (qpos)
-        state_qpos = self._extract_data(episode_data, 'states', self.json_state_data_name, 'qpos')
+        result = []
         
-        # Extract velocity data (qvel) 
-        state_qvel = self._extract_velocity_data(episode_data, 'states', self.json_state_data_name)
+        for sample_data in episode_data['data']:
+            action_vector = []
+            
+            # Extract actions in order: left_arm, right_arm, left_hand, right_hand, camera
+            # 0-6: left_arm qpos (7D)
+            if 'left_arm' in sample_data['actions'] and sample_data['actions']['left_arm']:
+                left_arm_qpos = sample_data['actions']['left_arm'].get('qpos', [])
+                action_vector.extend(left_arm_qpos)
+            
+            # 7-13: right_arm qpos (7D)
+            if 'right_arm' in sample_data['actions'] and sample_data['actions']['right_arm']:
+                right_arm_qpos = sample_data['actions']['right_arm'].get('qpos', [])
+                action_vector.extend(right_arm_qpos)
+            
+            # 14-20: left_hand qpos (7D)
+            if 'left_hand' in sample_data['actions'] and sample_data['actions']['left_hand']:
+                left_hand_qpos = sample_data['actions']['left_hand'].get('qpos', [])
+                action_vector.extend(left_hand_qpos)
+            
+            # 21-27: right_hand qpos (7D)
+            if 'right_hand' in sample_data['actions'] and sample_data['actions']['right_hand']:
+                right_hand_qpos = sample_data['actions']['right_hand'].get('qpos', [])
+                action_vector.extend(right_hand_qpos)
+            
+            # 28-29: camera qpos (2D) - if present
+            if 'camera' in sample_data['actions'] and sample_data['actions']['camera']:
+                camera_qpos = sample_data['actions']['camera'].get('qpos', [])
+                action_vector.extend(camera_qpos)
+            
+            result.append(np.array(action_vector, dtype=np.float32))
         
-        # Extract pressure data for hands only
-        hand_parts = [part for part in self.json_state_data_name if 'hand' in part]
-        state_pressure = self._extract_pressure_data(episode_data, 'states', hand_parts)
+        result_array = np.array(result)
         
-        return {
-            'qpos': state_qpos,
-            'qvel': state_qvel, 
-            'pressure': state_pressure
-        }
-
+        # Debug print for first episode to verify action structure
+        if len(result) > 0:
+            print(f"==> Action extraction debug:")
+            print(f"    Episode frames: {len(result)}")
+            print(f"    Action dimension: {result_array.shape[1] if len(result_array.shape) > 1 else len(result_array[0])}")
+            
+            # Print breakdown of first frame
+            if len(result) > 0:
+                sample = episode_data['data'][0]
+                idx = 0
+                print(f"    Action breakdown (first frame):")
+                
+                if 'left_arm' in sample['actions'] and sample['actions']['left_arm']:
+                    qpos_len = len(sample['actions']['left_arm'].get('qpos', []))
+                    print(f"      left_arm: qpos[{idx}:{idx+qpos_len}]")
+                    idx += qpos_len
+                
+                if 'right_arm' in sample['actions'] and sample['actions']['right_arm']:
+                    qpos_len = len(sample['actions']['right_arm'].get('qpos', []))
+                    print(f"      right_arm: qpos[{idx}:{idx+qpos_len}]")
+                    idx += qpos_len
+                
+                if 'left_hand' in sample['actions'] and sample['actions']['left_hand']:
+                    qpos_len = len(sample['actions']['left_hand'].get('qpos', []))
+                    print(f"      left_hand: qpos[{idx}:{idx+qpos_len}]")
+                    idx += qpos_len
+                
+                if 'right_hand' in sample['actions'] and sample['actions']['right_hand']:
+                    qpos_len = len(sample['actions']['right_hand'].get('qpos', []))
+                    print(f"      right_hand: qpos[{idx}:{idx+qpos_len}]")
+                    idx += qpos_len
+                
+                if 'camera' in sample['actions'] and sample['actions']['camera']:
+                    camera_len = len(sample['actions']['camera'].get('qpos', []))
+                    print(f"      camera: qpos[{idx}:{idx+camera_len}]")
+                    idx += camera_len
+                
+                print(f"    Total action features extracted: {idx}")
+        
+        return result_array
 
     def _parse_images(self, episode_path: str, episode_data) -> dict[str, list[np.ndarray]]:
         """Load and stack images for a given camera key."""
@@ -194,37 +365,55 @@ class JsonDataset:
 
         return images
 
-
     def get_item(self, index: Optional[int] = None,) -> Dict:
-        """Get a training sample from the dataset.  """
+        """Get a training sample from the dataset."""
             
         file_path = np.random.choice(self.episode_paths) if index is None else self.episode_paths[index]
         episode_data = self.episodes_data_cached[index]
 
-        # Extract all available sensor data and combine into single state
-        enriched_state_data = self._get_enriched_state_data(episode_data)
-        
-        # Create combined state array with all available sensor data
-        state_components = [enriched_state_data['qpos']]
-        
-        # Add velocity if available
-        if enriched_state_data['qvel'].size > 0:
-            state_components.append(enriched_state_data['qvel'])
-        
-        # Add pressure if available  
-        if enriched_state_data['pressure'].size > 0:
-            state_components.append(enriched_state_data['pressure'])
-        
-        # Concatenate all state components into single state array
-        state = np.concatenate(state_components, axis=1)
-        
-        # Action data (qpos only for actions)
-        action = self._extract_data(episode_data, 'actions', self.json_action_data_name)
+        # Extract properly ordered state and action data
+        state = self._extract_ordered_state_data(episode_data)
+        action = self._extract_ordered_action_data(episode_data)
         
         episode_length = len(state)
         state_dim = state.shape[1] if len(state.shape) == 2 else state.shape[0]
         action_dim = action.shape[1] if len(action.shape) == 2 else action.shape[0]
         
+        # Determine what features are available
+        sample_states = episode_data['data'][0]['states']
+        has_velocity = any(
+            part_data and 'qvel' in part_data and part_data['qvel']
+            for part_data in [
+                sample_states.get('left_arm'),
+                sample_states.get('right_arm'),
+                sample_states.get('left_hand'),
+                sample_states.get('right_hand')
+            ]
+            if part_data
+        )
+        
+        has_pressure = any(
+            part_data and 'pressures' in part_data and part_data['pressures']
+            for part_data in [
+                sample_states.get('left_hand'),
+                sample_states.get('right_hand')
+            ]
+            if part_data
+        )
+        
+        has_torque = any(
+            part_data and 'torque' in part_data and part_data['torque']
+            for part_data in [
+                sample_states.get('left_arm'),
+                sample_states.get('right_arm'),
+                sample_states.get('left_hand'),
+                sample_states.get('right_hand')
+            ]
+            if part_data
+        )
+
+        has_active_camera = True
+
         # Load task description
         task = episode_data.get('text', {}).get('goal', "")
         
@@ -239,13 +428,20 @@ class JsonDataset:
             'cam_width': cam_width,
             'state_dim': state_dim,
             'action_dim': action_dim,
-            'has_velocity': enriched_state_data['qvel'].size > 0,
-            'has_pressure': enriched_state_data['pressure'].size > 0,
+            'has_velocity': has_velocity,
+            'has_pressure': has_pressure,
+            'has_torque': has_torque,
+            'has_active_camera': has_active_camera 
         }
+        
+        print(f"==> Episode {index} configuration:")
+        print(f"    State shape: {state.shape}")
+        print(f"    Action shape: {action.shape}")
+        print(f"    Features detected: velocity={has_velocity}, pressure={has_pressure}, torque={has_torque}")
         
         return {'episode_index': index,
                 'episode_length': episode_length,
-                'state': state,  # This now contains all sensor data
+                'state': state,
                 'action': action,
                 'cameras': cameras,
                 'task': task,
@@ -260,6 +456,9 @@ def create_empty_dataset(
     has_velocity: bool = False,
     has_effort: bool = False,
     has_pressure: bool = False,
+    has_torque: bool = False,
+    has_active_camera: bool = False,
+    action_dim: int = None,
     state_dim: int = None,
     dataset_config: DatasetConfig = DEFAULT_DATASET_CONFIG,
 ) -> LeRobotDataset:
@@ -267,29 +466,103 @@ def create_empty_dataset(
     motors = ROBOT_CONFIGS[robot_type].motors
     cameras = ROBOT_CONFIGS[robot_type].cameras
 
-    # Use provided state dimension or calculate from motors count
-    if state_dim is None:
-        state_dim = len(motors)
-    
-    # Create feature names for enriched state
+    # Create feature names for enriched state based on the actual order used in extraction
     state_names = []
     
-    # Add position names (qpos)
-    state_names.extend([f"{motor}_pos" for motor in motors])
+    # For G1_Dex3, create feature names that match the extraction order in _extract_ordered_state_data
+    if robot_type == "Unitree_G1_Dex3":
+        # Left arm: qpos (7D) + qvel (7D) + torque (7D) = 21D
+        for i in range(7):
+            state_names.append(f"left_arm_qpos_{i}")
+        if has_velocity:
+            for i in range(7):
+                state_names.append(f"left_arm_qvel_{i}")
+        if has_torque:
+            for i in range(7):
+                state_names.append(f"left_arm_torque_{i}")
+        
+        # Right arm: qpos (7D) + qvel (7D) + torque (7D) = 21D
+        for i in range(7):
+            state_names.append(f"right_arm_qpos_{i}")
+        if has_velocity:
+            for i in range(7):
+                state_names.append(f"right_arm_qvel_{i}")
+        if has_torque:
+            for i in range(7):
+                state_names.append(f"right_arm_torque_{i}")
+        
+        # Left hand: qpos (7D) + qvel (7D) + torque (7D) + pressures (12D) = 33D
+        for i in range(7):
+            state_names.append(f"left_hand_qpos_{i}")
+        if has_velocity:
+            for i in range(7):
+                state_names.append(f"left_hand_qvel_{i}")
+        if has_torque:
+            for i in range(7):
+                state_names.append(f"left_hand_torque_{i}")
+        if has_pressure:
+            for i in range(12):
+                state_names.append(f"left_hand_pressure_{i}")
+        
+        # Right hand: qpos (7D) + qvel (7D) + torque (7D) + pressures (12D) = 33D
+        for i in range(7):
+            state_names.append(f"right_hand_qpos_{i}")
+        if has_velocity:
+            for i in range(7):
+                state_names.append(f"right_hand_qvel_{i}")
+        if has_torque:
+            for i in range(7):
+                state_names.append(f"right_hand_torque_{i}")
+        if has_pressure:
+            for i in range(12):
+                state_names.append(f"right_hand_pressure_{i}")
+        
+        # Camera: qpos (2D) - always include for G1_Dex3 (110D total)
+        for i in range(2):
+            state_names.append(f"camera_qpos_{i}")
+    else:
+        # For other robot types, use original logic
+        # Add position names (qpos)
+        state_names.extend([f"{motor}_pos" for motor in motors])
+        
+        # Add velocity names (qvel) if available
+        if has_velocity:
+            state_names.extend([f"{motor}_vel" for motor in motors])
+        
+        # Add pressure names if available
+        if has_pressure:
+            # Add pressure sensors for hands (12 per hand for dex3 hands)
+            state_names.extend([
+                f"left_hand_pressure_{i}" for i in range(12)
+            ])
+            state_names.extend([
+                f"right_hand_pressure_{i}" for i in range(12)
+            ])
     
-    # Add velocity names (qvel) if available
-    if has_velocity:
-        state_names.extend([f"{motor}_vel" for motor in motors])
-    
-    # Add pressure names if available
-    if has_pressure:
-        # Add pressure sensors for hands (12 per hand for dex3 hands)
-        state_names.extend([
-            f"left_hand_pressure_{i}" for i in range(12)
-        ])
-        state_names.extend([
-            f"right_hand_pressure_{i}" for i in range(12)
-        ])
+    # Calculate state dimension from the actual feature names
+    if state_dim is None:
+        state_dim = len(state_names)
+
+    # Create action feature names that match the extraction order in _extract_ordered_action_data
+    action_names = []
+    if robot_type == "Unitree_G1_Dex3":
+        # Action order: left_arm (7D) + right_arm (7D) + left_hand (7D) + right_hand (7D) + camera (2D)
+        for i in range(7):
+            action_names.append(f"left_arm_qpos_{i}")
+        for i in range(7):
+            action_names.append(f"right_arm_qpos_{i}")
+        for i in range(7):
+            action_names.append(f"left_hand_qpos_{i}")
+        for i in range(7):
+            action_names.append(f"right_hand_qpos_{i}")
+        # Always include camera for G1_Dex3 (30D total)
+        for i in range(2):
+            action_names.append(f"camera_qpos_{i}")
+        action_dim = len(action_names)
+    else:
+        # For other robot types, use motor names
+        action_names = motors
+        action_dim = len(motors)
 
     features = {
         "observation.state": {
@@ -299,17 +572,33 @@ def create_empty_dataset(
         },
         "action": {
             "dtype": "float32",
-            "shape": (len(motors),),
-            "names": motors,
+            "shape": (action_dim,),
+            "names": action_names,
         },
     }
 
     if has_effort:
-        features["observation.effort"] = {
-            "dtype": "float32",
-            "shape": (len(motors),),
-            "names": [f"{motor}_effort" for motor in motors],
-        }
+        if robot_type == "Unitree_G1_Dex3":
+            effort_names = []
+            for i in range(7):
+                effort_names.append(f"left_arm_torque_{i}")
+            for i in range(7):
+                effort_names.append(f"right_arm_torque_{i}")
+            for i in range(7):
+                effort_names.append(f"left_hand_torque_{i}")
+            for i in range(7):
+                effort_names.append(f"right_hand_torque_{i}")
+            features["observation.effort"] = {
+                "dtype": "float32",
+                "shape": (len(effort_names),),
+                "names": effort_names,
+            }
+        else:
+            features["observation.effort"] = {
+                "dtype": "float32",
+                "shape": (len(motors),),
+                "names": [f"{motor}_effort" for motor in motors],
+            }
 
 
     for cam in cameras:
@@ -395,9 +684,11 @@ def json_to_lerobot(
     # Detect available features
     has_velocity = data_cfg.get('has_velocity', False)
     has_pressure = data_cfg.get('has_pressure', False)
+    has_torque = data_cfg.get('has_torque', False)
+    has_active_camera = data_cfg.get('has_active_camera', False)  # Always pass for proper feature detection
     state_dim = data_cfg.get('state_dim', None)
     
-    print(f"Detected features - Velocity: {has_velocity}, Pressure: {has_pressure}")
+    print(f"Detected features - Velocity: {has_velocity}, Pressure: {has_pressure}, Torque: {has_torque}, Camera: {has_active_camera}")
     print(f"State dimension: {state_dim}")
 
     dataset = create_empty_dataset(
@@ -407,6 +698,8 @@ def json_to_lerobot(
         has_effort=False,
         has_velocity=has_velocity,
         has_pressure=has_pressure,
+        has_torque=has_torque,
+        has_active_camera=has_active_camera,
         state_dim=state_dim,
         dataset_config=dataset_config,
     )
