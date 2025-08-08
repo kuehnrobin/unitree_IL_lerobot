@@ -99,20 +99,8 @@ class WandbDataLoader:
         Returns:
             DataFrame with the run's metrics or None if loading fails
         """
-        if not WANDB_AVAILABLE:
-            print("wandb not available. Trying alternative methods...")
-            return self._load_run_data_alternative(run_info)
-            
-        try:
-            # Use wandb API to read the run data
-            api = wandb.Api()
-            
-            # Try to load from the wandb file directly
-            return self._load_from_wandb_file(run_info["wandb_file"])
-            
-        except Exception as e:
-            warnings.warn(f"Failed to load run data with wandb API: {e}")
-            return self._load_run_data_alternative(run_info)
+        # First try the alternative method (which includes advanced extraction)
+        return self._load_run_data_alternative(run_info)
     
     def _load_from_wandb_file(self, wandb_file: str) -> Optional[pd.DataFrame]:
         """
@@ -158,27 +146,102 @@ class WandbDataLoader:
         """
         run_dir = Path(run_info["run_dir"])
         
-        # Look for exported data files
-        for file_pattern in ["*.json", "*.jsonl", "*.csv"]:
-            for data_file in run_dir.rglob(file_pattern):
-                try:
-                    if data_file.suffix == ".json":
-                        with open(data_file, 'r') as f:
-                            data = json.load(f)
-                        return pd.json_normalize(data)
-                    elif data_file.suffix == ".jsonl":
-                        return pd.read_json(data_file, lines=True)
-                    elif data_file.suffix == ".csv":
-                        return pd.read_csv(data_file)
-                except Exception as e:
-                    continue
-                    
-        # If no data files found, create a sample DataFrame for demonstration
-        print(f"No parseable data files found in {run_dir}")
-        print("To extract data from wandb files, run:")
-        print(f"wandb export --dir {run_dir}")
+        # Look for exported data files in priority order
+        data_files_found = []
         
-        return self._create_sample_data(run_info)
+        # 1. Look for CSV files (exported data)
+        for csv_file in run_dir.glob("*.csv"):
+            data_files_found.append(csv_file)
+            try:
+                df = pd.read_csv(csv_file)
+                print(f"Loaded data from {csv_file}")
+                print(f"Data shape: {df.shape}")
+                print(f"Columns: {list(df.columns)}")
+                return df
+            except Exception as e:
+                print(f"Failed to load {csv_file}: {e}")
+                continue
+        
+        # 2. Look for JSONL files (wandb logs)
+        for jsonl_file in run_dir.glob("*.jsonl"):
+            data_files_found.append(jsonl_file)
+            try:
+                df = pd.read_json(jsonl_file, lines=True)
+                print(f"Loaded data from {jsonl_file}")
+                return df
+            except Exception as e:
+                print(f"Failed to load {jsonl_file}: {e}")
+                continue
+        
+        # 3. Look for JSON files
+        for json_file in run_dir.glob("*.json"):
+            data_files_found.append(json_file)
+            try:
+                with open(json_file, 'r') as f:
+                    data = json.load(f)
+                df = pd.json_normalize(data)
+                print(f"Loaded data from {json_file}")
+                return df
+            except Exception as e:
+                print(f"Failed to load {json_file}: {e}")
+                continue
+        
+        # 4. Look in subdirectories for data files
+        for subdir in ["files", "logs"]:
+            subdir_path = run_dir / subdir
+            if subdir_path.exists():
+                for file_pattern in ["*.csv", "*.jsonl", "*.json"]:
+                    for data_file in subdir_path.glob(file_pattern):
+                        data_files_found.append(data_file)
+                        try:
+                            if data_file.suffix == ".csv":
+                                df = pd.read_csv(data_file)
+                                print(f"Loaded data from {data_file}")
+                                return df
+                            elif data_file.suffix == ".jsonl":
+                                df = pd.read_json(data_file, lines=True)
+                                print(f"Loaded data from {data_file}")
+                                return df
+                            elif data_file.suffix == ".json":
+                                with open(data_file, 'r') as f:
+                                    data = json.load(f)
+                                df = pd.json_normalize(data)
+                                print(f"Loaded data from {data_file}")
+                                return df
+                        except Exception as e:
+                            continue
+        
+        # If no data files found, try the advanced extractor
+        if data_files_found:
+            print(f"Found {len(data_files_found)} data files but none could be parsed:")
+            for f in data_files_found:
+                print(f"  - {f}")
+        else:
+            print(f"No parseable data files found in {run_dir}")
+        
+        print("\nTrying advanced data extraction...")
+        try:
+            import sys
+            
+            # Import the advanced extractor
+            advanced_extractor_path = Path(__file__).parent / "advanced_extractor.py"
+            if advanced_extractor_path.exists():
+                sys.path.insert(0, str(advanced_extractor_path.parent))
+                from advanced_extractor import extract_wandb_data
+                
+                df = extract_wandb_data(str(run_dir))
+                if df is not None:
+                    return df
+        except Exception as e:
+            print(f"Advanced extraction failed: {e}")
+        
+        print("\nTo extract data from wandb files manually, try:")
+        print(f"  python advanced_extractor.py {run_dir}")
+        print("  or")
+        print(f"  python export_data.py {run_dir}")
+        
+        # Ask user if they want to use sample data
+        return None
     
     def _create_sample_data(self, run_info: Dict[str, Any]) -> pd.DataFrame:
         """

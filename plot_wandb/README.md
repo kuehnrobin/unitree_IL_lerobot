@@ -21,8 +21,11 @@ pip install -r requirements.txt
 
 2. (Optional) For LaTeX rendering, install a LaTeX distribution:
 ```bash
-# Ubuntu/Debian
-sudo apt-get install texlive-latex-extra dvipng
+# Ubuntu/Debian - Full installation
+sudo apt-get install texlive-latex-extra texlive-fonts-recommended dvipng cm-super
+
+# Ubuntu/Debian - Minimal installation
+sudo apt-get install texlive-latex-base texlive-latex-extra dvipng
 
 # macOS
 brew install --cask mactex

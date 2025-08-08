@@ -85,7 +85,11 @@ class PlotManager:
         # Set up LaTeX if requested
         if self.config.use_latex:
             plt.rcParams['text.usetex'] = True
-            plt.rcParams['text.latex.preamble'] = self.config.latex_preamble
+            # Convert list to string for matplotlib
+            if isinstance(self.config.latex_preamble, list):
+                plt.rcParams['text.latex.preamble'] = '\n'.join(self.config.latex_preamble)
+            else:
+                plt.rcParams['text.latex.preamble'] = self.config.latex_preamble
             
         # Font settings
         plt.rcParams['font.family'] = self.config.font_family
@@ -431,7 +435,7 @@ class PlotConfigs:
             font_family="serif",
             font_size=12,
             title_size=14,
-            use_latex=True,
+            use_latex=False,  # Disabled LaTeX to avoid dependency issues
             export_formats=["pdf", "svg", "png"],
             export_dpi=300,
             style="seaborn-v0_8-whitegrid"
