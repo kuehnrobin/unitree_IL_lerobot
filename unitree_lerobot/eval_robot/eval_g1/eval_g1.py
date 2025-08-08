@@ -301,7 +301,7 @@ def eval_policy(
         print("wait robot to pose")
         time.sleep(1)
 
-        frequency = 50.0
+        frequency = 30.0
         frame_counter = 0
         last_instruction_time = time.time()
         
