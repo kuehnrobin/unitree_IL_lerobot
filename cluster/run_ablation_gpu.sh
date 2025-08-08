@@ -6,7 +6,7 @@
 #SBATCH --ntasks-per-node=12
 #SBATCH --gres=gpu:a100m40:1
 #SBATCH --mem=40G
-#SBATCH --time=34:00:00
+#SBATCH --time=48:00:00
 #SBATCH --output=%x_%j.out
 #SBATCH --error=%x_%j.err
 #SBATCH --mail-type=BEGIN,END,FAIL
@@ -64,7 +64,7 @@ export TRANSFORMERS_OFFLINE=1
 export TORCH_HUB_OFFLINE=1
 
 # Local dataset path
-export LOCAL_DATASET_PATH=$BIGWORK/LargeFiles/huggingface/lerobot/kuehnrobin/g1_cubes_v2
+export LOCAL_DATASET_PATH=$BIGWORK/LargeFiles/huggingface/lerobot/kuehnrobin/g1_cubes_no_hover_v2
 
 # Set output directory for training results
 export OUTPUTS_DIR=$BIGWORK/outputs
