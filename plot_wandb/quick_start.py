@@ -8,12 +8,17 @@ This script provides a simple interface to get started with plotting wandb logs.
 import sys
 from pathlib import Path
 import argparse
+from typing import List, Optional, Union
 
 
-def quick_plot(wandb_dir: str, output_dir: str = "plots"):
+def quick_plot(wandb_dirs: Union[str, List[str]], output_dir: str = "plots", run_names: Optional[List[str]] = None):
     """Quick plotting function."""
     print("=== WandB Quick Plot ===")
-    print(f"Input: {wandb_dir}")
+    
+    if isinstance(wandb_dirs, str):
+        wandb_dirs = [wandb_dirs]
+    
+    print(f"Input directories: {wandb_dirs}")
     print(f"Output: {output_dir}")
     
     # Import the main function
@@ -21,13 +26,13 @@ def quick_plot(wandb_dir: str, output_dir: str = "plots"):
     from main import create_training_plots
     
     try:
-        create_training_plots(wandb_dir, output_dir, "thesis")
+        create_training_plots(wandb_dirs, output_dir, "thesis", None, True, run_names)
         print(f"\n✅ Plots created successfully in {output_dir}/")
         print("📁 Check the README.md file for usage instructions")
     except Exception as e:
         print(f"❌ Error: {e}")
         print("\n💡 Troubleshooting:")
-        print("1. Make sure the wandb directory contains valid runs")
+        print("1. Make sure the wandb directories contain valid runs")
         print("2. Try running: python advanced_extractor.py <wandb_run_dir>")
         print("3. Check if all dependencies are installed: pip install -r requirements.txt")
 
@@ -66,14 +71,17 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Quick plot generation
+  # Quick plot generation from single directory
   python quick_start.py plot /path/to/wandb
+
+  # Compare multiple runs with custom names
+  python quick_start.py plot /path/to/run1 /path/to/run2 --run-names "ResNet" "DINOv2"
 
   # Start server
   python quick_start.py server /path/to/wandb
 
   # Plot with custom output
-  python quick_start.py plot /path/to/wandb --output my_plots/
+  python quick_start.py plot /path/to/wandb1 /path/to/wandb2 --output comparison_plots/
         """
     )
     
@@ -81,8 +89,9 @@ Examples:
     
     # Plot command
     plot_parser = subparsers.add_parser("plot", help="Create plots quickly")
-    plot_parser.add_argument("wandb_dir", help="Path to wandb directory")
+    plot_parser.add_argument("wandb_dirs", nargs="+", help="Path(s) to wandb directory/directories")
     plot_parser.add_argument("--output", "-o", default="plots", help="Output directory")
+    plot_parser.add_argument("--run-names", "-n", nargs="+", help="Custom names for runs")
     
     # Server command
     server_parser = subparsers.add_parser("server", help="Start server quickly")
@@ -104,9 +113,12 @@ Examples:
             choice = input("\nEnter choice (1-3): ").strip()
             
             if choice == "1":
-                wandb_dir = input("Enter wandb directory path: ").strip()
+                wandb_dirs_input = input("Enter wandb directory path(s) (space-separated for multiple): ").strip()
+                wandb_dirs = wandb_dirs_input.split()
                 output_dir = input("Enter output directory (default: plots): ").strip() or "plots"
-                quick_plot(wandb_dir, output_dir)
+                run_names_input = input("Enter custom run names (optional, space-separated): ").strip()
+                run_names = run_names_input.split() if run_names_input else None
+                quick_plot(wandb_dirs, output_dir, run_names)
                 break
             elif choice == "2":
                 wandb_dir = input("Enter wandb directory path: ").strip()
@@ -123,7 +135,7 @@ Examples:
     else:
         # Command line mode
         if args.command == "plot":
-            quick_plot(args.wandb_dir, args.output)
+            quick_plot(args.wandb_dirs, args.output, args.run_names)
         elif args.command == "server":
             quick_server(args.wandb_dir, args.port)
 

@@ -132,116 +132,116 @@ class WandbDataLoader:
             warnings.warn(f"Failed to parse wandb file {wandb_file}: {e}")
             return None
     
-    def _load_run_data_alternative(self, run_info: Dict[str, Any]) -> Optional[pd.DataFrame]:
+    def _load_run_data_alternative(self, run_dir: str) -> pd.DataFrame:
         """
-        Alternative method to load run data when wandb API is not available.
-        
-        This method looks for exported data files or logs that can be parsed.
-        
-        Args:
-            run_info: Run information dictionary
-            
-        Returns:
-            DataFrame with metrics or None if loading fails
+        Alternative data loading method using wandb sync + API.
+        This is the most reliable method for offline runs.
         """
-        run_dir = Path(run_info["run_dir"])
+        import subprocess
+        import tempfile
+        import shutil
         
-        # Look for exported data files in priority order
-        data_files_found = []
+        run_path = Path(run_dir)
         
-        # 1. Look for CSV files (exported data)
-        for csv_file in run_dir.glob("*.csv"):
-            data_files_found.append(csv_file)
-            try:
-                df = pd.read_csv(csv_file)
-                print(f"Loaded data from {csv_file}")
-                print(f"Data shape: {df.shape}")
-                print(f"Columns: {list(df.columns)}")
-                return df
-            except Exception as e:
-                print(f"Failed to load {csv_file}: {e}")
-                continue
-        
-        # 2. Look for JSONL files (wandb logs)
-        for jsonl_file in run_dir.glob("*.jsonl"):
-            data_files_found.append(jsonl_file)
-            try:
-                df = pd.read_json(jsonl_file, lines=True)
-                print(f"Loaded data from {jsonl_file}")
-                return df
-            except Exception as e:
-                print(f"Failed to load {jsonl_file}: {e}")
-                continue
-        
-        # 3. Look for JSON files
-        for json_file in run_dir.glob("*.json"):
-            data_files_found.append(json_file)
-            try:
-                with open(json_file, 'r') as f:
-                    data = json.load(f)
-                df = pd.json_normalize(data)
-                print(f"Loaded data from {json_file}")
-                return df
-            except Exception as e:
-                print(f"Failed to load {json_file}: {e}")
-                continue
-        
-        # 4. Look in subdirectories for data files
-        for subdir in ["files", "logs"]:
-            subdir_path = run_dir / subdir
-            if subdir_path.exists():
-                for file_pattern in ["*.csv", "*.jsonl", "*.json"]:
-                    for data_file in subdir_path.glob(file_pattern):
-                        data_files_found.append(data_file)
-                        try:
-                            if data_file.suffix == ".csv":
-                                df = pd.read_csv(data_file)
-                                print(f"Loaded data from {data_file}")
-                                return df
-                            elif data_file.suffix == ".jsonl":
-                                df = pd.read_json(data_file, lines=True)
-                                print(f"Loaded data from {data_file}")
-                                return df
-                            elif data_file.suffix == ".json":
-                                with open(data_file, 'r') as f:
-                                    data = json.load(f)
-                                df = pd.json_normalize(data)
-                                print(f"Loaded data from {data_file}")
-                                return df
-                        except Exception as e:
-                            continue
-        
-        # If no data files found, try the advanced extractor
-        if data_files_found:
-            print(f"Found {len(data_files_found)} data files but none could be parsed:")
-            for f in data_files_found:
-                print(f"  - {f}")
-        else:
-            print(f"No parseable data files found in {run_dir}")
-        
-        print("\nTrying advanced data extraction...")
+        # Method 1: Try wandb sync to make offline runs accessible
         try:
-            import sys
+            print(f"Attempting to sync offline run: {run_dir}")
             
-            # Import the advanced extractor
-            advanced_extractor_path = Path(__file__).parent / "advanced_extractor.py"
-            if advanced_extractor_path.exists():
-                sys.path.insert(0, str(advanced_extractor_path.parent))
-                from advanced_extractor import extract_wandb_data
+            # Create a temporary project for syncing
+            temp_project = f"temp-analysis-{int(pd.Timestamp.now().timestamp())}"
+            
+            # Run wandb sync on the directory
+            sync_result = subprocess.run([
+                'wandb', 'sync', 
+                '--project', temp_project,
+                '--no-include-online',  # Only offline runs
+                '--mark-synced',        # Mark as synced
+                str(run_path)
+            ], capture_output=True, text=True, timeout=60)
+            
+            if sync_result.returncode == 0:
+                print("Sync successful! Attempting to read via API...")
                 
-                df = extract_wandb_data(str(run_dir))
-                if df is not None:
+                # Now try to access via API
+                try:
+                    import wandb
+                    api = wandb.Api()
+                    
+                    # Get runs from the temporary project
+                    runs = api.runs(f"/{temp_project}")
+                    
+                    if runs:
+                        # Get the most recent run (should be our synced run)
+                        run = runs[0]
+                        print(f"Found synced run: {run.id}")
+                        
+                        # Get the history
+                        history_df = run.history()
+                        
+                        if not history_df.empty:
+                            print(f"Successfully loaded data with shape: {history_df.shape}")
+                            print(f"Columns: {list(history_df.columns)}")
+                            
+                            # Save the real data for future use
+                            output_file = run_path / "extracted_real_data.csv"
+                            history_df.to_csv(output_file, index=False)
+                            print(f"Saved real data to: {output_file}")
+                            
+                            return history_df
+                        
+                except Exception as e:
+                    print(f"API access after sync failed: {e}")
+            else:
+                print(f"Sync failed: {sync_result.stderr}")
+                
+        except subprocess.TimeoutExpired:
+            print("Sync timed out")
+        except Exception as e:
+            print(f"Sync process failed: {e}")
+        
+        # Method 2: Try to read previously extracted real data
+        try:
+            extracted_file = run_path / "extracted_real_data.csv"
+            if extracted_file.exists():
+                print(f"Loading previously extracted real data from {extracted_file}")
+                df = pd.read_csv(extracted_file)
+                if not df.empty:
                     return df
         except Exception as e:
-            print(f"Advanced extraction failed: {e}")
+            print(f"Failed to read extracted data: {e}")
         
-        print("\nTo extract data from wandb files manually, try:")
-        print(f"  python advanced_extractor.py {run_dir}")
-        print("  or")
-        print(f"  python export_data.py {run_dir}")
+        # Method 3: Try different file types in order of preference
+        data_files = [
+            list(run_path.glob("*.csv")),
+            list(run_path.glob("*.json")),
+            list(run_path.glob("*.jsonl")),
+            list(run_path.glob("*.log"))
+        ]
         
-        # Ask user if they want to use sample data
-        return None
+        for file_list in data_files:
+            if file_list:
+                try:
+                    file_path = file_list[0]
+                    if file_path.suffix == '.csv':
+                        df = pd.read_csv(file_path)
+                        if not df.empty:
+                            return df
+                    elif file_path.suffix == '.json':
+                        df = pd.read_json(file_path)
+                        if not df.empty:
+                            return df
+                    elif file_path.suffix == '.jsonl':
+                        df = pd.read_json(file_path, lines=True)
+                        if not df.empty:
+                            return df
+                except Exception as e:
+                    print(f"Failed to read {file_path}: {e}")
+                    continue
+        
+        # Method 4: If all else fails, use the advanced extractor
+        print(f"Using advanced extractor for {run_dir}")
+        from .advanced_extractor import extract_wandb_data
+        return extract_wandb_data(run_dir)
     
     def _create_sample_data(self, run_info: Dict[str, Any]) -> pd.DataFrame:
         """

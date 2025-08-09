@@ -9,7 +9,7 @@ from local wandb logs and managing a local wandb server.
 import argparse
 import sys
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Union
 
 # Add the parent directory to the path so we can import our modules
 sys.path.insert(0, str(Path(__file__).parent))
@@ -20,21 +20,27 @@ from server import WandbServerManager, quick_start_server
 from export import ExportManager
 
 
-def create_training_plots(wandb_dir: str, 
+def create_training_plots(wandb_dirs: Union[str, List[str]], 
                          output_dir: str = "plots",
                          config_type: str = "thesis",
                          metrics: Optional[List[str]] = None,
-                         smooth: bool = True) -> None:
+                         smooth: bool = True,
+                         run_names: Optional[List[str]] = None) -> None:
     """
     Create training plots from wandb logs.
     
     Args:
-        wandb_dir: Path to wandb directory
+        wandb_dirs: Path(s) to wandb directory/directories
         output_dir: Output directory for plots
         config_type: Plot configuration type ('paper', 'presentation', 'thesis')
         metrics: List of metrics to plot. If None, uses default metrics.
         smooth: Whether to apply smoothing to curves
+        run_names: Optional custom names for the runs
     """
+    # Ensure wandb_dirs is a list
+    if isinstance(wandb_dirs, str):
+        wandb_dirs = [wandb_dirs]
+    
     # Set up configuration
     if config_type == "paper":
         config = PlotConfigs.paper_config()
@@ -47,33 +53,53 @@ def create_training_plots(wandb_dir: str,
     plot_manager = PlotManager(config)
     export_manager = ExportManager(output_dir)
     
-    # Load data
-    print(f"Loading data from {wandb_dir}...")
-    loader = WandbDataLoader(wandb_dir)
-    runs_data = loader.load_all_runs()
+    # Load data from all directories
+    print(f"Loading data from {len(wandb_dirs)} directories...")
+    all_runs_data = {}
     
-    if not runs_data:
-        print("No data found. Make sure the wandb directory contains valid runs.")
+    for i, wandb_dir in enumerate(wandb_dirs):
+        print(f"Loading from {wandb_dir}...")
+        loader = WandbDataLoader(wandb_dir)
+        runs_data = loader.load_all_runs()
+        
+        if runs_data:
+            # Add custom names if provided
+            for run_id, df in runs_data.items():
+                if run_names and i < len(run_names):
+                    combined_name = f"{run_names[i]}_{run_id}"
+                else:
+                    # Use directory name as prefix
+                    dir_name = Path(wandb_dir).name
+                    combined_name = f"{dir_name}_{run_id}"
+                all_runs_data[combined_name] = df
+            print(f"Found {len(runs_data)} runs in {wandb_dir}")
+        else:
+            print(f"No data found in {wandb_dir}")
+    
+    if not all_runs_data:
+        print("No data found in any directory. Make sure the wandb directories contain valid runs.")
         return
     
-    print(f"Found {len(runs_data)} runs")
+    print(f"Total: {len(all_runs_data)} runs loaded")
     
-    # Default metrics if none specified
+    # Default metrics if none specified (focusing on L1 loss)
     if metrics is None:
         metrics = [
-            "train/loss",
-            "val/loss", 
+            "train/l1_loss",
+            "val/l1_loss",
+            "train/loss", 
+            "val/loss",
             "train/accuracy",
             "val/accuracy"
         ]
     
     # Filter metrics that exist in the data
     available_metrics = set()
-    for df in runs_data.values():
+    for df in all_runs_data.values():
         available_metrics.update(df.columns)
     
     metrics = [m for m in metrics if m in available_metrics]
-    print(f"Available metrics: {list(available_metrics)}")
+    print(f"Available metrics: {sorted(list(available_metrics))}")
     print(f"Plotting metrics: {metrics}")
     
     if not metrics:
@@ -86,67 +112,57 @@ def create_training_plots(wandb_dir: str,
     captions = []
     labels = []
     
-    # Training curves
-    if len(runs_data) > 1:
-        # Multiple runs comparison
-        fig = plot_manager.create_training_curves(
-            runs_data, metrics, 
-            title="Training Curves Comparison",
-            smooth=smooth
+    # Training curves comparison (always create this for multiple runs)
+    fig = plot_manager.create_training_curves(
+        all_runs_data, metrics, 
+        title="Training Curves Comparison",
+        smooth=smooth
+    )
+    figures.append(fig)
+    figure_names.append("training_curves_comparison")
+    captions.append("Comparison of training curves across different model configurations")
+    labels.append("training_comparison")
+    
+    # Individual metric comparisons
+    for metric in metrics:
+        fig = plot_manager.create_comparison_plot(
+            all_runs_data, metric,
+            title=f"{metric.replace('/', ' ').title()} Comparison"
         )
         figures.append(fig)
-        figure_names.append("training_curves_comparison")
-        captions.append("Comparison of training curves across different model configurations")
-        labels.append("training_comparison")
-        
-        # Individual metric comparisons
-        for metric in metrics:
+        safe_metric_name = metric.replace('/', '_').replace(' ', '_')
+        figure_names.append(f"{safe_metric_name}_comparison")
+        captions.append(f"Comparison of {metric} across different configurations")
+        labels.append(f"{safe_metric_name}_comp")
+    
+    # Box plot for final performance (key metrics only)
+    key_metrics = [m for m in metrics if any(key in m.lower() for key in ['l1_loss', 'loss', 'accuracy'])]
+    for metric in key_metrics:
+        fig = plot_manager.create_box_plot(
+            all_runs_data, metric,
+            title=f"Final {metric.replace('/', ' ').title()} Distribution"
+        )
+        figures.append(fig)
+        safe_metric_name = metric.replace('/', '_').replace(' ', '_')
+        figure_names.append(f"{safe_metric_name}_boxplot")
+        captions.append(f"Distribution of final {metric} values")
+        labels.append(f"{safe_metric_name}_dist")
+    
+    # Special focus on L1 loss if available
+    l1_metrics = [m for m in available_metrics if 'l1' in m.lower() and 'loss' in m.lower()]
+    if l1_metrics:
+        print(f"Creating special L1 loss plots for: {l1_metrics}")
+        for l1_metric in l1_metrics:
+            # Create dedicated L1 loss comparison
             fig = plot_manager.create_comparison_plot(
-                runs_data, metric,
-                title=f"{metric.replace('/', ' ').title()} Comparison"
+                all_runs_data, l1_metric,
+                title="L1 Loss Comparison Across Runs",
+                final_values=True
             )
             figures.append(fig)
-            safe_metric_name = metric.replace('/', '_').replace(' ', '_')
-            figure_names.append(f"{safe_metric_name}_comparison")
-            captions.append(f"Comparison of {metric} across different configurations")
-            labels.append(f"{safe_metric_name}_comp")
-        
-        # Box plot for final performance
-        for metric in metrics:
-            fig = plot_manager.create_box_plot(
-                runs_data, metric,
-                title=f"Final {metric.replace('/', ' ').title()} Distribution"
-            )
-            figures.append(fig)
-            safe_metric_name = metric.replace('/', '_').replace(' ', '_')
-            figure_names.append(f"{safe_metric_name}_boxplot")
-            captions.append(f"Distribution of final {metric} values")
-            labels.append(f"{safe_metric_name}_dist")
-    
-    else:
-        # Single run
-        run_data = list(runs_data.values())[0]
-        fig = plot_manager.create_training_curves(
-            run_data, metrics,
-            title="Training Curves",
-            smooth=smooth
-        )
-        figures.append(fig)
-        figure_names.append("training_curves")
-        captions.append("Training curves showing model performance over time")
-        labels.append("training_curves")
-    
-    # Learning rate schedule if available
-    lr_metrics = [col for col in available_metrics if 'learning_rate' in col.lower()]
-    if lr_metrics:
-        fig = plot_manager.create_learning_rate_schedule(
-            runs_data if len(runs_data) > 1 else list(runs_data.values())[0],
-            lr_column=lr_metrics[0]
-        )
-        figures.append(fig)
-        figure_names.append("learning_rate_schedule")
-        captions.append("Learning rate schedule during training")
-        labels.append("lr_schedule")
+            figure_names.append("l1_loss_detailed_comparison")
+            captions.append("Detailed comparison of L1 loss across different model configurations showing convergence behavior")
+            labels.append("l1_loss_detailed")
     
     # Export all plots
     print(f"Exporting {len(figures)} plots...")
@@ -222,17 +238,20 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Create thesis plots from wandb logs
+  # Create thesis plots from single wandb log directory
   python main.py plot /path/to/wandb --config thesis --output plots/
+
+  # Compare multiple runs from different directories
+  python main.py plot /path/to/wandb1 /path/to/wandb2 --config thesis --output comparison_plots/
+
+  # Custom run names and specific metrics
+  python main.py plot /path/to/run1 /path/to/run2 --run-names "ResNet" "DINOv2" --metrics train/l1_loss val/l1_loss
 
   # Start wandb server
   python main.py server /path/to/wandb --port 8080
 
   # List available runs
   python main.py list /path/to/wandb
-
-  # Create presentation plots with custom metrics
-  python main.py plot /path/to/wandb --config presentation --metrics train/loss val/loss accuracy
         """
     )
     
@@ -240,7 +259,8 @@ Examples:
     
     # Plot command
     plot_parser = subparsers.add_parser("plot", help="Create plots from wandb logs")
-    plot_parser.add_argument("wandb_dir", help="Path to wandb directory")
+    plot_parser.add_argument("wandb_dirs", nargs="+", 
+                           help="Path(s) to wandb directory/directories")
     plot_parser.add_argument("--output", "-o", default="plots", 
                            help="Output directory for plots (default: plots)")
     plot_parser.add_argument("--config", "-c", choices=["paper", "presentation", "thesis"],
@@ -249,6 +269,8 @@ Examples:
                            help="Metrics to plot (default: common training metrics)")
     plot_parser.add_argument("--no-smooth", action="store_true",
                            help="Disable curve smoothing")
+    plot_parser.add_argument("--run-names", "-n", nargs="+",
+                           help="Custom names for the runs (optional)")
     
     # Server command
     server_parser = subparsers.add_parser("server", help="Start local wandb server")
@@ -268,21 +290,23 @@ Examples:
         parser.print_help()
         return
     
-    # Validate wandb directory
-    wandb_path = Path(args.wandb_dir)
-    if not wandb_path.exists():
-        print(f"Error: Directory {args.wandb_dir} does not exist")
-        return
+    # Validate wandb directories
+    for wandb_dir in (args.wandb_dirs if args.command == "plot" else [args.wandb_dir]):
+        wandb_path = Path(wandb_dir)
+        if not wandb_path.exists():
+            print(f"Error: Directory {wandb_dir} does not exist")
+            return
     
     # Execute command
     try:
         if args.command == "plot":
             create_training_plots(
-                args.wandb_dir,
+                args.wandb_dirs,
                 args.output,
                 args.config,
                 args.metrics,
-                not args.no_smooth
+                not args.no_smooth,
+                args.run_names
             )
         elif args.command == "server":
             start_server_command(args.wandb_dir, args.port, args.no_browser)

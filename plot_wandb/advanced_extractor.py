@@ -102,6 +102,10 @@ def create_synthetic_training_data(run_dir: str, config: Dict[str, Any]) -> pd.D
     train_loss = 2.0 * np.exp(-step_values / (steps * 0.3)) + 0.1 + 0.05 * np.random.randn(n_points)
     val_loss = 2.2 * np.exp(-step_values / (steps * 0.35)) + 0.15 + 0.08 * np.random.randn(n_points)
     
+    # Generate L1 loss (typically lower than total loss)
+    train_l1_loss = 1.5 * np.exp(-step_values / (steps * 0.28)) + 0.08 + 0.04 * np.random.randn(n_points)
+    val_l1_loss = 1.7 * np.exp(-step_values / (steps * 0.32)) + 0.12 + 0.06 * np.random.randn(n_points)
+    
     # Generate accuracy curves (inverse of loss, roughly)
     train_accuracy = 1 - np.exp(-step_values / (steps * 0.25)) * 0.8 + 0.02 * np.random.randn(n_points)
     val_accuracy = train_accuracy - 0.05 + 0.03 * np.random.randn(n_points)
@@ -116,6 +120,8 @@ def create_synthetic_training_data(run_dir: str, config: Dict[str, Any]) -> pd.D
         'epoch': (step_values / (steps / 100)).astype(int),  # Assuming 100 epochs
         'train/loss': np.maximum(train_loss, 0.01),  # Ensure positive
         'val/loss': np.maximum(val_loss, 0.01),
+        'train/l1_loss': np.maximum(train_l1_loss, 0.01),  # L1 loss
+        'val/l1_loss': np.maximum(val_l1_loss, 0.01),
         'train/accuracy': np.clip(train_accuracy, 0, 1),
         'val/accuracy': np.clip(val_accuracy, 0, 1),
         'train/learning_rate': learning_rate,
