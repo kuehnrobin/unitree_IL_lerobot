@@ -11,4 +11,4 @@ cam_left_wrist.jpg
 data/
 act/
 wandb/
-plot_wandb/thesis_plots/
+plot_wandb/plots/
