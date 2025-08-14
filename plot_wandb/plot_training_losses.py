@@ -264,7 +264,8 @@ Examples:
   python plot_training_losses.py
   python plot_training_losses.py --csv_path my_data.csv
   python plot_training_losses.py --output_dir my_plots
-  python plot_training_losses.py --csv_path my_data.csv --output_dir my_plots
+  python plot_training_losses.py --plots comparison individual
+  python plot_training_losses.py --csv_path my_data.csv --output_dir my_plots --plots all
         """
     )
     
@@ -283,6 +284,14 @@ Examples:
     )
     
     parser.add_argument(
+        '--plots', '-p',
+        nargs='*',
+        choices=['comparison', 'individual', 'convergence', 'summary', 'all'],
+        default=['all'],
+        help='Choose which plots to create. Options: comparison, individual, convergence, summary, all (default: all)'
+    )
+    
+    parser.add_argument(
         '--no_display',
         action='store_true',
         help='Do not display plots interactively (useful for headless environments)'
@@ -294,6 +303,12 @@ Examples:
     csv_path = Path(args.csv_path)
     output_dir = Path(args.output_dir)
     
+    # Handle plot selection
+    if 'all' in args.plots:
+        selected_plots = ['comparison', 'individual', 'convergence', 'summary']
+    else:
+        selected_plots = args.plots
+    
     # Validate input file exists
     if not csv_path.exists():
         print(f"Error: CSV file '{csv_path}' not found!")
@@ -304,6 +319,7 @@ Examples:
     
     print(f"Input CSV: {csv_path}")
     print(f"Output directory: {output_dir}")
+    print(f"Selected plots: {', '.join(selected_plots)}")
     print()
     
     print("Loading and processing data...")
@@ -327,24 +343,29 @@ Examples:
         # Disable plt.show() calls by monkey patching
         plt.show = lambda: None
     
-    print("Creating training loss comparison plot...")
-    create_training_loss_plot(df, models, output_dir)
+    # Create selected plots
+    if 'comparison' in selected_plots:
+        print("Creating training loss comparison plot...")
+        create_training_loss_plot(df, models, output_dir)
     
-    print("Creating individual model plots...")
-    create_individual_model_plots(df, models, output_dir)
+    if 'individual' in selected_plots:
+        print("Creating individual model plots...")
+        create_individual_model_plots(df, models, output_dir)
     
-    print("Creating convergence analysis plot...")
-    create_convergence_analysis_plot(df, models, output_dir)
+    if 'convergence' in selected_plots:
+        print("Creating convergence analysis plot...")
+        create_convergence_analysis_plot(df, models, output_dir)
     
-    print("Creating summary statistics plot...")
-    create_summary_statistics_plot(df, models, output_dir)
+    if 'summary' in selected_plots:
+        print("Creating summary statistics plot...")
+        create_summary_statistics_plot(df, models, output_dir)
     
     print()
-    print(f"✓ All plots saved to {output_dir}/ in both PNG and SVG formats")
+    print(f"✓ Selected plots saved to {output_dir}/ in both PNG and SVG formats")
     print("  • PNG files are recommended for insertion in documents")
     print("  • SVG files are vector graphics, perfect for presentations and high-quality printing")
     
     return 0
 
 if __name__ == "__main__":
-    main()
+    exit(main())
