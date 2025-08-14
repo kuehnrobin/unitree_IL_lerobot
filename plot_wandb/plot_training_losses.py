@@ -74,6 +74,8 @@ def create_training_loss_plot(df, models, output_dir):
     # Add grid for better readability
     ax.grid(True, alpha=0.3, linestyle='-', linewidth=0.5)
     
+    # Set x-axis to start from 0
+    ax.set_xlim(left=0)
     # Set y-axis to start from 0 for better comparison
     ax.set_ylim(bottom=0)
     
@@ -122,7 +124,7 @@ def create_individual_model_plots(df, models, output_dir):
             final_loss = losses.iloc[-1]
             improvement = ((initial_loss - final_loss) / initial_loss) * 100
             
-            ax.text(0.02, 0.98, f'Improvement: {improvement:.1f}%', 
+            ax.text(0.10, 0.98, f'Improvement: {improvement:.1f}%', 
                    transform=ax.transAxes, fontsize=12, fontweight='bold',
                    verticalalignment='top', bbox=dict(boxstyle='round', 
                    facecolor='white', alpha=0.8))
@@ -133,6 +135,7 @@ def create_individual_model_plots(df, models, output_dir):
                     fontweight='bold', pad=20)
         
         ax.grid(True, alpha=0.3)
+        ax.set_xlim(left=0)
         ax.set_ylim(bottom=0)
         
         # Styling
