@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
 from pathlib import Path
+import argparse
 
 # Set up the plotting style for thesis-quality figures
 plt.style.use('seaborn-v0_8-whitegrid')
@@ -254,15 +255,77 @@ def create_summary_statistics_plot(df, models, output_dir):
     plt.show()
 
 def main():
-    # Set up paths
-    csv_path = Path('wandb/wandb_export_2025-08-13T15_25_06.121+02_00.csv')
-    output_dir = Path('plot_wandb/plots')
-    output_dir.mkdir(exist_ok=True)
+    # Set up command line argument parsing
+    parser = argparse.ArgumentParser(
+        description='Generate beautiful training loss plots from WandB CSV export data.',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python plot_training_losses.py
+  python plot_training_losses.py --csv_path my_data.csv
+  python plot_training_losses.py --output_dir my_plots
+  python plot_training_losses.py --csv_path my_data.csv --output_dir my_plots
+        """
+    )
+    
+    parser.add_argument(
+        '--csv_path', '-c',
+        type=str,
+        default='wandb/wandb_export_2025-08-13T15_25_06.121+02_00.csv',
+        help='Path to the CSV file containing training data (default: wandb/wandb_export_2025-08-13T15_25_06.121+02_00.csv)'
+    )
+    
+    parser.add_argument(
+        '--output_dir', '-o',
+        type=str,
+        default='plot_wandb/plots',
+        help='Directory to save output plots (default: plot_wandb/plots)'
+    )
+    
+    parser.add_argument(
+        '--no_display',
+        action='store_true',
+        help='Do not display plots interactively (useful for headless environments)'
+    )
+    
+    args = parser.parse_args()
+    
+    # Convert to Path objects
+    csv_path = Path(args.csv_path)
+    output_dir = Path(args.output_dir)
+    
+    # Validate input file exists
+    if not csv_path.exists():
+        print(f"Error: CSV file '{csv_path}' not found!")
+        return 1
+    
+    # Create output directory
+    output_dir.mkdir(parents=True, exist_ok=True)
+    
+    print(f"Input CSV: {csv_path}")
+    print(f"Output directory: {output_dir}")
+    print()
     
     print("Loading and processing data...")
-    df, models = load_and_clean_data(csv_path)
+    try:
+        df, models = load_and_clean_data(csv_path)
+    except Exception as e:
+        print(f"Error loading CSV file: {e}")
+        return 1
+    
+    if not models:
+        print("No training loss data found in the CSV file!")
+        return 1
     
     print(f"Found {len(models)} models: {list(models.keys())}")
+    print()
+    
+    # Set matplotlib backend for headless environments
+    if args.no_display:
+        import matplotlib
+        matplotlib.use('Agg')
+        # Disable plt.show() calls by monkey patching
+        plt.show = lambda: None
     
     print("Creating training loss comparison plot...")
     create_training_loss_plot(df, models, output_dir)
@@ -276,9 +339,12 @@ def main():
     print("Creating summary statistics plot...")
     create_summary_statistics_plot(df, models, output_dir)
     
-    print(f"All plots saved to {output_dir}/ in both PNG and SVG formats")
-    print("PNG files are recommended for insertion in documents")
-    print("SVG files are vector graphics, perfect for presentations and high-quality printing")
+    print()
+    print(f"✓ All plots saved to {output_dir}/ in both PNG and SVG formats")
+    print("  • PNG files are recommended for insertion in documents")
+    print("  • SVG files are vector graphics, perfect for presentations and high-quality printing")
+    
+    return 0
 
 if __name__ == "__main__":
     main()
