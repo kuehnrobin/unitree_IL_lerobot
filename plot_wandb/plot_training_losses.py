@@ -370,11 +370,19 @@ Examples:
     )
 
     parser.add_argument(
-        "--headless",
+        "--no_display",
         action="store_true",
         help="Do not display plots interactively (useful for headless environments)",
     )
 
+    parser.add_argument(
+        "--max_steps",
+        "-s",
+        type=int,
+        default=None,
+        help="Only use data points with Step <= this value (e.g., 80000)",
+    )
+    
     args = parser.parse_args()
 
     # Convert to Path objects
@@ -406,6 +414,18 @@ Examples:
     except Exception as e:
         print(f"Error loading CSV file: {e}")
         return 1
+    
+    if args.max_steps is not None:
+        if "Step" not in df.columns:
+            print("Error: 'Step' column not found in the CSV.")
+            return 1
+        before = len(df)
+        df = df[df["Step"] <= args.max_steps].copy()
+        if df.empty:
+            print(f"Error: No rows with Step <= {args.max_steps}.")
+            return 1
+        print(f"Applied step limit: Step <= {args.max_steps} "
+              f"(rows kept: {len(df)}/{before})")
 
     if not models:
         print("No training loss data found in the CSV file!")
@@ -440,12 +460,7 @@ Examples:
         create_summary_statistics_plot(df, models, output_dir)
 
     print()
-    print(f"✓ Selected plots saved to {output_dir}/ in both PNG and SVG formats")
-    print("  • PNG files are recommended for insertion in documents")
-    print(
-        "  • SVG files are vector graphics, perfect for presentations and high-quality printing"
-    )
-
+    print(f"✓ Selected plots saved to {output_dir}/ in PNG formats")
     return 0
 
 
