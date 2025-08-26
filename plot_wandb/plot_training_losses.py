@@ -1,5 +1,6 @@
 import argparse
 from pathlib import Path
+from math import ceil
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -30,6 +31,7 @@ plt.rcParams.update(
     }
 )
 
+COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#00b1b1", "#d62728", "#9467bd", "#FF24BD"]
 
 def load_and_clean_data(csv_path):
     """Load CSV data and clean it for plotting."""
@@ -49,7 +51,7 @@ def create_training_loss_plot(df, models, output_dir):
     """Create a comprehensive training loss plot."""
     fig, ax = plt.subplots(figsize=(12, 8))
 
-    colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#00b1b1", "#d62728", "#9467bd", "#b6b900"]
+    colors = COLORS
 
     for i, (model_name, col_name) in enumerate(models.items()):
         # Get data and remove NaN values
@@ -111,86 +113,88 @@ def create_training_loss_plot(df, models, output_dir):
     plt.show()
 
 
-def create_individual_model_plots(df, models, output_dir):
-    """Create individual plots for each model."""
-    for model_name, col_name in models.items():
-        fig, ax = plt.subplots(figsize=(10, 6))
+def create_individual_model_plots(df, models, output_dir, ncols: int = 3):
+    """Create all individual model plots as subplots in a grid."""
+    model_items = list(models.items())
+    n_models = len(model_items)
+    if n_models == 0:
+        return
 
-        # Get data and remove NaN values
+    ncols = max(1, int(ncols))
+    nrows = int(ceil(n_models / ncols))
+
+    # Size scales with grid
+    fig, axes = plt.subplots(
+        nrows, ncols, figsize=(5.0 * ncols, 4.2 * nrows), squeeze=False
+    )
+
+    for idx, (model_name, col_name) in enumerate(model_items):
+        r, c = divmod(idx, ncols)
+        ax = axes[r][c]
+
+        # Data
         data = df[["Step", col_name]].dropna()
-
         if len(data) == 0:
+            ax.set_visible(False)
             continue
 
         steps_k = data["Step"] / 1000
         losses = data[col_name]
 
-        # Plot with filled area under curve
-        ax.plot(steps_k, losses, linewidth=2.5, color="#1f77b4", alpha=0.8)
-        ax.fill_between(steps_k, losses, alpha=0.3, color="#1f77b4")
+        # Main series
+        ax.plot(steps_k, losses, linewidth=1.8, color="#1f77b4", alpha=0.9)
+        ax.fill_between(steps_k, losses, alpha=0.20, color="#1f77b4")
 
-        # Add trend line
+        # Trend line (smoothed)
         if len(data) > 10:
             window_size = max(5, len(data) // 15)
             smoothed = losses.rolling(window=window_size, center=True).mean()
-            ax.plot(
-                steps_k,
-                smoothed,
-                "--",
-                color="#9c0500",
-                alpha=0.8,
-                linewidth=2,
-                label="Trend",
-            )
-            ax.legend()
+            ax.plot(steps_k, smoothed, "--", color="#9c0500", alpha=0.8, linewidth=1.6)
 
-        # Calculate and display final loss improvement
+        # Improvement annotation (small, top-left)
         if len(losses) > 1:
-            initial_loss = losses.iloc[0]
-            final_loss = losses.iloc[-1]
-            improvement = ((initial_loss - final_loss) / initial_loss) * 100
+            init = losses.iloc[0]
+            final = losses.iloc[-1]
+            if init != 0:
+                improvement = ((init - final) / init) * 100
+                ax.text(
+                    0.02,
+                    0.98,
+                    f"Δ {improvement:.1f}%",
+                    transform=ax.transAxes,
+                    fontsize=9,
+                    fontweight="bold",
+                    va="top",
+                    ha="left",
+                    bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.8),
+                )
 
-            ax.text(
-                0.10,
-                0.98,
-                f"Improvement: {improvement:.1f}%",
-                transform=ax.transAxes,
-                fontsize=12,
-                fontweight="bold",
-                verticalalignment="top",
-                bbox=dict(boxstyle="round", facecolor="white", alpha=0.8),
-            )
-
-        ax.set_xlabel("Training Steps (×1000)", fontweight="bold")
-        ax.set_ylabel("L1 Loss", fontweight="bold")
-        ax.set_title(
-            f'{model_name.replace("_", " ").title()} - Training Loss',
-            fontweight="bold",
-            pad=20,
-        )
-
+        ax.set_xlabel("Steps (×1000)")
+        ax.set_ylabel("L1 Loss")
+        ax.set_title(model_name.replace("_", " ").title(), fontsize=11, pad=8)
         ax.grid(True, alpha=0.3)
         ax.set_xlim(left=0)
         ax.set_ylim(bottom=0)
-
-        # Styling
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
 
-        plt.tight_layout()
+    # Hide any unused axes
+    for idx in range(n_models, nrows * ncols):
+        r, c = divmod(idx, ncols)
+        axes[r][c].set_visible(False)
 
-        # Save individual plots
-        safe_name = model_name.replace(" ", "_").replace("-", "_")
-        plt.savefig(output_dir / f"{safe_name}_training_loss.png", format="png")
-        #plt.savefig(output_dir / f"{safe_name}_training_loss.svg", format="svg")
-        plt.show()
+    fig.suptitle("Individual Training Loss Curves", fontweight="bold", y=0.995)
+    plt.tight_layout(rect=[0, 0, 1, 0.97])
+    plt.savefig(output_dir / "individual_models_grid.png", format="png")
+    # plt.savefig(output_dir / "individual_models_grid.svg", format="svg")
+    plt.show()
 
 
 def create_convergence_analysis_plot(df, models, output_dir):
     """Create a plot showing convergence behavior."""
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
 
-    colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#00b1b1", "#d62728", "#9467bd", "#b6b900"]
+    colors = COLORS
 
     # Plot 1: Log scale for better visualization of convergence
     for i, (model_name, col_name) in enumerate(models.items()):
@@ -383,6 +387,13 @@ Examples:
         help="Only use data points with Step <= this value (e.g., 80000)",
     )
     
+    parser.add_argument(
+        "--grid_cols",
+        type=int,
+        default=3,
+        help="Number of columns for the individual-plots grid (default: 3)",
+    )
+
     args = parser.parse_args()
 
     # Convert to Path objects
@@ -448,8 +459,8 @@ Examples:
         create_training_loss_plot(df, models, output_dir)
 
     if "individual" in selected_plots:
-        print("Creating individual model plots...")
-        create_individual_model_plots(df, models, output_dir)
+        print("Creating individual model plots grid...")
+        create_individual_model_plots(df, models, output_dir, ncols=args.grid_cols)
 
     if "convergence" in selected_plots:
         print("Creating convergence analysis plot...")
