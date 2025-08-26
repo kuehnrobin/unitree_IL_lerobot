@@ -107,7 +107,7 @@ def create_training_loss_plot(df, models, output_dir):
 
     # Save in both formats
     plt.savefig(output_dir / "training_loss_comparison.png", format="png")
-    plt.savefig(output_dir / "training_loss_comparison.svg", format="svg")
+    #plt.savefig(output_dir / "training_loss_comparison.svg", format="svg")
     plt.show()
 
 
@@ -182,7 +182,7 @@ def create_individual_model_plots(df, models, output_dir):
         # Save individual plots
         safe_name = model_name.replace(" ", "_").replace("-", "_")
         plt.savefig(output_dir / f"{safe_name}_training_loss.png", format="png")
-        plt.savefig(output_dir / f"{safe_name}_training_loss.svg", format="svg")
+        #plt.savefig(output_dir / f"{safe_name}_training_loss.svg", format="svg")
         plt.show()
 
 
@@ -248,7 +248,7 @@ def create_convergence_analysis_plot(df, models, output_dir):
 
     plt.tight_layout()
     plt.savefig(output_dir / "convergence_analysis.png", format="png")
-    plt.savefig(output_dir / "convergence_analysis.svg", format="svg")
+    #plt.savefig(output_dir / "convergence_analysis.svg", format="svg")
     plt.show()
 
 
@@ -325,7 +325,7 @@ def create_summary_statistics_plot(df, models, output_dir):
 
     plt.tight_layout()
     plt.savefig(output_dir / "summary_statistics.png", format="png")
-    plt.savefig(output_dir / "summary_statistics.svg", format="svg")
+    #plt.savefig(output_dir / "summary_statistics.svg", format="svg")
     plt.show()
 
 
@@ -370,7 +370,7 @@ Examples:
     )
 
     parser.add_argument(
-        "--no_display",
+        "--headless",
         action="store_true",
         help="Do not display plots interactively (useful for headless environments)",
     )
