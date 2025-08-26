@@ -49,7 +49,7 @@ def create_training_loss_plot(df, models, output_dir):
     """Create a comprehensive training loss plot."""
     fig, ax = plt.subplots(figsize=(12, 8))
 
-    colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd"]
+    colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#00b1b1", "#d62728", "#9467bd", "#b6b900"]
 
     for i, (model_name, col_name) in enumerate(models.items()):
         # Get data and remove NaN values
@@ -137,7 +137,7 @@ def create_individual_model_plots(df, models, output_dir):
                 steps_k,
                 smoothed,
                 "--",
-                color="#ff7f0e",
+                color="#9c0500",
                 alpha=0.8,
                 linewidth=2,
                 label="Trend",
@@ -190,7 +190,7 @@ def create_convergence_analysis_plot(df, models, output_dir):
     """Create a plot showing convergence behavior."""
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
 
-    colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd"]
+    colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#00b1b1", "#d62728", "#9467bd", "#b6b900"]
 
     # Plot 1: Log scale for better visualization of convergence
     for i, (model_name, col_name) in enumerate(models.items()):
