@@ -122,7 +122,7 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
     
     policy_stats = policy_stats[subtasks]  # Reorder columns
     
-    # Professional color scheme for thesis
+    # Professional color scheme
     thesis_colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f']
     
     # Set up radar chart with better proportions
@@ -142,23 +142,22 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
     for idx, (policy, scores) in enumerate(policy_stats.iterrows()):
         values = scores.tolist()
         values += values[:1]  # Complete the circle
-        
         color = thesis_colors[idx % len(thesis_colors)]
-        
-        # Main line with enhanced styling
-        ax.plot(angles, values, 'o-', linewidth=3, label=policy, color=color, 
-                markersize=8, markerfacecolor=color, markeredgecolor='white', 
-                markeredgewidth=2, alpha=0.9)
-        
-        # Semi-transparent fill
+
+        ax.plot(angles, values, 'o-', linewidth=3, label=policy, color=color,
+               markersize=8, markerfacecolor=color, markeredgecolor='white',
+               markeredgewidth=2, alpha=0.9)
+
         ax.fill(angles, values, alpha=0.08, color=color)
-        
-        # Add value labels on points for better readability
+
+        # Dynamic label positioning to prevent overlap
         for angle, value in zip(angles[:-1], values[:-1]):
-            if value > 0.05:  # Only show labels for non-zero values
-                ax.text(angle, value + 0.05, f'{value:.2f}', 
-                       ha='center', va='center', fontsize=9, fontweight='bold',
-                       bbox=dict(boxstyle='round,pad=0.2', facecolor='white', 
+            if value > 0.05:
+                # Adjust vertical offset based on value
+                offset = 0.03 + (0.1 if value < 0.3 else 0.05)
+                ax.text(angle, value + offset, f'{value:.2f}',
+                       ha='center', va='bottom', fontsize=9, fontweight='bold',
+                       bbox=dict(boxstyle='round,pad=0.2', facecolor='white',
                                edgecolor=color, alpha=0.8))
     
     # Enhanced axis customization
@@ -185,23 +184,23 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
     
     # Professional title and styling
     plt.title('Policy Performance Comparison on Can Sorting Task', 
-              size=18, fontweight='bold', pad=40, color='#2c3e50')
+              size=16, fontweight='bold', pad=30, color='#2c3e50')
     
     # Enhanced legend
-    legend = ax.legend(loc='center', bbox_to_anchor=(1.4, 0.5), 
+    legend = ax.legend(loc='lower right',  # Changed to bottom-right
                       frameon=True, fancybox=True, shadow=True,
-                      fontsize=12, title='ACT Policies', title_fontsize=14)
+                      fontsize=10, title='ACT Policies', title_fontsize=11)
     legend.get_frame().set_facecolor('#f8f9fa')
     legend.get_frame().set_edgecolor('#dee2e6')
     legend.get_frame().set_linewidth(1.5)
     legend.get_title().set_fontweight('bold')
     
     # Add subtitle for context
-    fig.text(0.5, 0.92, 'Success Rate by Subtask (0.0 = Failure, 1.0 = Perfect Success)', 
+    fig.text(0.5, 0.90, 'Success Rate by Subtask (0.0 = Failure, 1.0 = Success)', 
              ha='center', va='top', fontsize=12, style='italic', color='#6c757d')
     
     # Professional layout
-    plt.tight_layout()
+    plt.tight_layout(rect=[0, 0, 0.95, 0.95])  # Add margins to prevent clipping
     
     # Save with multiple formats for thesis use
     plt.savefig(output_dir / 'radar_chart_policy_comparison.png', 
