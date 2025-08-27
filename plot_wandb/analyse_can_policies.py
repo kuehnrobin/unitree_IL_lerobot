@@ -145,7 +145,7 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
     ax.set_yticklabels(['0.2', '0.4', '0.6', '0.8', '1.0'], fontsize=10)
     ax.grid(True)
     
-    plt.title('Policy Performance Comparison\n(Radar Chart)', size=16, fontweight='bold', pad=30)
+    plt.title('Sort Cans Policy Performance', size=16, fontweight='bold', pad=30)
     plt.legend(loc='upper right', bbox_to_anchor=(1.3, 1.1))
     
     plt.tight_layout()
@@ -204,7 +204,7 @@ def create_grouped_bar_plot(df: pd.DataFrame, output_dir: Path) -> None:
             ax.text(bar.get_x() + bar.get_width()/2., height + std + 0.02,
                    f'{mean:.2f}', ha='center', va='bottom', fontsize=9)
     
-    plt.suptitle('Policy Performance by Subtask\n(Grouped Bar Plot with Error Bars)', 
+    plt.suptitle('Sort Cans Policy Performance)', 
                  fontsize=16, fontweight='bold', y=0.98)
     plt.tight_layout()
     plt.savefig(output_dir / 'grouped_bar_plot_with_errors.png', dpi=300, bbox_inches='tight')
