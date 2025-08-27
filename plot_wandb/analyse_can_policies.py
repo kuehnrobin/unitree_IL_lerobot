@@ -122,42 +122,100 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
     
     policy_stats = policy_stats[subtasks]  # Reorder columns
     
-    # Set up radar chart
+    # Professional color scheme for thesis
+    thesis_colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f']
+    
+    # Set up radar chart with better proportions
     N = len(subtasks)
     angles = [n / float(N) * 2 * pi for n in range(N)]
     angles += angles[:1]  # Complete the circle
     
-    fig, ax = plt.subplots(figsize=(10, 10), subplot_kw=dict(projection='polar'))
+    fig, ax = plt.subplots(figsize=(12, 10), subplot_kw=dict(projection='polar'), dpi=150)
     ax.set_theta_offset(pi / 2)
     ax.set_theta_direction(-1)
     
-    # Plot each policy
-    colors = plt.cm.Set1(np.linspace(0, 1, len(policy_stats)))
+    # Enhanced grid styling
+    ax.grid(True, alpha=0.4, linewidth=0.8, color='gray')
+    ax.set_facecolor('#fafafa')
+    
+    # Plot each policy with enhanced styling
     for idx, (policy, scores) in enumerate(policy_stats.iterrows()):
         values = scores.tolist()
         values += values[:1]  # Complete the circle
         
-        ax.plot(angles, values, 'o-', linewidth=2, label=policy, color=colors[idx])
-        ax.fill(angles, values, alpha=0.15, color=colors[idx])
+        color = thesis_colors[idx % len(thesis_colors)]
+        
+        # Main line with enhanced styling
+        ax.plot(angles, values, 'o-', linewidth=3, label=policy, color=color, 
+                markersize=8, markerfacecolor=color, markeredgecolor='white', 
+                markeredgewidth=2, alpha=0.9)
+        
+        # Semi-transparent fill
+        ax.fill(angles, values, alpha=0.08, color=color)
+        
+        # Add value labels on points for better readability
+        for angle, value in zip(angles[:-1], values[:-1]):
+            if value > 0.05:  # Only show labels for non-zero values
+                ax.text(angle, value + 0.05, f'{value:.2f}', 
+                       ha='center', va='center', fontsize=9, fontweight='bold',
+                       bbox=dict(boxstyle='round,pad=0.2', facecolor='white', 
+                               edgecolor=color, alpha=0.8))
     
-    # Customize the chart
+    # Enhanced axis customization
     ax.set_xticks(angles[:-1])
-    ax.set_xticklabels(subtasks, fontsize=12)
+    
+    # Better task labels with line breaks for readability
+    task_labels = [
+        "Move to\nCan",
+        "Grasp\nCan", 
+        "Move to\nCorrect Box",
+        "Place Can in\nCorrect Box"
+    ]
+    ax.set_xticklabels(task_labels, fontsize=12, fontweight='bold', ha='center')
+    
+    # Enhanced radial axis
     ax.set_ylim(0, 1)
     ax.set_yticks([0.2, 0.4, 0.6, 0.8, 1.0])
-    ax.set_yticklabels(['0.2', '0.4', '0.6', '0.8', '1.0'], fontsize=10)
-    ax.grid(True)
+    ax.set_yticklabels(['0.2', '0.4', '0.6', '0.8', '1.0'], 
+                       fontsize=11, alpha=0.8, fontweight='medium')
     
-    plt.title('Sort Cans Policy Performance', size=16, fontweight='bold', pad=30)
-    plt.legend(loc='upper right', bbox_to_anchor=(1.3, 1.1))
+    # Add radial grid lines at specific values
+    for tick in [0.2, 0.4, 0.6, 0.8, 1.0]:
+        ax.plot([0, 2*pi], [tick, tick], color='gray', alpha=0.3, linewidth=0.8)
     
+    # Professional title and styling
+    plt.title('Policy Performance Comparison on Can Sorting Task', 
+              size=18, fontweight='bold', pad=40, color='#2c3e50')
+    
+    # Enhanced legend
+    legend = ax.legend(loc='center', bbox_to_anchor=(1.4, 0.5), 
+                      frameon=True, fancybox=True, shadow=True,
+                      fontsize=12, title='ACT Policies', title_fontsize=14)
+    legend.get_frame().set_facecolor('#f8f9fa')
+    legend.get_frame().set_edgecolor('#dee2e6')
+    legend.get_frame().set_linewidth(1.5)
+    legend.get_title().set_fontweight('bold')
+    
+    # Add subtitle for context
+    fig.text(0.5, 0.92, 'Success Rate by Subtask (0.0 = Failure, 1.0 = Perfect Success)', 
+             ha='center', va='top', fontsize=12, style='italic', color='#6c757d')
+    
+    # Professional layout
     plt.tight_layout()
-    plt.savefig(output_dir / 'radar_chart_policy_comparison.png', dpi=300, bbox_inches='tight')
+    
+    # Save with multiple formats for thesis use
+    plt.savefig(output_dir / 'radar_chart_policy_comparison.png', 
+                dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
+    plt.savefig(output_dir / 'radar_chart_policy_comparison.pdf', 
+                bbox_inches='tight', facecolor='white', edgecolor='none')
+    plt.savefig(output_dir / 'radar_chart_policy_comparison.svg', 
+                bbox_inches='tight', facecolor='white', edgecolor='none')
+    
     plt.show()
 
 
 def create_grouped_bar_plot(df: pd.DataFrame, output_dir: Path) -> None:
-    """Create grouped bar plots with error bars for each subtask."""
+    """Create beautiful grouped bar plots with error bars for each subtask."""
     
     # Calculate statistics
     stats = df.groupby(['Policy', 'Task'])['Score'].agg(['mean', 'std', 'count']).reset_index()
@@ -165,9 +223,15 @@ def create_grouped_bar_plot(df: pd.DataFrame, output_dir: Path) -> None:
     subtasks = ["Hand Move to Can", "Hand Grasp Can", "Hand Move to correct Box", "Can in correct Box"]
     policies = stats['Policy'].unique()
     
-    # Set up the plot
-    fig, axes = plt.subplots(2, 2, figsize=(16, 12))
+    # Professional color scheme for thesis
+    thesis_colors = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#34495e', '#e67e22']
+    
+    # Set up the plot with better spacing and professional styling
+    fig, axes = plt.subplots(2, 2, figsize=(18, 14), dpi=150)
     axes = axes.flatten()
+    
+    # Global styling
+    fig.patch.set_facecolor('white')
     
     # Create a subplot for each subtask
     for task_idx, task in enumerate(subtasks):
@@ -183,34 +247,104 @@ def create_grouped_bar_plot(df: pd.DataFrame, output_dir: Path) -> None:
             policy_data = task_data[task_data['Policy'] == policy]
             if len(policy_data) > 0:
                 means.append(policy_data['mean'].iloc[0])
-                stds.append(policy_data['std'].iloc[0] if pd.notna(policy_data['std'].iloc[0]) else 0)
+                std_val = policy_data['std'].iloc[0] if pd.notna(policy_data['std'].iloc[0]) else 0
+                stds.append(std_val)
             else:
                 means.append(0)
                 stds.append(0)
         
-        # Create bars with error bars
-        bars = ax.bar(x, means, yerr=stds, capsize=5, alpha=0.8, 
-                     color=plt.cm.Set2(np.linspace(0, 1, len(policies))))
+        # Create beautiful bars with enhanced styling
+        bars = ax.bar(x, means, yerr=stds, capsize=8, capthick=2,
+                     color=[thesis_colors[i % len(thesis_colors)] for i in range(len(policies))],
+                     alpha=0.85, edgecolor='white', linewidth=2,
+                     error_kw={'elinewidth': 2, 'ecolor': '#2c3e50', 'alpha': 0.8})
         
-        # Customize subplot
-        ax.set_title(f'{task}', fontsize=14, fontweight='bold', pad=10)
-        ax.set_ylabel('Success Rate', fontsize=12)
-        ax.set_xlabel('Policy', fontsize=12)
+        # Add gradient effect to bars
+        for i, bar in enumerate(bars):
+            # Add subtle gradient by varying alpha
+            gradient = plt.Rectangle((bar.get_x(), 0), bar.get_width(), bar.get_height(),
+                                   facecolor=thesis_colors[i % len(thesis_colors)], 
+                                   alpha=0.3, edgecolor='none')
+            ax.add_patch(gradient)
+        
+        # Enhanced subplot styling
+        ax.set_facecolor('#fafafa')
+        ax.grid(axis='y', linestyle='--', alpha=0.4, linewidth=1, color='#bdc3c7')
+        ax.set_axisbelow(True)
+        
+        # Customize subplot titles with better formatting
+        task_title = task.replace(' to ', ' to\n') if len(task) > 20 else task
+        ax.set_title(f'{task_title}', fontsize=16, fontweight='bold', 
+                    pad=15, color='#2c3e50')
+        
+        # Enhanced axis labels
+        ax.set_ylabel('Success Rate', fontsize=14, fontweight='medium', color='#2c3e50')
+        ax.set_xlabel('Policy', fontsize=14, fontweight='medium', color='#2c3e50')
+        
+        # Better x-axis labels
         ax.set_xticks(x)
-        ax.set_xticklabels(policies, rotation=45, ha='right', fontsize=10)
-        ax.set_ylim(0, 1.1)
-        ax.grid(axis='y', linestyle='--', alpha=0.7)
+        policy_labels = [policy.replace(' ', '\n') if len(policy) > 12 else policy for policy in policies]
+        ax.set_xticklabels(policy_labels, fontsize=12, fontweight='medium', color='#34495e')
         
-        # Add value labels on bars
+        # Set consistent y-axis limits with padding
+        ax.set_ylim(0, 1.1)
+        ax.set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1.0])
+        ax.tick_params(axis='y', labelsize=11, colors='#34495e')
+        
+        # Add value labels on bars with enhanced styling
         for i, (bar, mean, std) in enumerate(zip(bars, means, stds)):
             height = bar.get_height()
-            ax.text(bar.get_x() + bar.get_width()/2., height + std + 0.02,
-                   f'{mean:.2f}', ha='center', va='bottom', fontsize=9)
+            
+            # Position label above error bar
+            label_y = height + std + 0.03
+            
+            # Style the label
+            ax.text(bar.get_x() + bar.get_width()/2., label_y,
+                   f'{mean:.3f}', ha='center', va='bottom', 
+                   fontsize=11, fontweight='bold', color='#2c3e50',
+                   bbox=dict(boxstyle='round,pad=0.3', facecolor='white', 
+                           edgecolor=thesis_colors[i % len(thesis_colors)], 
+                           alpha=0.9, linewidth=1.5))
+        
+        # Add horizontal reference lines for common thresholds
+        for threshold, color, style in [(0.5, '#e74c3c', '--'), (0.8, '#27ae60', ':')]:
+            ax.axhline(y=threshold, color=color, linestyle=style, alpha=0.6, linewidth=1.5)
+        
+        # Add subtle border to subplot
+        for spine in ax.spines.values():
+            spine.set_edgecolor('#bdc3c7')
+            spine.set_linewidth(1.5)
     
-    plt.suptitle('Sort Cans Policy Performance)', 
-                 fontsize=16, fontweight='bold', y=0.98)
-    plt.tight_layout()
-    plt.savefig(output_dir / 'grouped_bar_plot_with_errors.png', dpi=300, bbox_inches='tight')
+    # Professional main title with subtitle
+    fig.suptitle('ACT Policy Performance Analysis: Can Sorting Task', 
+                fontsize=22, fontweight='bold', y=0.96, color='#2c3e50')
+    
+    # Add subtitle
+    fig.text(0.5, 0.93, 'Mean Success Rate ± Standard Deviation by Subtask', 
+             ha='center', va='top', fontsize=14, style='italic', color='#7f8c8d')
+    
+    # Add legend for reference lines
+    from matplotlib.lines import Line2D
+    legend_elements = [
+        Line2D([0], [0], color='#e74c3c', linestyle='--', alpha=0.6, label='50% Success'),
+        Line2D([0], [0], color='#27ae60', linestyle=':', alpha=0.6, label='80% Success')
+    ]
+    
+    # Position legend in the bottom right
+    fig.legend(handles=legend_elements, loc='lower right', bbox_to_anchor=(0.98, 0.02),
+              frameon=True, fancybox=True, shadow=True, fontsize=11)
+    
+    # Professional layout with proper spacing
+    plt.tight_layout(rect=[0, 0.03, 1, 0.91])
+    
+    # Save in multiple formats for thesis use
+    plt.savefig(output_dir / 'grouped_bar_plot_with_errors.png', 
+                dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
+    plt.savefig(output_dir / 'grouped_bar_plot_with_errors.pdf', 
+                bbox_inches='tight', facecolor='white', edgecolor='none')
+    plt.savefig(output_dir / 'grouped_bar_plot_with_errors.svg', 
+                bbox_inches='tight', facecolor='white', edgecolor='none')
+    
     plt.show()
 
 
