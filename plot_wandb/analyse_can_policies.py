@@ -481,6 +481,225 @@ def perform_statistical_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     return results
 
 
+def create_statistical_plots(df: pd.DataFrame, output_dir: Path) -> None:
+    """Create visualizations for statistical analysis results."""
+    
+    # Perform statistical analysis to get results
+    stats_results = perform_statistical_analysis(df, output_dir)
+    
+    # Create a figure with multiple subplots for statistical visualization
+    fig = plt.figure(figsize=(20, 16))
+    
+    # 1. P-value heatmap for policy differences
+    ax1 = plt.subplot(2, 3, 1)
+    
+    # Extract p-values for policy ANOVA
+    policy_anova = stats_results.get('policy_anova', {})
+    tasks = list(policy_anova.keys())
+    p_values = [policy_anova[task]['p_value'] for task in tasks]
+    
+    if tasks and p_values:
+        # Create a heatmap-style bar plot for p-values
+        colors = ['red' if p < 0.001 else 'orange' if p < 0.01 else 'yellow' if p < 0.05 else 'lightgray' for p in p_values]
+        bars = ax1.barh(range(len(tasks)), [-np.log10(p) for p in p_values], color=colors)
+        
+        # Add significance threshold lines
+        ax1.axvline(-np.log10(0.05), color='red', linestyle='--', alpha=0.7, label='p=0.05')
+        ax1.axvline(-np.log10(0.01), color='orange', linestyle='--', alpha=0.7, label='p=0.01')
+        ax1.axvline(-np.log10(0.001), color='darkred', linestyle='--', alpha=0.7, label='p=0.001')
+        
+        ax1.set_yticks(range(len(tasks)))
+        ax1.set_yticklabels([task.replace(' to ', '\nto ') for task in tasks], fontsize=10)
+        ax1.set_xlabel('-log10(p-value)', fontsize=12)
+        ax1.set_title('Policy Differences\n(ANOVA p-values)', fontsize=14, fontweight='bold')
+        ax1.legend(fontsize=9)
+        ax1.grid(axis='x', alpha=0.3)
+        
+        # Add p-value labels on bars
+        for i, (bar, p_val) in enumerate(zip(bars, p_values)):
+            width = bar.get_width()
+            ax1.text(width + 0.1, bar.get_y() + bar.get_height()/2, 
+                    f'p={p_val:.4f}', ha='left', va='center', fontsize=9)
+    
+    # 2. Effect sizes heatmap
+    ax2 = plt.subplot(2, 3, 2)
+    
+    effect_sizes = stats_results.get('effect_sizes', {})
+    if effect_sizes:
+        # Create matrix for effect sizes
+        policies = df['Policy'].unique()
+        n_policies = len(policies)
+        effect_matrix = np.zeros((len(tasks), n_policies * (n_policies - 1) // 2))
+        comparison_labels = []
+        
+        col_idx = 0
+        for i, policy1 in enumerate(policies):
+            for policy2 in policies[i+1:]:
+                comparison_labels.append(f"{policy1}\nvs\n{policy2}")
+                for row_idx, task in enumerate(tasks):
+                    comparison_key = f"{policy1} vs {policy2}"
+                    if task in effect_sizes and comparison_key in effect_sizes[task]:
+                        effect_matrix[row_idx, col_idx] = effect_sizes[task][comparison_key]['cohens_d']
+                col_idx += 1
+        
+        if comparison_labels:
+            im = ax2.imshow(effect_matrix, cmap='RdBu_r', vmin=-2, vmax=2, aspect='auto')
+            ax2.set_xticks(range(len(comparison_labels)))
+            ax2.set_xticklabels(comparison_labels, rotation=45, ha='right', fontsize=9)
+            ax2.set_yticks(range(len(tasks)))
+            ax2.set_yticklabels([task.replace(' to ', '\nto ') for task in tasks], fontsize=10)
+            ax2.set_title("Effect Sizes (Cohen's d)\nPolicy Comparisons", fontsize=14, fontweight='bold')
+            
+            # Add colorbar
+            cbar = plt.colorbar(im, ax=ax2, shrink=0.8)
+            cbar.set_label("Cohen's d", fontsize=11)
+            
+            # Add text annotations
+            for i in range(len(tasks)):
+                for j in range(len(comparison_labels)):
+                    value = effect_matrix[i, j]
+                    if abs(value) > 0.1:  # Only show non-negligible effects
+                        color = 'white' if abs(value) > 1 else 'black'
+                        ax2.text(j, i, f'{value:.2f}', ha='center', va='center', 
+                                color=color, fontsize=8, fontweight='bold')
+    
+    # 3. Color effect analysis
+    ax3 = plt.subplot(2, 3, 3)
+    
+    color_results = stats_results.get('color_analysis', {})
+    if color_results:
+        color_tasks = list(color_results.keys())
+        color_p_values = [color_results[task]['p_value'] for task in color_tasks]
+        
+        colors_plot = ['green' if p < 0.001 else 'lightgreen' if p < 0.01 else 'yellow' if p < 0.05 else 'lightcoral' for p in color_p_values]
+        bars = ax3.barh(range(len(color_tasks)), [-np.log10(p) for p in color_p_values], color=colors_plot)
+        
+        ax3.axvline(-np.log10(0.05), color='red', linestyle='--', alpha=0.7)
+        ax3.set_yticks(range(len(color_tasks)))
+        ax3.set_yticklabels([task.replace(' to ', '\nto ') for task in color_tasks], fontsize=10)
+        ax3.set_xlabel('-log10(p-value)', fontsize=12)
+        ax3.set_title('Color Effects\n(ANOVA p-values)', fontsize=14, fontweight='bold')
+        ax3.grid(axis='x', alpha=0.3)
+        
+        # Add p-value labels
+        for i, (bar, p_val) in enumerate(zip(bars, color_p_values)):
+            width = bar.get_width()
+            ax3.text(width + 0.1, bar.get_y() + bar.get_height()/2, 
+                    f'p={p_val:.4f}', ha='left', va='center', fontsize=9)
+    
+    # 4. Distribution comparison (violin plot)
+    ax4 = plt.subplot(2, 3, 4)
+    
+    policies = df['Policy'].unique()
+    policy_data = [df[df['Policy'] == policy]['Score'].values for policy in policies]
+    
+    # Create violin plot
+    parts = ax4.violinplot(policy_data, positions=range(len(policies)), widths=0.7, showmeans=True)
+    
+    # Customize violin plot
+    for pc in parts['bodies']:
+        pc.set_facecolor('lightblue')
+        pc.set_alpha(0.7)
+    
+    ax4.set_xticks(range(len(policies)))
+    ax4.set_xticklabels(policies, rotation=45, ha='right', fontsize=10)
+    ax4.set_ylabel('Success Rate', fontsize=12)
+    ax4.set_title('Score Distributions\nby Policy', fontsize=14, fontweight='bold')
+    ax4.grid(axis='y', alpha=0.3)
+    ax4.set_ylim(0, 1)
+    
+    # Add statistical annotations
+    from scipy.stats import kruskal
+    if len(policy_data) > 1:
+        try:
+            h_stat, kruskal_p = kruskal(*policy_data)
+            ax4.text(0.02, 0.98, f'Kruskal-Wallis\nH={h_stat:.2f}, p={kruskal_p:.4f}', 
+                    transform=ax4.transAxes, va='top', ha='left', 
+                    bbox=dict(boxstyle='round', facecolor='white', alpha=0.8), fontsize=9)
+        except:
+            pass
+    
+    # 5. Color performance by policy
+    ax5 = plt.subplot(2, 3, 5)
+    
+    colors_available = [c for c in df['Color'].unique() if c not in ['unknown', None]]
+    if len(colors_available) >= 2:
+        # Create grouped bar plot for color effects
+        policy_color_means = df.groupby(['Policy', 'Color'])['Score'].mean().unstack(fill_value=0)
+        
+        x = np.arange(len(policies))
+        width = 0.35
+        
+        if len(colors_available) == 2:
+            color1, color2 = colors_available[:2]
+            means1 = [policy_color_means.loc[policy, color1] if color1 in policy_color_means.columns and policy in policy_color_means.index else 0 for policy in policies]
+            means2 = [policy_color_means.loc[policy, color2] if color2 in policy_color_means.columns and policy in policy_color_means.index else 0 for policy in policies]
+            
+            ax5.bar(x - width/2, means1, width, label=color1.title(), alpha=0.8)
+            ax5.bar(x + width/2, means2, width, label=color2.title(), alpha=0.8)
+        else:
+            # More than 2 colors - use different approach
+            for i, color in enumerate(colors_available[:4]):  # Limit to 4 colors for readability
+                means = [policy_color_means.loc[policy, color] if color in policy_color_means.columns and policy in policy_color_means.index else 0 for policy in policies]
+                offset = (i - len(colors_available)/2) * width/len(colors_available)
+                ax5.bar(x + offset, means, width/len(colors_available), label=color.title(), alpha=0.8)
+        
+        ax5.set_xticks(x)
+        ax5.set_xticklabels(policies, rotation=45, ha='right', fontsize=10)
+        ax5.set_ylabel('Mean Success Rate', fontsize=12)
+        ax5.set_title('Performance by\nCan Color', fontsize=14, fontweight='bold')
+        ax5.legend(fontsize=10)
+        ax5.grid(axis='y', alpha=0.3)
+        ax5.set_ylim(0, 1)
+    
+    # 6. Summary statistics table
+    ax6 = plt.subplot(2, 3, 6)
+    ax6.axis('off')
+    
+    # Create summary table
+    summary_data = []
+    for policy in policies:
+        policy_scores = df[df['Policy'] == policy]['Score']
+        summary_data.append([
+            policy,
+            f"{policy_scores.mean():.3f}",
+            f"{policy_scores.std():.3f}",
+            f"{policy_scores.count()}"
+        ])
+    
+    table = ax6.table(cellText=summary_data,
+                      colLabels=['Policy', 'Mean', 'Std', 'N'],
+                      cellLoc='center',
+                      loc='center',
+                      bbox=[0, 0.3, 1, 0.7])
+    
+    table.auto_set_font_size(False)
+    table.set_fontsize(10)
+    table.scale(1, 1.5)
+    
+    # Style the table
+    for i in range(len(policies) + 1):
+        for j in range(4):
+            cell = table[(i, j)]
+            if i == 0:  # Header
+                cell.set_facecolor('#4472C4')
+                cell.set_text_props(weight='bold', color='white')
+            else:
+                cell.set_facecolor('#F2F2F2' if i % 2 == 0 else 'white')
+    
+    ax6.set_title('Summary Statistics\nby Policy', fontsize=14, fontweight='bold', y=0.95)
+    
+    # Add overall title and adjust layout
+    fig.suptitle('Statistical Analysis of ACT Policy Performance on Can Sorting Task', 
+                 fontsize=18, fontweight='bold', y=0.96)
+    
+    plt.tight_layout(rect=[0, 0, 1, 0.94])
+    plt.savefig(output_dir / 'statistical_analysis_plots.png', dpi=300, bbox_inches='tight')
+    plt.show()
+    
+    print(f"Statistical analysis plots saved to: {output_dir / 'statistical_analysis_plots.png'}")
+
+
 def create_summary_statistics(df: pd.DataFrame, output_dir: Path) -> None:
     """Create and save summary statistics."""
     
@@ -565,7 +784,7 @@ def main():
     parser.add_argument(
         "--plots",
         nargs="*",
-        choices=["radar", "bars", "summary", "statistics", "all"],
+        choices=["radar", "bars", "summary", "statistics", "stat_plots", "all"],
         default=["all"],
         help="Choose which plots to create"
     )
@@ -600,7 +819,7 @@ def main():
     # Determine which plots to create
     selected_plots = args.plots
     if "all" in selected_plots:
-        selected_plots = ["radar", "bars", "summary", "statistics"]
+        selected_plots = ["radar", "bars", "summary", "statistics", "stat_plots"]
     
     # Set plot style
     plt.style.use('default')
@@ -631,6 +850,10 @@ def main():
     if "statistics" in selected_plots:
         print("Performing statistical analysis...")
         perform_statistical_analysis(df, output_dir)
+    
+    if "stat_plots" in selected_plots:
+        print("Creating statistical visualization plots...")
+        create_statistical_plots(df, output_dir)
     
     print(f"\nAnalysis complete! Results saved to: {output_dir.absolute()}")
     return 0
