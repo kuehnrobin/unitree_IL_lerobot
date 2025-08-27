@@ -254,10 +254,10 @@ def create_grouped_bar_plot(df: pd.DataFrame, output_dir: Path) -> None:
                 stds.append(0)
         
         # Create beautiful bars with enhanced styling
-        bars = ax.bar(x, means, yerr=stds, capsize=8, capthick=2,
+        bars = ax.bar(x, means, yerr=stds, capsize=8,
                      color=[thesis_colors[i % len(thesis_colors)] for i in range(len(policies))],
                      alpha=0.85, edgecolor='white', linewidth=2,
-                     error_kw={'elinewidth': 2, 'ecolor': '#2c3e50', 'alpha': 0.8})
+                     error_kw={'elinewidth': 2, 'capthick': 2, 'ecolor': '#2c3e50', 'alpha': 0.8})
         
         # Add gradient effect to bars
         for i, bar in enumerate(bars):
