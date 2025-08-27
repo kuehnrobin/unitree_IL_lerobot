@@ -149,7 +149,7 @@ def create_individual_model_plots(df, models, output_dir, ncols: int = 3):
         if len(data) > 10:
             window_size = max(5, len(data) // 15)
             smoothed = losses.rolling(window=window_size, center=True).mean()
-            ax.plot(steps_k, smoothed, "--", color="#9c0500", alpha=0.8, linewidth=1.6)
+            ax.plot(steps_k, smoothed, "--", color="#ff5100", alpha=0.8, linewidth=1.6)
 
         # Improvement annotation (small, top-left)
         if len(losses) > 1:
@@ -158,7 +158,7 @@ def create_individual_model_plots(df, models, output_dir, ncols: int = 3):
             if init != 0:
                 improvement = ((init - final) / init) * 100
                 ax.text(
-                    0.02,
+                    0.05,
                     0.98,
                     f"Δ {improvement:.1f}%",
                     transform=ax.transAxes,
@@ -169,9 +169,9 @@ def create_individual_model_plots(df, models, output_dir, ncols: int = 3):
                     bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.8),
                 )
 
-        ax.set_xlabel("Steps (×1000)")
-        ax.set_ylabel("L1 Loss")
-        ax.set_title(model_name.replace("_", " ").title(), fontsize=11, pad=8)
+        ax.set_xlabel("Steps (×1000)", fontsize=12)
+        ax.set_ylabel("L1 Loss", fontsize=12)
+        ax.set_title(model_name.replace("_", " ").title(), fontsize=14, pad=8, fontweight="bold")
         ax.grid(True, alpha=0.3)
         ax.set_xlim(left=0)
         ax.set_ylim(bottom=0)
