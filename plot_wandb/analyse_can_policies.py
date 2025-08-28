@@ -130,7 +130,8 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
     angles = [n / float(N) * 2 * pi for n in range(N)]
     angles += angles[:1]  # Complete the circle
     
-    fig, ax = plt.subplots(figsize=(12, 10), subplot_kw=dict(projection='polar'), dpi=150)
+    # Enlarge figure for more space
+    fig, ax = plt.subplots(figsize=(13, 12), subplot_kw=dict(projection='polar'), dpi=150)
     ax.set_theta_offset(pi / 2)
     ax.set_theta_direction(-1)
     
@@ -163,43 +164,38 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
                 else:
                     norm_idx = 0.0
 
-                # Angle jitter (horizontal spreading around each spoke)
-                # Larger at top/bottom where many values cluster; moderate left/right
+                # Stronger angle jitter for more horizontal spread
                 if angle_deg <= 45 or (135 < angle_deg <= 225) or angle_deg >= 315:
-                    angle_jitter = 0.18
-                elif (45 < angle_deg <= 135) or (225 < angle_deg <= 315):
-                    angle_jitter = 0.14
+                    angle_jitter = 0.26   # top/bottom
                 else:
-                    angle_jitter = 0.12
-                angle_offset = norm_idx * angle_jitter
-                angle_shifted = angle + angle_offset
+                    angle_jitter = 0.20   # left/right
+                angle_shifted = angle + norm_idx * angle_jitter
 
-                # Radial base offsets keep labels away from markers
+                # Place labels outside the data region while staying inside figure
                 base_tb = 0.12 if value < 0.3 else 0.10
                 base_lr = 0.10
-                # Add a small signed radial jitter by policy index for additional separation
-                signed_radial = 0.02 * norm_idx
+                signed_radial = 0.03 * norm_idx  # more radial separation
+                outside_min_top = 1.07
+                outside_min_lr  = 1.10
+                outside_min_bot = 1.10
+                outside_max = 1.16
 
-                if angle_deg <= 45 or angle_deg >= 315:  # Top region
-                    label_r = max(value + base_tb + abs(signed_radial), 0.25)
-                    # Keep inside ring to leave room for title/subtitle
-                    label_r = min(label_r, 0.88)
+                if angle_deg <= 45 or angle_deg >= 315:  # Top
+                    label_r = max(value + base_tb + abs(signed_radial), outside_min_top)
+                    label_r = min(label_r, outside_max)
                     ha, va = 'center', 'bottom'
-                elif 45 < angle_deg <= 135:  # Right region
-                    label_r = max(value + base_lr + abs(signed_radial), 0.25)
-                    label_r = min(label_r, 0.93)
+                elif 45 < angle_deg <= 135:  # Right
+                    label_r = max(value + base_lr + abs(signed_radial), outside_min_lr)
+                    label_r = min(label_r, outside_max)
                     ha, va = 'left', 'center'
-                elif 135 < angle_deg <= 225:  # Bottom region
-                    label_r = max(value + base_tb + abs(signed_radial), 0.25)
-                    label_r = min(label_r, 0.94)
+                elif 135 < angle_deg <= 225:  # Bottom
+                    label_r = max(value + base_tb + abs(signed_radial), outside_min_bot)
+                    label_r = min(label_r, outside_max)
                     ha, va = 'center', 'top'
-                else:  # Left region
-                    label_r = max(value + base_lr + abs(signed_radial), 0.25)
-                    label_r = min(label_r, 0.93)
+                else:  # Left
+                    label_r = max(value + base_lr + abs(signed_radial), outside_min_lr)
+                    label_r = min(label_r, outside_max)
                     ha, va = 'right', 'center'
-
-                if value < 0.2:
-                    label_r = max(label_r, 0.30)
 
                 ax.text(angle_shifted, label_r, f'{value:.2f}',
                         ha=ha, va=va, fontsize=9, fontweight='bold',
@@ -210,31 +206,29 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
     # Enhanced axis customization
     ax.set_xticks(angles[:-1])
     
-    # Better task labels with line breaks for readability
+    # Task labels: move farther outside for extra clearance
     task_labels = [
         "Move to\nCan",
         "Grasp\nCan", 
         "Move to\nCorrect Box",
         "Place Can in\nCorrect Box"
     ]
-    ax.set_xticklabels(task_labels, fontsize=12, fontweight='bold', ha='center')
-    # Move theta tick labels closer to the circle to avoid subtitle
-    ax.tick_params(axis='x', pad=2)
+    ax.set_xticklabels(task_labels, fontsize=13, fontweight='bold', ha='center')
+    ax.tick_params(axis='x', pad=28)  # push task labels outward
     
-    # Enhanced radial axis
-    ax.set_ylim(0, 1.05)
+    # Increase radial limit to make room for outside numeric labels
+    ax.set_ylim(0, 1.20)
     ax.set_yticks([0.2, 0.4, 0.6, 0.8, 1.0])
-    ax.set_yticklabels(['0.2', '0.4', '0.6', '0.8', '1.0'], 
-                       fontsize=11, alpha=0.8, fontweight='medium')
+    ax.set_yticklabels(['0.2', '0.4', '0.6', '0.8', '1.0'], fontsize=11, alpha=0.8, fontweight='medium')
     
     # Add radial grid lines at specific values
     for tick in [0.2, 0.4, 0.6, 0.8, 1.0]:
         ax.plot([0, 2*pi], [tick, tick], color='gray', alpha=0.3, linewidth=0.8)
     
-    # Clear axes-level title; we use a figure suptitle and subtitle instead
+    # Clear axes-level title
     ax.set_title("")
     
-    # Enhanced legend (push further to bottom-right, outside the plot)
+    # Legend stays outside bottom-right
     legend = ax.legend(loc='lower right', bbox_to_anchor=(1.42, -0.06),
                       borderaxespad=0.0, frameon=True, fancybox=True, shadow=True,
                       fontsize=10, title='ACT Policies', title_fontsize=11)
@@ -243,14 +237,14 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
     legend.get_frame().set_linewidth(1.5)
     legend.get_title().set_fontweight('bold')
 
-    # Main title and subtitle (subtitle under title)
+    # Title/subtitle: move left and a bit down
     fig.suptitle('Policy Performance Comparison on Can Sorting Task',
-                 size=18, fontweight='bold', y=0.996, color='#2c3e50')
-    fig.text(0.5, 0.976, 'Success Rate by Subtask (0.0 = Failure, 1.0 = Success)', 
-             ha='center', va='top', fontsize=12, style='italic', color='#6c757d')
+                 x=0.08, y=0.965, size=18, fontweight='bold', color='#2c3e50', ha='left')
+    fig.text(0.08, 0.942, 'Success Rate by Subtask (0.0 = Failure, 1.0 = Success)', 
+             ha='left', va='top', fontsize=12, style='italic', color='#6c757d')
 
-    # Professional layout (reserve space right for legend and top for titles)
-    plt.tight_layout(pad=2, rect=[0, 0, 0.86, 0.90])
+    # Layout: allocate space right for legend and top for titles
+    plt.tight_layout(pad=2, rect=[0.00, 0.00, 0.85, 0.88])
     
     # Save with multiple formats for thesis use
     plt.savefig(output_dir / 'radar_chart_policy_comparison.png', 
