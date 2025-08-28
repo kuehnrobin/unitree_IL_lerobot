@@ -139,6 +139,7 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
     ax.set_facecolor('#fafafa')
     
     # Plot each policy with enhanced styling
+    n_policies = len(policy_stats)
     for idx, (policy, scores) in enumerate(policy_stats.iterrows()):
         values = scores.tolist()
         values += values[:1]  # Complete the circle
@@ -150,16 +151,62 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
 
         ax.fill(angles, values, alpha=0.08, color=color)
 
-        # Dynamic label positioning to prevent overlap
-        for angle, value in zip(angles[:-1], values[:-1]):
+        # Enhanced dynamic label positioning: spread labels by policy index
+        # so multiple policies at the same angle don't overlap.
+        for j, (angle, value) in enumerate(zip(angles[:-1], values[:-1])):
             if value > 0.05:
-                # Adjust vertical offset based on value
-                offset = 0.03 + (0.1 if value < 0.3 else 0.05)
-                ax.text(angle, value + offset, f'{value:.2f}',
-                       ha='center', va='bottom', fontsize=9, fontweight='bold',
-                       bbox=dict(boxstyle='round,pad=0.2', facecolor='white',
-                               edgecolor=color, alpha=0.8))
-    
+                angle_deg = (angle * 180 / pi) % 360
+
+                # Normalized policy offset in [-1, 1]
+                if n_policies > 1:
+                    norm_idx = (idx - (n_policies - 1) / 2) / ((n_policies - 1) / 2)
+                else:
+                    norm_idx = 0.0
+
+                # Angle jitter (horizontal spreading around each spoke)
+                # Larger at top/bottom where many values cluster; moderate left/right
+                if angle_deg <= 45 or (135 < angle_deg <= 225) or angle_deg >= 315:
+                    angle_jitter = 0.18
+                elif (45 < angle_deg <= 135) or (225 < angle_deg <= 315):
+                    angle_jitter = 0.14
+                else:
+                    angle_jitter = 0.12
+                angle_offset = norm_idx * angle_jitter
+                angle_shifted = angle + angle_offset
+
+                # Radial base offsets keep labels away from markers
+                base_tb = 0.12 if value < 0.3 else 0.10
+                base_lr = 0.10
+                # Add a small signed radial jitter by policy index for additional separation
+                signed_radial = 0.02 * norm_idx
+
+                if angle_deg <= 45 or angle_deg >= 315:  # Top region
+                    label_r = max(value + base_tb + abs(signed_radial), 0.25)
+                    # Keep inside ring to leave room for title/subtitle
+                    label_r = min(label_r, 0.88)
+                    ha, va = 'center', 'bottom'
+                elif 45 < angle_deg <= 135:  # Right region
+                    label_r = max(value + base_lr + abs(signed_radial), 0.25)
+                    label_r = min(label_r, 0.93)
+                    ha, va = 'left', 'center'
+                elif 135 < angle_deg <= 225:  # Bottom region
+                    label_r = max(value + base_tb + abs(signed_radial), 0.25)
+                    label_r = min(label_r, 0.94)
+                    ha, va = 'center', 'top'
+                else:  # Left region
+                    label_r = max(value + base_lr + abs(signed_radial), 0.25)
+                    label_r = min(label_r, 0.93)
+                    ha, va = 'right', 'center'
+
+                if value < 0.2:
+                    label_r = max(label_r, 0.30)
+
+                ax.text(angle_shifted, label_r, f'{value:.2f}',
+                        ha=ha, va=va, fontsize=9, fontweight='bold',
+                        bbox=dict(boxstyle='round,pad=0.22', facecolor='white',
+                                  edgecolor=color, alpha=0.85, linewidth=1.2),
+                        zorder=10, clip_on=False)
+
     # Enhanced axis customization
     ax.set_xticks(angles[:-1])
     
@@ -171,9 +218,11 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
         "Place Can in\nCorrect Box"
     ]
     ax.set_xticklabels(task_labels, fontsize=12, fontweight='bold', ha='center')
+    # Move theta tick labels closer to the circle to avoid subtitle
+    ax.tick_params(axis='x', pad=2)
     
     # Enhanced radial axis
-    ax.set_ylim(0, 1)
+    ax.set_ylim(0, 1.05)
     ax.set_yticks([0.2, 0.4, 0.6, 0.8, 1.0])
     ax.set_yticklabels(['0.2', '0.4', '0.6', '0.8', '1.0'], 
                        fontsize=11, alpha=0.8, fontweight='medium')
@@ -182,25 +231,26 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
     for tick in [0.2, 0.4, 0.6, 0.8, 1.0]:
         ax.plot([0, 2*pi], [tick, tick], color='gray', alpha=0.3, linewidth=0.8)
     
-    # Professional title and styling
-    plt.title('Policy Performance Comparison on Can Sorting Task', 
-              size=16, fontweight='bold', pad=30, color='#2c3e50')
+    # Clear axes-level title; we use a figure suptitle and subtitle instead
+    ax.set_title("")
     
-    # Enhanced legend
-    legend = ax.legend(loc='lower right',  # Changed to bottom-right
-                      frameon=True, fancybox=True, shadow=True,
+    # Enhanced legend (push further to bottom-right, outside the plot)
+    legend = ax.legend(loc='lower right', bbox_to_anchor=(1.42, -0.06),
+                      borderaxespad=0.0, frameon=True, fancybox=True, shadow=True,
                       fontsize=10, title='ACT Policies', title_fontsize=11)
     legend.get_frame().set_facecolor('#f8f9fa')
     legend.get_frame().set_edgecolor('#dee2e6')
     legend.get_frame().set_linewidth(1.5)
     legend.get_title().set_fontweight('bold')
-    
-    # Add subtitle for context
-    fig.text(0.5, 0.90, 'Success Rate by Subtask (0.0 = Failure, 1.0 = Success)', 
+
+    # Main title and subtitle (subtitle under title)
+    fig.suptitle('Policy Performance Comparison on Can Sorting Task',
+                 size=18, fontweight='bold', y=0.996, color='#2c3e50')
+    fig.text(0.5, 0.976, 'Success Rate by Subtask (0.0 = Failure, 1.0 = Success)', 
              ha='center', va='top', fontsize=12, style='italic', color='#6c757d')
-    
-    # Professional layout
-    plt.tight_layout(rect=[0, 0, 0.95, 0.95])  # Add margins to prevent clipping
+
+    # Professional layout (reserve space right for legend and top for titles)
+    plt.tight_layout(pad=2, rect=[0, 0, 0.86, 0.90])
     
     # Save with multiple formats for thesis use
     plt.savefig(output_dir / 'radar_chart_policy_comparison.png', 
