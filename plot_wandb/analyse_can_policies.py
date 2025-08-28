@@ -130,7 +130,7 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
     angles = [n / float(N) * 2 * pi for n in range(N)]
     angles += angles[:1]  # Complete the circle
     
-    # Enlarge figure for more space
+    # Enlarge figure for more space around chart
     fig, ax = plt.subplots(figsize=(13, 12), subplot_kw=dict(projection='polar'), dpi=150)
     ax.set_theta_offset(pi / 2)
     ax.set_theta_direction(-1)
@@ -157,42 +157,38 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
         for j, (angle, value) in enumerate(zip(angles[:-1], values[:-1])):
             if value > 0.05:
                 angle_deg = (angle * 180 / pi) % 360
-
                 # Normalized policy offset in [-1, 1]
-                if n_policies > 1:
-                    norm_idx = (idx - (n_policies - 1) / 2) / ((n_policies - 1) / 2)
-                else:
-                    norm_idx = 0.0
+                norm_idx = (idx - (n_policies - 1) / 2) / ((n_policies - 1) / 2) if n_policies > 1 else 0.0
 
-                # Stronger angle jitter for more horizontal spread
+                # Stronger angle jitter at top/bottom to spread horizontally more
                 if angle_deg <= 45 or (135 < angle_deg <= 225) or angle_deg >= 315:
-                    angle_jitter = 0.26   # top/bottom
+                    angle_jitter = 0.34  # increased spread for top/bottom spokes
                 else:
-                    angle_jitter = 0.20   # left/right
+                    angle_jitter = 0.22  # left/right
                 angle_shifted = angle + norm_idx * angle_jitter
 
-                # Place labels outside the data region while staying inside figure
+                # Place numeric labels outside the data region but inside figure
                 base_tb = 0.12 if value < 0.3 else 0.10
                 base_lr = 0.10
-                signed_radial = 0.03 * norm_idx  # more radial separation
-                outside_min_top = 1.07
-                outside_min_lr  = 1.10
-                outside_min_bot = 1.10
-                outside_max = 1.16
+                signed_radial = 0.03 * norm_idx
+                outside_min_top = 1.10
+                outside_min_lr  = 1.12
+                outside_min_bot = 1.12
+                outside_max = 1.18  # keep below tick label at left that we move to ~1.24
 
-                if angle_deg <= 45 or angle_deg >= 315:  # Top
+                if angle_deg <= 45 or angle_deg >= 315:
                     label_r = max(value + base_tb + abs(signed_radial), outside_min_top)
                     label_r = min(label_r, outside_max)
                     ha, va = 'center', 'bottom'
-                elif 45 < angle_deg <= 135:  # Right
+                elif 45 < angle_deg <= 135:
                     label_r = max(value + base_lr + abs(signed_radial), outside_min_lr)
                     label_r = min(label_r, outside_max)
                     ha, va = 'left', 'center'
-                elif 135 < angle_deg <= 225:  # Bottom
+                elif 135 < angle_deg <= 225:
                     label_r = max(value + base_tb + abs(signed_radial), outside_min_bot)
                     label_r = min(label_r, outside_max)
                     ha, va = 'center', 'top'
-                else:  # Left
+                else:
                     label_r = max(value + base_lr + abs(signed_radial), outside_min_lr)
                     label_r = min(label_r, outside_max)
                     ha, va = 'right', 'center'
@@ -205,8 +201,6 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
 
     # Enhanced axis customization
     ax.set_xticks(angles[:-1])
-    
-    # Task labels: move farther outside for extra clearance
     task_labels = [
         "Move to\nCan",
         "Grasp\nCan", 
@@ -214,13 +208,22 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
         "Place Can in\nCorrect Box"
     ]
     ax.set_xticklabels(task_labels, fontsize=13, fontweight='bold', ha='center')
-    ax.tick_params(axis='x', pad=28)  # push task labels outward
-    
-    # Increase radial limit to make room for outside numeric labels
-    ax.set_ylim(0, 1.20)
+    ax.tick_params(axis='x', pad=32)  # push all task labels outward
+
+    # Specifically move the left task label farther out to avoid value labels
+    xtick_angles = angles[:-1]
+    if len(xtick_angles) >= 4:
+        # Hide the default left label and draw a custom one further out
+        labels = ax.get_xticklabels()
+        labels[3].set_visible(False)
+        ax.text(3*pi/2, 1.24, 'Place Can in\nCorrect Box',
+                ha='center', va='center', fontsize=13, fontweight='bold')
+
+    # Increase radial limit to make room for outside labels
+    ax.set_ylim(0, 1.28)
     ax.set_yticks([0.2, 0.4, 0.6, 0.8, 1.0])
     ax.set_yticklabels(['0.2', '0.4', '0.6', '0.8', '1.0'], fontsize=11, alpha=0.8, fontweight='medium')
-    
+
     # Add radial grid lines at specific values
     for tick in [0.2, 0.4, 0.6, 0.8, 1.0]:
         ax.plot([0, 2*pi], [tick, tick], color='gray', alpha=0.3, linewidth=0.8)
@@ -237,13 +240,13 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
     legend.get_frame().set_linewidth(1.5)
     legend.get_title().set_fontweight('bold')
 
-    # Title/subtitle: move left and a bit down
+    # Titles: bring closer to the figure at left
     fig.suptitle('Policy Performance Comparison on Can Sorting Task',
-                 x=0.08, y=0.965, size=18, fontweight='bold', color='#2c3e50', ha='left')
-    fig.text(0.08, 0.942, 'Success Rate by Subtask (0.0 = Failure, 1.0 = Success)', 
+                 x=0.06, y=0.93, size=18, fontweight='bold', color='#2c3e50', ha='left')
+    fig.text(0.06, 0.905, 'Success Rate by Subtask (0.0 = Failure, 1.0 = Success)', 
              ha='left', va='top', fontsize=12, style='italic', color='#6c757d')
 
-    # Layout: allocate space right for legend and top for titles
+    # Layout: leave room right for legend and adjust top spacing
     plt.tight_layout(pad=2, rect=[0.00, 0.00, 0.85, 0.88])
     
     # Save with multiple formats for thesis use
