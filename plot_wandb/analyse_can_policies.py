@@ -245,7 +245,7 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
     #plt.savefig(output_dir / 'radar_chart_policy_comparison.svg', 
     #            bbox_inches='tight', facecolor='white', edgecolor='none')
     
-    plt.show()
+    #plt.show()
 
 
 def create_grouped_bar_plot(df: pd.DataFrame, output_dir: Path) -> None:
@@ -379,7 +379,7 @@ def create_grouped_bar_plot(df: pd.DataFrame, output_dir: Path) -> None:
     #plt.savefig(output_dir / 'grouped_bar_plot_with_errors.svg', 
     #            bbox_inches='tight', facecolor='white', edgecolor='none')
     
-    plt.show()
+    #plt.show()
 
 
 def perform_statistical_analysis(df: pd.DataFrame, output_dir: Path) -> None:
@@ -839,7 +839,7 @@ def create_statistical_plots(df: pd.DataFrame, output_dir: Path) -> None:
                       colLabels=['Policy', 'Mean', 'Std', 'N'],
                       cellLoc='center',
                       loc='center',
-                      bbox=[0, 0.3, 1, 0.7])
+                      bbox=[0, 0.2, 1, 0.6])  # Changed from [0, 0.3, 1, 0.7] to [0, 0.2, 1, 0.6]
     
     table.auto_set_font_size(False)
     table.set_fontsize(10)
@@ -855,15 +855,17 @@ def create_statistical_plots(df: pd.DataFrame, output_dir: Path) -> None:
             else:
                 cell.set_facecolor('#F2F2F2' if i % 2 == 0 else 'white')
     
-    ax6.set_title('Summary Statistics\nby Policy', fontsize=14, fontweight='bold', y=0.95)
+    ax6.set_title('Summary Statistics\nby Policy', fontsize=14, fontweight='bold', y=1.0)
     
     # Add overall title and adjust layout
     fig.suptitle('Statistical Analysis of ACT Policy Performance on Can Sorting Task', 
                  fontsize=18, fontweight='bold', y=0.96)
     
     plt.tight_layout(rect=[0, 0, 1, 0.94])
-    plt.savefig(output_dir / 'statistical_analysis_plots.png', dpi=300, bbox_inches='tight')
-    plt.show()
+    #plt.savefig(output_dir / 'statistical_analysis_plots.png', dpi=300, bbox_inches='tight')
+    plt.savefig(output_dir / 'statistical_analysis_plots.pdf', 
+                bbox_inches='tight', facecolor='white', edgecolor='none')
+    #plt.show()
     
     print(f"Statistical analysis plots saved to: {output_dir / 'statistical_analysis_plots.png'}")
 
