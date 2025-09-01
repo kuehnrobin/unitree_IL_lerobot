@@ -708,7 +708,7 @@ def create_statistical_plots(df: pd.DataFrame, output_dir: Path) -> None:
         for i, policy1 in enumerate(policies):
             for policy2 in policies[i+1:]:
                 # Use numbers instead of policy names
-                comparison_labels.append(f"[{policy_numbers[policy1]}]\nvs\n[{policy_numbers[policy2]}]")
+                comparison_labels.append(f"[{policy_numbers[policy1]}] vs [{policy_numbers[policy2]}]")
                 for row_idx, task in enumerate(tasks):
                     comparison_key = f"{policy1} vs {policy2}"
                     if task in effect_sizes and comparison_key in effect_sizes[task]:
@@ -718,7 +718,7 @@ def create_statistical_plots(df: pd.DataFrame, output_dir: Path) -> None:
         if comparison_labels:
             im = ax2.imshow(effect_matrix, cmap='RdBu_r', vmin=-2, vmax=2, aspect='auto')
             ax2.set_xticks(range(len(comparison_labels)))
-            ax2.set_xticklabels(comparison_labels, rotation=45, ha='right', fontsize=10)  # Changed rotation to 0
+            ax2.set_xticklabels(comparison_labels, rotation=45, ha='center', fontsize=9)  # Changed rotation to 0
             ax2.set_yticks(range(len(tasks)))
             ax2.set_yticklabels([task.replace(' to ', '\nto ') for task in tasks], fontsize=10)
             ax2.set_title("Effect Sizes (Cohen's d)\nPolicy Comparisons", fontsize=14, fontweight='bold')
