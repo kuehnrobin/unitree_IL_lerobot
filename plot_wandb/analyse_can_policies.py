@@ -208,19 +208,10 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
         "Place Can in\nCorrect Box"
     ]
     ax.set_xticklabels(task_labels, fontsize=13, fontweight='bold', ha='center')
-    ax.tick_params(axis='x', pad=32)  # push all task labels outward
-
-    # Specifically move the left task label farther out to avoid value labels
-    xtick_angles = angles[:-1]
-    if len(xtick_angles) >= 4:
-        # Hide the default left label and draw a custom one further out
-        labels = ax.get_xticklabels()
-        labels[3].set_visible(False)
-        ax.text(3*pi/2, 1.24, 'Place Can in\nCorrect Box',
-                ha='center', va='center', fontsize=13, fontweight='bold')
+    ax.tick_params(axis='x', pad=36)  # push all task labels outward
 
     # Increase radial limit to make room for outside labels
-    ax.set_ylim(0, 1.28)
+    ax.set_ylim(0, 1.25)
     ax.set_yticks([0.2, 0.4, 0.6, 0.8, 1.0])
     ax.set_yticklabels(['0.2', '0.4', '0.6', '0.8', '1.0'], fontsize=11, alpha=0.8, fontweight='medium')
 
@@ -229,10 +220,10 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
         ax.plot([0, 2*pi], [tick, tick], color='gray', alpha=0.3, linewidth=0.8)
     
     # Clear axes-level title
-    ax.set_title("")
+    #ax.set_title("")
     
     # Legend stays outside bottom-right
-    legend = ax.legend(loc='lower right', bbox_to_anchor=(1.42, -0.06),
+    legend = ax.legend(loc='lower right', bbox_to_anchor=(1.20, -0.06),
                       borderaxespad=0.0, frameon=True, fancybox=True, shadow=True,
                       fontsize=10, title='ACT Policies', title_fontsize=11)
     legend.get_frame().set_facecolor('#f8f9fa')
@@ -243,19 +234,18 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
     # Titles: bring closer to the figure at left
     fig.suptitle('Policy Performance Comparison on Can Sorting Task',
                  x=0.06, y=0.93, size=18, fontweight='bold', color='#2c3e50', ha='left')
-    fig.text(0.06, 0.905, 'Success Rate by Subtask (0.0 = Failure, 1.0 = Success)', 
+    fig.text(0.10, 0.89, 'Success Rate by Subtask (0.0 = Failure, 1.0 = Success)', 
              ha='left', va='top', fontsize=12, style='italic', color='#6c757d')
 
-    # Layout: leave room right for legend and adjust top spacing
-    plt.tight_layout(pad=2, rect=[0.00, 0.00, 0.85, 0.88])
-    
+    #plt.tight_layout(pad=2, rect=[0.15, 0.00, 0.83, 0.88])
+    plt.tight_layout()
     # Save with multiple formats for thesis use
     plt.savefig(output_dir / 'radar_chart_policy_comparison.png', 
                 dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
     plt.savefig(output_dir / 'radar_chart_policy_comparison.pdf', 
                 bbox_inches='tight', facecolor='white', edgecolor='none')
-    plt.savefig(output_dir / 'radar_chart_policy_comparison.svg', 
-                bbox_inches='tight', facecolor='white', edgecolor='none')
+    #plt.savefig(output_dir / 'radar_chart_policy_comparison.svg', 
+    #            bbox_inches='tight', facecolor='white', edgecolor='none')
     
     plt.show()
 
@@ -366,7 +356,7 @@ def create_grouped_bar_plot(df: pd.DataFrame, output_dir: Path) -> None:
                 fontsize=22, fontweight='bold', y=0.96, color='#2c3e50')
     
     # Add subtitle
-    fig.text(0.5, 0.93, 'Mean Success Rate ± Standard Deviation by Subtask', 
+    fig.text(0.5, 0.92, 'Mean Success Rate ± Standard Deviation by Subtask', 
              ha='center', va='top', fontsize=14, style='italic', color='#7f8c8d')
     
     # Add legend for reference lines
@@ -384,12 +374,12 @@ def create_grouped_bar_plot(df: pd.DataFrame, output_dir: Path) -> None:
     plt.tight_layout(rect=[0, 0.03, 1, 0.91])
     
     # Save in multiple formats for thesis use
-    plt.savefig(output_dir / 'grouped_bar_plot_with_errors.png', 
-                dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
+    #plt.savefig(output_dir / 'grouped_bar_plot_with_errors.png', 
+    #            dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
     plt.savefig(output_dir / 'grouped_bar_plot_with_errors.pdf', 
                 bbox_inches='tight', facecolor='white', edgecolor='none')
-    plt.savefig(output_dir / 'grouped_bar_plot_with_errors.svg', 
-                bbox_inches='tight', facecolor='white', edgecolor='none')
+    #plt.savefig(output_dir / 'grouped_bar_plot_with_errors.svg', 
+    #            bbox_inches='tight', facecolor='white', edgecolor='none')
     
     plt.show()
 
