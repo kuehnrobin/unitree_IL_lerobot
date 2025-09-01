@@ -697,13 +697,18 @@ def create_statistical_plots(df: pd.DataFrame, output_dir: Path) -> None:
         # Create matrix for effect sizes
         policies = df['Policy'].unique()
         n_policies = len(policies)
+        
+        # Create policy number mapping
+        policy_numbers = {policy: i+1 for i, policy in enumerate(policies)}
+        
         effect_matrix = np.zeros((len(tasks), n_policies * (n_policies - 1) // 2))
         comparison_labels = []
         
         col_idx = 0
         for i, policy1 in enumerate(policies):
             for policy2 in policies[i+1:]:
-                comparison_labels.append(f"{policy1}\nvs\n{policy2}")
+                # Use numbers instead of policy names
+                comparison_labels.append(f"[{policy_numbers[policy1]}]\nvs\n[{policy_numbers[policy2]}]")
                 for row_idx, task in enumerate(tasks):
                     comparison_key = f"{policy1} vs {policy2}"
                     if task in effect_sizes and comparison_key in effect_sizes[task]:
@@ -713,7 +718,7 @@ def create_statistical_plots(df: pd.DataFrame, output_dir: Path) -> None:
         if comparison_labels:
             im = ax2.imshow(effect_matrix, cmap='RdBu_r', vmin=-2, vmax=2, aspect='auto')
             ax2.set_xticks(range(len(comparison_labels)))
-            ax2.set_xticklabels(comparison_labels, rotation=45, ha='right', fontsize=9)
+            ax2.set_xticklabels(comparison_labels, rotation=45, ha='right', fontsize=10)  # Changed rotation to 0
             ax2.set_yticks(range(len(tasks)))
             ax2.set_yticklabels([task.replace(' to ', '\nto ') for task in tasks], fontsize=10)
             ax2.set_title("Effect Sizes (Cohen's d)\nPolicy Comparisons", fontsize=14, fontweight='bold')
@@ -820,7 +825,7 @@ def create_statistical_plots(df: pd.DataFrame, output_dir: Path) -> None:
         ax5.grid(axis='y', alpha=0.3)
         ax5.set_ylim(0, 1)
     
-    # 6. Summary statistics table
+    # 6. Summary statistics table and policy legend
     ax6 = plt.subplot(2, 3, 6)
     ax6.axis('off')
     
@@ -838,9 +843,9 @@ def create_statistical_plots(df: pd.DataFrame, output_dir: Path) -> None:
     table = ax6.table(cellText=summary_data,
                       colLabels=['Policy', 'Mean', 'Std', 'N'],
                       cellLoc='center',
-                      loc='center',
-                      bbox=[0, 0.2, 1, 0.6])  # Changed from [0, 0.3, 1, 0.7] to [0, 0.2, 1, 0.6]
-    
+                      loc='upper center',
+                      bbox=[0, 0.5, 1, 0.4])  # Changed bbox to make room for legend below
+
     table.auto_set_font_size(False)
     table.set_fontsize(10)
     table.scale(1, 1.5)
@@ -856,7 +861,21 @@ def create_statistical_plots(df: pd.DataFrame, output_dir: Path) -> None:
                 cell.set_facecolor('#F2F2F2' if i % 2 == 0 else 'white')
     
     ax6.set_title('Summary Statistics\nby Policy', fontsize=14, fontweight='bold', y=1.0)
-    
+
+    # Add policy number legend below the table
+    legend_y_start = 0.4
+    ax6.text(0.5, legend_y_start, 'Policy Number Legend:', 
+             ha='center', va='top', fontsize=12, fontweight='bold',
+             transform=ax6.transAxes)
+
+    # Create policy legend with numbers
+    for i, policy in enumerate(policies):
+        y_pos = legend_y_start - 0.05 - (i * 0.06)
+        ax6.text(0.5, y_pos, f'[{i+1}] {policy}', 
+                 ha='center', va='top', fontsize=10,
+                 transform=ax6.transAxes,
+                 bbox=dict(boxstyle='round,pad=0.3', facecolor='lightgray', alpha=0.5))
+
     # Add overall title and adjust layout
     fig.suptitle('Statistical Analysis of ACT Policy Performance on Can Sorting Task', 
                  fontsize=18, fontweight='bold', y=0.96)
