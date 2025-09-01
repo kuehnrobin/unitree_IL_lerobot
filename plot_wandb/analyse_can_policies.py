@@ -219,9 +219,6 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
     for tick in [0.2, 0.4, 0.6, 0.8, 1.0]:
         ax.plot([0, 2*pi], [tick, tick], color='gray', alpha=0.3, linewidth=0.8)
     
-    # Clear axes-level title
-    #ax.set_title("")
-    
     # Legend stays outside bottom-right
     legend = ax.legend(loc='lower right', bbox_to_anchor=(1.20, -0.06),
                       borderaxespad=0.0, frameon=True, fancybox=True, shadow=True,
@@ -233,11 +230,12 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
 
     # Titles: bring closer to the figure at left
     fig.suptitle('Policy Performance Comparison on Can Sorting Task',
-                 x=0.06, y=0.93, size=18, fontweight='bold', color='#2c3e50', ha='left')
-    fig.text(0.10, 0.89, 'Success Rate by Subtask (0.0 = Failure, 1.0 = Success)', 
+                 x=0.26, y=1.0, size=18, fontweight='bold', color='#2c3e50', ha='left')
+    fig.text(0.30, 0.95, 'Success Rate by Subtask (0.0 = Failure, 1.0 = Success)', 
              ha='left', va='top', fontsize=12, style='italic', color='#6c757d')
 
     #plt.tight_layout(pad=2, rect=[0.15, 0.00, 0.83, 0.88])
+    #plt.tight_layout(rect=[0.00, 0.00, 1.00, 0.91])  # Changed from default to reserve top space
     plt.tight_layout()
     # Save with multiple formats for thesis use
     plt.savefig(output_dir / 'radar_chart_policy_comparison.png', 
