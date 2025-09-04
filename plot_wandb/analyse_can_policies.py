@@ -10,6 +10,7 @@ import matplotlib.pyplot as plt
 from math import pi
 import argparse
 import os
+import json
 from pathlib import Path
 from scipy import stats
 from scipy.stats import f_oneway, ttest_ind, chi2_contingency
@@ -24,7 +25,7 @@ def parse_csv_data(csv_path: str) -> pd.DataFrame:
         csv_path: Path to the can_policies.csv file
         
     Returns:
-        Cleaned DataFrame with columns: Policy, Trial, Color, Task, Score
+        Cleaned DataFrame with columns: Policy, Trial, Color, Task, Score, Time
     """
     # Read raw CSV
     raw_df = pd.read_csv(csv_path, delimiter=';', header=None)
@@ -43,12 +44,12 @@ def parse_csv_data(csv_path: str) -> pd.DataFrame:
     # Process each policy section
     policy_start_rows = []
     for idx, row in raw_df.iterrows():
-        if pd.notna(row[0]) and any(policy in str(row[0]).lower() for policy in ['cans_resnet', 'dino']):
+        if pd.notna(row[0]) and any(policy in str(row[0]).lower() for policy in ['cans_r', 'r-', 'dino']):
             policy_start_rows.append(idx)
     
     for policy_idx, start_row in enumerate(policy_start_rows):
-        # Extract policy name
-        policy_name = str(raw_df.iloc[start_row, 0]).replace('cans_', '').replace('_', ' ').title()
+        # Extract policy name - handle abbreviated names like R-3456-P
+        policy_name = str(raw_df.iloc[start_row, 0]).replace('cans_', '').upper()
         
         # Find the end of this policy section
         end_row = policy_start_rows[policy_idx + 1] if policy_idx + 1 < len(policy_start_rows) else len(raw_df)
@@ -104,18 +105,90 @@ def parse_csv_data(csv_path: str) -> pd.DataFrame:
                     })
                 
                 trial_idx += 1
+        
+        # Process End Position data (last subtask row)
+        end_pos_row_idx = start_row + len(subtasks) + 1
+        if end_pos_row_idx < end_row:
+            end_pos_row = raw_df.iloc[end_pos_row_idx, 1:]
+            
+            trial_idx = 0
+            for col_idx in range(0, len(end_pos_row), 8):  # Every 8 columns is a new trial
+                if trial_idx >= n_trials:
+                    break
+                
+                # Extract end position score (usually in the 7th column of each trial)
+                end_pos_score = None
+                time_score = None
+                
+                if col_idx + 6 < len(end_pos_row):  # End position score
+                    end_pos_val = end_pos_row.iloc[col_idx + 6]
+                    if pd.notna(end_pos_val) and str(end_pos_val) not in ['None', 'end', 'time', '']:
+                        try:
+                            end_pos_score = float(end_pos_val)
+                        except ValueError:
+                            end_pos_score = 1.0 if str(end_pos_val) == '1' else 0.0
+                
+                if col_idx + 7 < len(end_pos_row):  # Time data
+                    time_val = end_pos_row.iloc[col_idx + 7]
+                    if pd.notna(time_val) and str(time_val) not in ['None', 'end', 'time', '']:
+                        time_str = str(time_val)
+                        # Parse time format like "05:40" to seconds
+                        if ':' in time_str:
+                            try:
+                                time_parts = time_str.split(':')
+                                time_seconds = int(time_parts[0]) * 60 + int(time_parts[1])
+                                # Convert to normalized score (lower time = higher score)
+                                # Assuming max reasonable time is 15 minutes (900 seconds)
+                                time_score = max(0, (900 - time_seconds) / 900)
+                            except ValueError:
+                                pass
+                
+                # Add End Position data
+                if end_pos_score is not None:
+                    color_idx = trial_idx * 6
+                    trial_color = valid_colors[color_idx] if color_idx < len(valid_colors) else 'unknown'
+                    
+                    parsed_data.append({
+                        'Policy': policy_name,
+                        'Trial': trial_idx + 1,
+                        'Color': trial_color,
+                        'Task': 'Return to Start Position',
+                        'Score': end_pos_score
+                    })
+                
+                # Add Time data
+                if time_score is not None:
+                    color_idx = trial_idx * 6
+                    trial_color = valid_colors[color_idx] if color_idx < len(valid_colors) else 'unknown'
+                    
+                    parsed_data.append({
+                        'Policy': policy_name,
+                        'Trial': trial_idx + 1,
+                        'Color': trial_color,
+                        'Task': 'Execution Time',
+                        'Score': time_score
+                    })
+                
+                trial_idx += 1
     
     return pd.DataFrame(parsed_data)
 
 
 def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
-    """Create a radar chart comparing all policies across subtasks."""
+    """Create a radar chart comparing all policies across subtasks including End Position and Time."""
     
     # Calculate mean scores per policy and task
     policy_stats = df.groupby(['Policy', 'Task'])['Score'].mean().unstack(fill_value=0)
     
-    # Ensure all subtasks are present
-    subtasks = ["Hand Move to Can", "Hand Grasp Can", "Hand Move to correct Box", "Can in correct Box"]
+    # Ensure all subtasks are present including new metrics
+    subtasks = [
+        "Hand Move to Can",
+        "Hand Grasp Can", 
+        "Hand Move to correct Box",
+        "Can in correct Box",
+        "Return to Start Position",
+        "Execution Time"
+    ]
     for task in subtasks:
         if task not in policy_stats.columns:
             policy_stats[task] = 0
@@ -131,7 +204,7 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
     angles += angles[:1]  # Complete the circle
     
     # Enlarge figure for more space around chart
-    fig, ax = plt.subplots(figsize=(13, 12), subplot_kw=dict(projection='polar'), dpi=150)
+    fig, ax = plt.subplots(figsize=(15, 14), subplot_kw=dict(projection='polar'), dpi=150)
     ax.set_theta_offset(pi / 2)
     ax.set_theta_direction(-1)
     
@@ -205,10 +278,12 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
         "Move to\nCan",
         "Grasp\nCan", 
         "Move to\nCorrect Box",
-        "Place Can in\nCorrect Box"
+        "Place Can in\nCorrect Box",
+        "Return to\nStart Position",
+        "Execution\nTime"
     ]
-    ax.set_xticklabels(task_labels, fontsize=13, fontweight='bold', ha='center')
-    ax.tick_params(axis='x', pad=36)  # push all task labels outward
+    ax.set_xticklabels(task_labels, fontsize=12, fontweight='bold', ha='center')
+    ax.tick_params(axis='x', pad=40)  # push all task labels outward
 
     # Increase radial limit to make room for outside labels
     ax.set_ylim(0, 1.25)
@@ -249,19 +324,26 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
 
 
 def create_grouped_bar_plot(df: pd.DataFrame, output_dir: Path) -> None:
-    """Create beautiful grouped bar plots with error bars for each subtask."""
+    """Create beautiful grouped bar plots with error bars for each subtask including End Position and Time."""
     
     # Calculate statistics
     stats = df.groupby(['Policy', 'Task'])['Score'].agg(['mean', 'std', 'count']).reset_index()
     
-    subtasks = ["Hand Move to Can", "Hand Grasp Can", "Hand Move to correct Box", "Can in correct Box"]
+    subtasks = [
+        "Hand Move to Can", 
+        "Hand Grasp Can", 
+        "Hand Move to correct Box", 
+        "Can in correct Box",
+        "Return to Start Position",
+        "Execution Time"
+    ]
     policies = stats['Policy'].unique()
     
     # Professional color scheme for thesis
     thesis_colors = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#34495e', '#e67e22']
     
-    # Set up the plot with better spacing and professional styling
-    fig, axes = plt.subplots(2, 2, figsize=(18, 14), dpi=150)
+    # Set up the plot with better spacing and professional styling - now 3x2 grid
+    fig, axes = plt.subplots(3, 2, figsize=(18, 20), dpi=150)
     axes = axes.flatten()
     
     # Global styling
@@ -380,6 +462,129 @@ def create_grouped_bar_plot(df: pd.DataFrame, output_dir: Path) -> None:
     #            bbox_inches='tight', facecolor='white', edgecolor='none')
     
     #plt.show()
+
+
+def create_end_position_analysis(df: pd.DataFrame, output_dir: Path) -> None:
+    """Create focused analysis for End Position performance."""
+    
+    # Filter for End Position data
+    end_pos_data = df[df['Task'] == 'Return to Start Position']
+    
+    if end_pos_data.empty:
+        print("No End Position data found")
+        return
+    
+    # Professional styling
+    plt.style.use('default')
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8), dpi=150)
+    
+    # 1. Bar plot of end position success rates
+    policy_stats = end_pos_data.groupby('Policy')['Score'].agg(['mean', 'std', 'count'])
+    
+    colors = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#34495e', '#e67e22']
+    x = np.arange(len(policy_stats.index))
+    
+    bars = ax1.bar(x, policy_stats['mean'], yerr=policy_stats['std'], 
+                   capsize=8, color=colors[:len(policy_stats)], alpha=0.85,
+                   edgecolor='white', linewidth=2)
+    
+    ax1.set_xticks(x)
+    ax1.set_xticklabels(policy_stats.index, rotation=45, ha='right', fontsize=12)
+    ax1.set_ylabel('Success Rate', fontsize=14, fontweight='bold')
+    ax1.set_title('Return to Start Position Success Rate', fontsize=16, fontweight='bold')
+    ax1.set_ylim(0, 1.1)
+    ax1.grid(axis='y', alpha=0.3)
+    
+    # Add value labels
+    for bar, mean, std in zip(bars, policy_stats['mean'], policy_stats['std']):
+        height = bar.get_height()
+        ax1.text(bar.get_x() + bar.get_width()/2., height + 0.02,
+                f'{mean:.2f}±{std:.2f}', ha='center', va='bottom', fontweight='bold')
+    
+    # 2. Color-based performance for end position
+    if len(end_pos_data['Color'].unique()) > 1:
+        color_policy_stats = end_pos_data.groupby(['Policy', 'Color'])['Score'].mean().unstack(fill_value=0)
+        
+        x2 = np.arange(len(color_policy_stats.index))
+        width = 0.35
+        
+        if 'red' in color_policy_stats.columns and 'green' in color_policy_stats.columns:
+            bars1 = ax2.bar(x2 - width/2, color_policy_stats['red'], width, 
+                           label='Red Cans', color='#e74c3c', alpha=0.8)
+            bars2 = ax2.bar(x2 + width/2, color_policy_stats['green'], width,
+                           label='Green Cans', color='#2ecc71', alpha=0.8)
+        
+        ax2.set_xticks(x2)
+        ax2.set_xticklabels(color_policy_stats.index, rotation=45, ha='right', fontsize=12)
+        ax2.set_ylabel('Success Rate', fontsize=14, fontweight='bold')
+        ax2.set_title('End Position by Can Color', fontsize=16, fontweight='bold')
+        ax2.legend()
+        ax2.set_ylim(0, 1.1)
+        ax2.grid(axis='y', alpha=0.3)
+    
+    plt.tight_layout()
+    plt.savefig(output_dir / 'end_position_analysis.pdf', bbox_inches='tight')
+    plt.close()
+
+
+def create_time_analysis(df: pd.DataFrame, output_dir: Path) -> None:
+    """Create focused analysis for execution time performance."""
+    
+    # Filter for Time data
+    time_data = df[df['Task'] == 'Execution Time']
+    
+    if time_data.empty:
+        print("No Execution Time data found")
+        return
+    
+    # Professional styling
+    plt.style.use('default')
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8), dpi=150)
+    
+    # 1. Bar plot of time efficiency (higher score = faster execution)
+    policy_stats = time_data.groupby('Policy')['Score'].agg(['mean', 'std', 'count'])
+    
+    colors = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#34495e', '#e67e22']
+    x = np.arange(len(policy_stats.index))
+    
+    bars = ax1.bar(x, policy_stats['mean'], yerr=policy_stats['std'], 
+                   capsize=8, color=colors[:len(policy_stats)], alpha=0.85,
+                   edgecolor='white', linewidth=2)
+    
+    ax1.set_xticks(x)
+    ax1.set_xticklabels(policy_stats.index, rotation=45, ha='right', fontsize=12)
+    ax1.set_ylabel('Time Efficiency Score', fontsize=14, fontweight='bold')
+    ax1.set_title('Execution Time Efficiency', fontsize=16, fontweight='bold')
+    ax1.set_ylim(0, 1.1)
+    ax1.grid(axis='y', alpha=0.3)
+    
+    # Add value labels
+    for bar, mean, std in zip(bars, policy_stats['mean'], policy_stats['std']):
+        height = bar.get_height()
+        ax1.text(bar.get_x() + bar.get_width()/2., height + 0.02,
+                f'{mean:.2f}±{std:.2f}', ha='center', va='bottom', fontweight='bold')
+    
+    # 2. Violin plot showing distribution of time scores
+    policies = time_data['Policy'].unique()
+    time_distributions = [time_data[time_data['Policy'] == policy]['Score'].values for policy in policies]
+    
+    parts = ax2.violinplot(time_distributions, positions=range(len(policies)), widths=0.7, showmeans=True)
+    
+    # Customize violin plot
+    for pc in parts['bodies']:
+        pc.set_facecolor('#3498db')
+        pc.set_alpha(0.7)
+    
+    ax2.set_xticks(range(len(policies)))
+    ax2.set_xticklabels(policies, rotation=45, ha='right', fontsize=12)
+    ax2.set_ylabel('Time Efficiency Score', fontsize=14, fontweight='bold')
+    ax2.set_title('Time Efficiency Distribution', fontsize=16, fontweight='bold')
+    ax2.grid(axis='y', alpha=0.3)
+    ax2.set_ylim(0, 1)
+    
+    plt.tight_layout()
+    plt.savefig(output_dir / 'time_analysis.pdf', bbox_inches='tight')
+    plt.close()
 
 
 def perform_statistical_analysis(df: pd.DataFrame, output_dir: Path) -> None:
@@ -973,7 +1178,7 @@ def main():
     parser.add_argument(
         "--plots",
         nargs="*",
-        choices=["radar", "bars", "summary", "statistics", "stat_plots", "all"],
+        choices=["radar", "bars", "summary", "statistics", "stat_plots", "end_position", "time_analysis", "all"],
         default=["all"],
         help="Choose which plots to create"
     )
@@ -1008,7 +1213,7 @@ def main():
     # Determine which plots to create
     selected_plots = args.plots
     if "all" in selected_plots:
-        selected_plots = ["radar", "bars", "summary", "statistics", "stat_plots"]
+        selected_plots = ["radar", "bars", "summary", "statistics", "stat_plots", "end_position", "time_analysis"]
     
     # Set plot style
     plt.style.use('default')
@@ -1043,6 +1248,14 @@ def main():
     if "stat_plots" in selected_plots:
         print("Creating statistical visualization plots...")
         create_statistical_plots(df, output_dir)
+    
+    if "end_position" in selected_plots:
+        print("Creating end position analysis...")
+        create_end_position_analysis(df, output_dir)
+    
+    if "time_analysis" in selected_plots:
+        print("Creating time analysis...")
+        create_time_analysis(df, output_dir)
     
     print(f"\nAnalysis complete! Results saved to: {output_dir.absolute()}")
     return 0
