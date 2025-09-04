@@ -283,7 +283,7 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
         "Execution\nTime"
     ]
     ax.set_xticklabels(task_labels, fontsize=12, fontweight='bold', ha='center')
-    ax.tick_params(axis='x', pad=40)  # push all task labels outward
+    ax.tick_params(axis='x', pad=30)  # push all task labels outward
 
     # Increase radial limit to make room for outside labels
     ax.set_ylim(0, 1.25)
@@ -306,15 +306,15 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
     # Titles: bring closer to the figure at left
     fig.suptitle('Policy Performance Comparison on Can Sorting Task',
                  x=0.26, y=1.0, size=18, fontweight='bold', color='#2c3e50', ha='left')
-    fig.text(0.33, 0.97, 'Success Rate by Subtask (0.0 = Failure, 1.0 = Success)', 
+    fig.text(0.33, 0.98, 'Success Rate by Subtask (0.0 = Failure, 1.0 = Success)', 
              ha='left', va='top', fontsize=12, style='italic', color='#6c757d')
 
     #plt.tight_layout(pad=2, rect=[0.15, 0.00, 0.83, 0.88])
-    plt.tight_layout(rect=[0.00, 0.00, 1.00, 0.9])  # Changed from default to reserve top space
+    plt.tight_layout(rect=[0.00, 0.00, 1.00, 0.8])  # Changed from default to reserve top space
     plt.tight_layout()
     # Save with multiple formats for thesis use
-    plt.savefig(output_dir / 'radar_chart_policy_comparison.png', 
-                dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
+    #plt.savefig(output_dir / 'radar_chart_policy_comparison.png', 
+    #            dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
     plt.savefig(output_dir / 'radar_chart_policy_comparison.pdf', 
                 bbox_inches='tight', facecolor='white', edgecolor='none')
     #plt.savefig(output_dir / 'radar_chart_policy_comparison.svg', 
@@ -1164,7 +1164,7 @@ def main():
     parser.add_argument(
         "--csv_path", "-c",
         type=str,
-        default="plot_wandb/can_policies.csv",
+        default="plot_wandb/can_policies_time.csv",
         help="Path to the CSV file containing policy test results"
     )
     
