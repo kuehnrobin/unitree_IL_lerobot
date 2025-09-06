@@ -34,8 +34,8 @@ def parse_csv_data(csv_path: str) -> pd.DataFrame:
     subtasks = [
         "Hand Move to Can",
         "Hand Grasp Can", 
-        "Hand Move to correct Box",
-        "Can in correct Box"
+        "Hand Move to Correct Box",
+        "Can in Correct Box"
     ]
     
     # Initialize list to store parsed data
@@ -232,9 +232,9 @@ def parse_csv_data(csv_path: str) -> pd.DataFrame:
         task_weights = {
             "Hand Move to Can": 1.0,
             "Hand Grasp Can": 1.0,
-            "Hand Move to correct Box": 1.0,
-            "Can in correct Box": 1.0,
-            "Return to Start Position": 1.0,
+            "Hand Move to Correct Box": 1.0,
+            "Can in Correct Box": 1.0,
+            "Return to Home Position": 1.0,
             "Execution Time": 1.0
         }
         
@@ -282,9 +282,9 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
     subtasks = [
         "Hand Move to Can",
         "Hand Grasp Can", 
-        "Hand Move to correct Box",
-        "Can in correct Box",
-        "Return to Start Position",
+        "Hand Move to Correct Box",
+        "Can in Correct Box",
+        "Return to Home Position",
         "Execution Time",
         "Total Score"
     ]
@@ -378,7 +378,7 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
         "Grasp\nCan", 
         "Move to\nCorrect Box",
         "Place Can in\nCorrect Box",
-        "Return to\nStart Position",
+        "Return to\nHome Position",
         "Execution\nTime",
         "Total\nScore"
     ]
@@ -432,9 +432,9 @@ def create_grouped_bar_plot(df: pd.DataFrame, output_dir: Path) -> None:
     subtasks = [
         "Hand Move to Can", 
         "Hand Grasp Can", 
-        "Hand Move to correct Box", 
-        "Can in correct Box",
-        "Return to Start Position",
+        "Hand Move to Correct Box", 
+        "Can in Correct Box",
+        "Return to Home Position",
         "Execution Time",
         "Total Score"
     ]
