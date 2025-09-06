@@ -204,7 +204,7 @@ def parse_csv_data(csv_path: str) -> pd.DataFrame:
                         'Policy': policy_name,
                         'Trial': trial_idx + 1,
                         'Color': trial_color,
-                        'Task': 'Return to Start Position',
+                        'Task': 'Return to Home Position',
                         'Score': end_pos_score
                     })
                 
@@ -435,16 +435,15 @@ def create_grouped_bar_plot(df: pd.DataFrame, output_dir: Path) -> None:
         "Hand Move to Correct Box", 
         "Can in Correct Box",
         "Return to Home Position",
-        "Execution Time",
-        "Total Score"
+        "Execution Time"
     ]
     policies = stats['Policy'].unique()
     
     # Professional color scheme for thesis
     thesis_colors = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#34495e', '#e67e22']
     
-    # Set up the plot with better spacing and professional styling - now 4x2 grid
-    fig, axes = plt.subplots(4, 2, figsize=(18, 24), dpi=150)
+    # Set up the plot with better spacing and professional styling - now 3x2 grid
+    fig, axes = plt.subplots(3, 2, figsize=(18, 20), dpi=150)
     axes = axes.flatten()
     
     # Global styling
@@ -606,17 +605,44 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     if len(total_score_data['Color'].unique()) > 1:
         color_policy_stats = total_score_data.groupby(['Policy', 'Color'])['Score'].mean().unstack(fill_value=0)
         
-        x2 = np.arange(len(color_policy_stats.index))
-        width = 0.35
-        
         if 'red' in color_policy_stats.columns and 'green' in color_policy_stats.columns:
-            bars1 = ax2.bar(x2 - width/2, color_policy_stats['red'], width, 
+            # Add averaged totals row
+            policies_list = list(color_policy_stats.index)
+            
+            # Calculate average across all policies for each color
+            red_avg = color_policy_stats['red'].mean()
+            green_avg = color_policy_stats['green'].mean()
+            
+            # Create extended data including the average
+            extended_policies = policies_list + ['Average']
+            red_values = list(color_policy_stats['red']) + [red_avg]
+            green_values = list(color_policy_stats['green']) + [green_avg]
+            
+            x2 = np.arange(len(extended_policies))
+            width = 0.35
+            
+            bars1 = ax2.bar(x2 - width/2, red_values, width, 
                            label='Red Cans', color='#e74c3c', alpha=0.8)
-            bars2 = ax2.bar(x2 + width/2, color_policy_stats['green'], width,
+            bars2 = ax2.bar(x2 + width/2, green_values, width,
                            label='Green Cans', color='#2ecc71', alpha=0.8)
+            
+            # Add value labels on bars
+            for i, (bar, value) in enumerate(zip(bars1, red_values)):
+                height = bar.get_height()
+                ax2.text(bar.get_x() + bar.get_width()/2., height + 0.01,
+                        f'{value:.2f}', ha='center', va='bottom', fontsize=10, fontweight='bold')
+            
+            for i, (bar, value) in enumerate(zip(bars2, green_values)):
+                height = bar.get_height()
+                ax2.text(bar.get_x() + bar.get_width()/2., height + 0.01,
+                        f'{value:.2f}', ha='center', va='bottom', fontsize=10, fontweight='bold')
+            
+            ax2.set_xticks(x2)
+            ax2.set_xticklabels(extended_policies, rotation=45, ha='right', fontsize=12)
+            
+            # Add a visual separator before the sum column
+            ax2.axvline(x=len(policies_list) - 0.5, color='black', linestyle='--', alpha=0.5, linewidth=1)
         
-        ax2.set_xticks(x2)
-        ax2.set_xticklabels(color_policy_stats.index, rotation=45, ha='right', fontsize=12)
         ax2.set_ylabel('Total Score', fontsize=14, fontweight='bold')
         ax2.set_title('Total Score by Can Color', fontsize=16, fontweight='bold')
         ax2.legend()
@@ -632,7 +658,7 @@ def create_end_position_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     """Create focused analysis for End Position performance."""
     
     # Filter for End Position data
-    end_pos_data = df[df['Task'] == 'Return to Start Position']
+    end_pos_data = df[df['Task'] == 'Return to Home Position']
     
     if end_pos_data.empty:
         print("No End Position data found")
@@ -655,7 +681,7 @@ def create_end_position_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     ax1.set_xticks(x)
     ax1.set_xticklabels(policy_stats.index, rotation=45, ha='right', fontsize=12)
     ax1.set_ylabel('Success Rate', fontsize=14, fontweight='bold')
-    ax1.set_title('Return to Start Position Success Rate', fontsize=16, fontweight='bold')
+    ax1.set_title('Return to Home Position Success Rate', fontsize=16, fontweight='bold')
     ax1.set_ylim(0, 1.1)
     ax1.grid(axis='y', alpha=0.3)
     
