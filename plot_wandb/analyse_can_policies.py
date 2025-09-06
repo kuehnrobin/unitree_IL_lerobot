@@ -41,11 +41,63 @@ def parse_csv_data(csv_path: str) -> pd.DataFrame:
     # Initialize list to store parsed data
     parsed_data = []
     
+    # First pass: collect all execution times for relative normalization
+    all_execution_times = []
+    
     # Process each policy section
     policy_start_rows = []
     for idx, row in raw_df.iterrows():
         if pd.notna(row[0]) and any(policy in str(row[0]).lower() for policy in ['cans_r', 'r-', 'dino']):
             policy_start_rows.append(idx)
+    
+    # First pass: collect all execution times for relative normalization
+    for policy_idx, start_row in enumerate(policy_start_rows):
+        # Find the end of this policy section
+        end_row = policy_start_rows[policy_idx + 1] if policy_idx + 1 < len(policy_start_rows) else len(raw_df)
+        
+        # Extract color sequence (first row after policy name)
+        color_row = raw_df.iloc[start_row, 1:]
+        colors = [str(c).lower() if pd.notna(c) and str(c).lower() in ['red', 'green', 'black'] else None 
+                 for c in color_row]
+        
+        # Count trials (number of color entries / 8, since each trial has 8 columns including 'end' and 'time')
+        valid_colors = [c for c in colors if c is not None]
+        n_trials = len(valid_colors) // 6  # 6 colors per trial
+        
+        # Process End Position data to extract execution times
+        end_pos_row_idx = start_row + len(subtasks) + 1
+        if end_pos_row_idx < end_row:
+            end_pos_row = raw_df.iloc[end_pos_row_idx, 1:]
+            
+            trial_idx = 0
+            for col_idx in range(0, len(end_pos_row), 8):  # Every 8 columns is a new trial
+                if trial_idx >= n_trials:
+                    break
+                
+                if col_idx + 7 < len(end_pos_row):  # Time data
+                    time_val = end_pos_row.iloc[col_idx + 7]
+                    if pd.notna(time_val) and str(time_val) not in ['None', 'end', 'time', '']:
+                        time_str = str(time_val)
+                        # Parse time format like "05:40" to seconds
+                        if ':' in time_str:
+                            try:
+                                time_parts = time_str.split(':')
+                                time_seconds = int(time_parts[0]) * 60 + int(time_parts[1])
+                                all_execution_times.append(time_seconds)
+                            except ValueError:
+                                pass
+                
+                trial_idx += 1
+    
+    # Calculate min and max execution times for relative normalization
+    if all_execution_times:
+        min_time = min(all_execution_times)
+        max_time = max(all_execution_times)
+        time_range = max_time - min_time if max_time > min_time else 1  # Avoid division by zero
+    else:
+        min_time, max_time, time_range = 0, 900, 900  # Fallback to old method
+    
+    # Second pass: actual data processing with relative time normalization
     
     for policy_idx, start_row in enumerate(policy_start_rows):
         # Extract policy name - handle abbreviated names like R-3456-P
@@ -137,9 +189,9 @@ def parse_csv_data(csv_path: str) -> pd.DataFrame:
                             try:
                                 time_parts = time_str.split(':')
                                 time_seconds = int(time_parts[0]) * 60 + int(time_parts[1])
-                                # Convert to normalized score (lower time = higher score)
-                                # Assuming max reasonable time is 15 minutes (900 seconds)
-                                time_score = max(0, (900 - time_seconds) / 900)
+                                # Convert to relative normalized score (fastest policy = 1.0, slowest policy = 0.0)
+                                # Lower time = higher score using relative normalization
+                                time_score = (max_time - time_seconds) / time_range if time_range > 0 else 0.0
                             except ValueError:
                                 pass
                 
@@ -171,7 +223,53 @@ def parse_csv_data(csv_path: str) -> pd.DataFrame:
                 
                 trial_idx += 1
     
-    return pd.DataFrame(parsed_data)
+    # Create DataFrame from parsed data
+    df = pd.DataFrame(parsed_data)
+    
+    # Calculate total policy scores with optional weighting
+    if not df.empty:
+        # Define task weights (all set to 1.0 for unweighted average)
+        task_weights = {
+            "Hand Move to Can": 1.0,
+            "Hand Grasp Can": 1.0,
+            "Hand Move to correct Box": 1.0,
+            "Can in correct Box": 1.0,
+            "Return to Start Position": 1.0,
+            "Execution Time": 1.0
+        }
+        
+        # Calculate weighted total scores for each policy and trial
+        for policy in df['Policy'].unique():
+            for trial in df[df['Policy'] == policy]['Trial'].unique():
+                policy_trial_data = df[(df['Policy'] == policy) & (df['Trial'] == trial)]
+                
+                if len(policy_trial_data) > 0:
+                    # Calculate weighted average score
+                    total_score = 0
+                    total_weight = 0
+                    trial_color = policy_trial_data['Color'].iloc[0]
+                    
+                    for task in task_weights.keys():
+                        task_data = policy_trial_data[policy_trial_data['Task'] == task]
+                        if len(task_data) > 0:
+                            task_score = task_data['Score'].iloc[0]
+                            weight = task_weights[task]
+                            total_score += task_score * weight
+                            total_weight += weight
+                    
+                    if total_weight > 0:
+                        weighted_average = total_score / total_weight
+                        
+                        # Add total score as a new task
+                        df = pd.concat([df, pd.DataFrame([{
+                            'Policy': policy,
+                            'Trial': trial,
+                            'Color': trial_color,
+                            'Task': 'Total Score',
+                            'Score': weighted_average
+                        }])], ignore_index=True)
+    
+    return df
 
 
 def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
@@ -187,7 +285,8 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
         "Hand Move to correct Box",
         "Can in correct Box",
         "Return to Start Position",
-        "Execution Time"
+        "Execution Time",
+        "Total Score"
     ]
     for task in subtasks:
         if task not in policy_stats.columns:
@@ -280,7 +379,8 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
         "Move to\nCorrect Box",
         "Place Can in\nCorrect Box",
         "Return to\nStart Position",
-        "Execution\nTime"
+        "Execution\nTime",
+        "Total\nScore"
     ]
     ax.set_xticklabels(task_labels, fontsize=12, fontweight='bold', ha='center')
     ax.tick_params(axis='x', pad=30)  # push all task labels outward
@@ -335,15 +435,16 @@ def create_grouped_bar_plot(df: pd.DataFrame, output_dir: Path) -> None:
         "Hand Move to correct Box", 
         "Can in correct Box",
         "Return to Start Position",
-        "Execution Time"
+        "Execution Time",
+        "Total Score"
     ]
     policies = stats['Policy'].unique()
     
     # Professional color scheme for thesis
     thesis_colors = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#34495e', '#e67e22']
     
-    # Set up the plot with better spacing and professional styling - now 3x2 grid
-    fig, axes = plt.subplots(3, 2, figsize=(18, 20), dpi=150)
+    # Set up the plot with better spacing and professional styling - now 4x2 grid
+    fig, axes = plt.subplots(4, 2, figsize=(18, 24), dpi=150)
     axes = axes.flatten()
     
     # Global styling
@@ -462,6 +563,69 @@ def create_grouped_bar_plot(df: pd.DataFrame, output_dir: Path) -> None:
     #            bbox_inches='tight', facecolor='white', edgecolor='none')
     
     #plt.show()
+
+
+def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
+    """Create focused analysis for Total Score performance."""
+    
+    # Filter for Total Score data
+    total_score_data = df[df['Task'] == 'Total Score']
+    
+    if total_score_data.empty:
+        print("No Total Score data found")
+        return
+    
+    # Professional styling
+    plt.style.use('default')
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 8), dpi=150)
+    
+    # 1. Bar plot of total scores
+    policy_stats = total_score_data.groupby('Policy')['Score'].agg(['mean', 'std', 'count'])
+    
+    colors = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#34495e', '#e67e22']
+    x = np.arange(len(policy_stats.index))
+    
+    bars = ax1.bar(x, policy_stats['mean'], yerr=policy_stats['std'], 
+                   capsize=8, color=colors[:len(policy_stats)], alpha=0.85,
+                   edgecolor='white', linewidth=2)
+    
+    ax1.set_xticks(x)
+    ax1.set_xticklabels(policy_stats.index, rotation=45, ha='right', fontsize=12)
+    ax1.set_ylabel('Total Score', fontsize=14, fontweight='bold')
+    ax1.set_title('Total Policy Performance Score', fontsize=16, fontweight='bold')
+    ax1.set_ylim(0, 1.1)
+    ax1.grid(axis='y', alpha=0.3)
+    
+    # Add value labels
+    for bar, mean, std in zip(bars, policy_stats['mean'], policy_stats['std']):
+        height = bar.get_height()
+        ax1.text(bar.get_x() + bar.get_width()/2., height + 0.02,
+                f'{mean:.2f}±{std:.2f}', ha='center', va='bottom', fontweight='bold')
+    
+    # 2. Color-based performance for total score
+    if len(total_score_data['Color'].unique()) > 1:
+        color_policy_stats = total_score_data.groupby(['Policy', 'Color'])['Score'].mean().unstack(fill_value=0)
+        
+        x2 = np.arange(len(color_policy_stats.index))
+        width = 0.35
+        
+        if 'red' in color_policy_stats.columns and 'green' in color_policy_stats.columns:
+            bars1 = ax2.bar(x2 - width/2, color_policy_stats['red'], width, 
+                           label='Red Cans', color='#e74c3c', alpha=0.8)
+            bars2 = ax2.bar(x2 + width/2, color_policy_stats['green'], width,
+                           label='Green Cans', color='#2ecc71', alpha=0.8)
+        
+        ax2.set_xticks(x2)
+        ax2.set_xticklabels(color_policy_stats.index, rotation=45, ha='right', fontsize=12)
+        ax2.set_ylabel('Total Score', fontsize=14, fontweight='bold')
+        ax2.set_title('Total Score by Can Color', fontsize=16, fontweight='bold')
+        ax2.legend()
+        ax2.set_ylim(0, 1.1)
+        ax2.grid(axis='y', alpha=0.3)
+    
+    plt.tight_layout()
+    plt.savefig(output_dir / 'total_score_analysis.pdf', bbox_inches='tight')
+    plt.close()
 
 
 def create_end_position_analysis(df: pd.DataFrame, output_dir: Path) -> None:
@@ -1178,7 +1342,7 @@ def main():
     parser.add_argument(
         "--plots",
         nargs="*",
-        choices=["radar", "bars", "summary", "statistics", "stat_plots", "end_position", "time_analysis", "all"],
+        choices=["radar", "bars", "summary", "statistics", "stat_plots", "end_position", "time_analysis", "total_score", "all"],
         default=["all"],
         help="Choose which plots to create"
     )
@@ -1213,7 +1377,7 @@ def main():
     # Determine which plots to create
     selected_plots = args.plots
     if "all" in selected_plots:
-        selected_plots = ["radar", "bars", "summary", "statistics", "stat_plots", "end_position", "time_analysis"]
+        selected_plots = ["radar", "bars", "summary", "statistics", "stat_plots", "end_position", "time_analysis", "total_score"]
     
     # Set plot style
     plt.style.use('default')
@@ -1256,6 +1420,10 @@ def main():
     if "time_analysis" in selected_plots:
         print("Creating time analysis...")
         create_time_analysis(df, output_dir)
+    
+    if "total_score" in selected_plots:
+        print("Creating total score analysis...")
+        create_total_score_analysis(df, output_dir)
     
     print(f"\nAnalysis complete! Results saved to: {output_dir.absolute()}")
     return 0
