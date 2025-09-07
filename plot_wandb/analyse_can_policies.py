@@ -11,13 +11,15 @@ from math import pi
 import argparse
 import os
 import json
+import warnings
 from pathlib import Path
+from typing import Tuple
 from scipy import stats
 from scipy.stats import f_oneway, ttest_ind, chi2_contingency
 import warnings
 
 
-def parse_csv_data(csv_path: str) -> pd.DataFrame:
+def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
     """
     Parse the complex CSV format with multiple policies and trials.
     
@@ -25,7 +27,9 @@ def parse_csv_data(csv_path: str) -> pd.DataFrame:
         csv_path: Path to the can_policies.csv file
         
     Returns:
-        Cleaned DataFrame with columns: Policy, Trial, Color, Task, Score, Time
+        Tuple of:
+        - Cleaned DataFrame with columns: Policy, Trial, Color, Task, Score, Time
+        - Time info dictionary with min_time, max_time, time_range in seconds
     """
     # Read raw CSV
     raw_df = pd.read_csv(csv_path, delimiter=';', header=None)
@@ -226,6 +230,31 @@ def parse_csv_data(csv_path: str) -> pd.DataFrame:
     # Create DataFrame from parsed data
     df = pd.DataFrame(parsed_data)
     
+    # Store time information for axis labeling
+    time_info = {
+        'min_time_seconds': min_time,
+        'max_time_seconds': max_time,
+        'time_range_seconds': time_range,
+        'min_time_minutes': min_time / 60.0,
+        'max_time_minutes': max_time / 60.0
+    }
+    
+    # Calculate policy-specific execution times for labeling
+    policy_times = {}
+    for policy in df['Policy'].unique():
+        policy_time_data = df[(df['Policy'] == policy) & (df['Task'] == 'Execution Time')]
+        if not policy_time_data.empty:
+            # Convert normalized score back to actual time
+            mean_score = policy_time_data['Score'].mean()
+            # Inverse of normalization: time = max_time - (score * time_range)
+            actual_time_seconds = max_time - (mean_score * time_range)
+            policy_times[policy] = {
+                'seconds': actual_time_seconds,
+                'minutes': actual_time_seconds / 60.0
+            }
+    
+    time_info['policy_times'] = policy_times
+    
     # Calculate total policy scores with optional weighting
     if not df.empty:
         # Define task weights (all set to 1.0 for unweighted average)
@@ -269,10 +298,10 @@ def parse_csv_data(csv_path: str) -> pd.DataFrame:
                             'Score': weighted_average
                         }])], ignore_index=True)
     
-    return df
+    return df, time_info
 
 
-def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
+def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path) -> None:
     """Create a radar chart comparing all policies across subtasks including End Position and Time."""
     
     # Calculate mean scores per policy and task
@@ -365,7 +394,17 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
                     label_r = min(label_r, outside_max)
                     ha, va = 'right', 'center'
 
-                ax.text(angle_shifted, label_r, f'{value:.2f}',
+                # Determine label text based on task type
+                task_name = subtasks[j] if j < len(subtasks) else "Unknown"
+                if task_name == "Execution Time" and policy in time_info.get('policy_times', {}):
+                    # Show actual time in minutes for execution time
+                    actual_minutes = time_info['policy_times'][policy]['minutes']
+                    label_text = f'{actual_minutes:.1f}min'
+                else:
+                    # Show normalized score for other tasks
+                    label_text = f'{value:.2f}'
+
+                ax.text(angle_shifted, label_r, label_text,
                         ha=ha, va=va, fontsize=9, fontweight='bold',
                         bbox=dict(boxstyle='round,pad=0.22', facecolor='white',
                                   edgecolor=color, alpha=0.85, linewidth=1.2),
@@ -379,7 +418,7 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
         "Move to\nCorrect Box",
         "Place Can in\nCorrect Box",
         "Return to\nHome Position",
-        "Execution\nTime",
+        f"Execution\nTime\n({time_info['min_time_minutes']:.1f}-{time_info['max_time_minutes']:.1f} min)",
         "Total\nScore"
     ]
     ax.set_xticklabels(task_labels, fontsize=12, fontweight='bold', ha='center')
@@ -423,7 +462,7 @@ def create_radar_chart(df: pd.DataFrame, output_dir: Path) -> None:
     #plt.show()
 
 
-def create_grouped_bar_plot(df: pd.DataFrame, output_dir: Path) -> None:
+def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path) -> None:
     """Create beautiful grouped bar plots with error bars for each subtask including End Position and Time."""
     
     # Calculate statistics
@@ -514,9 +553,19 @@ def create_grouped_bar_plot(df: pd.DataFrame, output_dir: Path) -> None:
             # Position label above error bar
             label_y = height + std + 0.03
             
+            # Determine label text based on task type
+            policy = policies[i]
+            if task == "Execution Time" and policy in time_info.get('policy_times', {}):
+                # Show actual time in minutes for execution time
+                actual_minutes = time_info['policy_times'][policy]['minutes']
+                label_text = f'{actual_minutes:.1f}min'
+            else:
+                # Show normalized score for other tasks
+                label_text = f'{mean:.3f}'
+            
             # Style the label
             ax.text(bar.get_x() + bar.get_width()/2., label_y,
-                   f'{mean:.3f}', ha='center', va='bottom', 
+                   label_text, ha='center', va='bottom', 
                    fontsize=11, fontweight='bold', color='#2c3e50',
                    bbox=dict(boxstyle='round,pad=0.3', facecolor='white', 
                            edgecolor=thesis_colors[i % len(thesis_colors)], 
@@ -717,7 +766,7 @@ def create_end_position_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     plt.close()
 
 
-def create_time_analysis(df: pd.DataFrame, output_dir: Path) -> None:
+def create_time_analysis(df: pd.DataFrame, time_info: dict, output_dir: Path) -> None:
     """Create focused analysis for execution time performance."""
     
     # Filter for Time data
@@ -744,9 +793,28 @@ def create_time_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     ax1.set_xticks(x)
     ax1.set_xticklabels(policy_stats.index, rotation=45, ha='right', fontsize=12)
     ax1.set_ylabel('Time Efficiency Score', fontsize=14, fontweight='bold')
-    ax1.set_title('Execution Time Efficiency', fontsize=16, fontweight='bold')
+    ax1.set_title(f'Execution Time Efficiency\n(Range: {time_info["min_time_minutes"]:.1f}-{time_info["max_time_minutes"]:.1f} minutes)', 
+                  fontsize=16, fontweight='bold')
     ax1.set_ylim(0, 1.1)
     ax1.grid(axis='y', alpha=0.3)
+    
+    # Add secondary y-axis showing actual minutes
+    ax1_twin = ax1.twinx()
+    
+    # Convert efficiency scores back to actual minutes for secondary axis
+    def score_to_minutes(score):
+        # Reverse the normalization: score = (max_time - time_seconds) / time_range
+        # Therefore: time_seconds = max_time - (score * time_range)
+        time_seconds = time_info['max_time_seconds'] - (score * time_info['time_range_seconds'])
+        return time_seconds / 60.0
+    
+    # Set up secondary axis ticks
+    efficiency_ticks = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
+    minute_ticks = [score_to_minutes(score) for score in efficiency_ticks]
+    ax1_twin.set_ylim(0, 1.1)
+    ax1_twin.set_yticks(efficiency_ticks)
+    ax1_twin.set_yticklabels([f'{min_val:.1f}' for min_val in minute_ticks], fontsize=11)
+    ax1_twin.set_ylabel('Execution Time (minutes)', fontsize=14, fontweight='bold')
     
     # Add value labels
     for bar, mean, std in zip(bars, policy_stats['mean'], policy_stats['std']):
@@ -768,9 +836,18 @@ def create_time_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     ax2.set_xticks(range(len(policies)))
     ax2.set_xticklabels(policies, rotation=45, ha='right', fontsize=12)
     ax2.set_ylabel('Time Efficiency Score', fontsize=14, fontweight='bold')
-    ax2.set_title('Time Efficiency Distribution', fontsize=16, fontweight='bold')
+    ax2.set_title(f'Time Efficiency Distribution\n(Higher score = faster execution)', fontsize=16, fontweight='bold')
     ax2.grid(axis='y', alpha=0.3)
     ax2.set_ylim(0, 1)
+    
+    # Add secondary y-axis for violin plot too
+    ax2_twin = ax2.twinx()
+    efficiency_ticks_violin = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
+    minute_ticks_violin = [score_to_minutes(score) for score in efficiency_ticks_violin]
+    ax2_twin.set_ylim(0, 1)
+    ax2_twin.set_yticks(efficiency_ticks_violin)
+    ax2_twin.set_yticklabels([f'{min_val:.1f}' for min_val in minute_ticks_violin], fontsize=11)
+    ax2_twin.set_ylabel('Execution Time (minutes)', fontsize=14, fontweight='bold')
     
     plt.tight_layout()
     plt.savefig(output_dir / 'time_analysis.pdf', bbox_inches='tight')
@@ -1388,10 +1465,11 @@ def main():
     
     # Parse the CSV data
     try:
-        df = parse_csv_data(args.csv_path)
+        df, time_info = parse_csv_data(args.csv_path)
         print(f"Successfully parsed {len(df)} data points")
         print(f"Policies found: {df['Policy'].unique()}")
         print(f"Tasks found: {df['Task'].unique()}")
+        print(f"Time range: {time_info['min_time_minutes']:.1f}-{time_info['max_time_minutes']:.1f} minutes")
     except Exception as e:
         print(f"Error parsing CSV file: {e}")
         return 1
@@ -1421,11 +1499,11 @@ def main():
     # Create plots
     if "radar" in selected_plots:
         print("\nCreating radar chart...")
-        create_radar_chart(df, output_dir)
+        create_radar_chart(df, time_info, output_dir)
     
     if "bars" in selected_plots:
         print("Creating grouped bar plots...")
-        create_grouped_bar_plot(df, output_dir)
+        create_grouped_bar_plot(df, time_info, output_dir)
     
     if "summary" in selected_plots:
         print("Generating summary statistics...")
@@ -1445,7 +1523,7 @@ def main():
     
     if "time_analysis" in selected_plots:
         print("Creating time analysis...")
-        create_time_analysis(df, output_dir)
+        create_time_analysis(df, time_info, output_dir)
     
     if "total_score" in selected_plots:
         print("Creating total score analysis...")
