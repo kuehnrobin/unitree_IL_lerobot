@@ -418,7 +418,7 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path) -> N
         "Move to\nCorrect Box",
         "Place Can in\nCorrect Box",
         "Return to\nHome Position",
-        f"Execution\nTime\n({time_info['min_time_minutes']:.1f}\n-{time_info['max_time_minutes']:.1f} min)",
+        f"Execution\nTime\n\n({time_info['min_time_minutes']:.1f}-\n{time_info['max_time_minutes']:.1f} min)",
         "Total\nScore"
     ]
     ax.set_xticklabels(task_labels, fontsize=12, fontweight='bold', ha='center')
