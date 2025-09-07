@@ -439,6 +439,10 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
     # Global styling
     fig.patch.set_facecolor('white')
     
+    # Hide the last empty subplot
+    if len(subtasks) < len(axes):
+        axes[-1].set_visible(False)
+    
     # Create a subplot for each subtask
     for task_idx, task in enumerate(subtasks):
         ax = axes[task_idx]
