@@ -452,8 +452,8 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path) -> N
     plt.tight_layout(rect=[0.00, 0.00, 1.00, 0.8])  # Changed from default to reserve top space
     plt.tight_layout()
     # Save with multiple formats for thesis use
-    #plt.savefig(output_dir / 'radar_chart_policy_comparison.png', 
-    #            dpi=300, bbox_inches='tight', facecolor='white', edgecolor='none')
+    plt.savefig(output_dir / 'radar_chart_policy_comparison.png', 
+                dpi=150, bbox_inches='tight', facecolor='white', edgecolor='none')
     plt.savefig(output_dir / 'radar_chart_policy_comparison.pdf', 
                 bbox_inches='tight', facecolor='white', edgecolor='none')
     #plt.savefig(output_dir / 'radar_chart_policy_comparison.svg', 

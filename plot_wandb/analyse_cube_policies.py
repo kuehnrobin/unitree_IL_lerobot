@@ -862,7 +862,7 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
 def main():
     """Main function to run the cube policy analysis."""
     parser = argparse.ArgumentParser(description='Analyze cube manipulation policy performance')
-    parser.add_argument('csv_path', help='Path to the cubes_policies.csv file')
+    parser.add_argument('csv_path', default="cubes_policies.csv",help='Path to the cubes_policies.csv file')
     parser.add_argument('--output_dir', default='plots', help='Output directory for plots')
     parser.add_argument('--plots', nargs='+', 
                        choices=['radar', 'grouped_bar', 'hand_analysis', 'color_analysis', 'total_score'],
