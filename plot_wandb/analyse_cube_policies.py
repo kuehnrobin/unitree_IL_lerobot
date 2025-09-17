@@ -388,7 +388,7 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
                     label_text = f'{actual_minutes:.1f}min'
                 else:
                     # Show normalized score for other tasks
-                    label_text = f'{value:.2f}'
+                    label_text = f'{value:.2f}'.lstrip('0')
 
                 ax.text(angle_shifted, label_r, label_text,
                         ha=ha, va=va, fontsize=9, fontweight='bold',
@@ -403,7 +403,7 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
         "Grasp\nCube", 
         "Move to\nBox",
         "Place Cube in\nBox",
-        f"Execution\nTime\n\n({time_info['min_time_minutes']:.1f}-\n{time_info['max_time_minutes']:.1f} min)"
+        f"Execution\nTime\n({time_info['min_time_minutes']:.1f}-\n{time_info['max_time_minutes']:.1f} min)"
     ]
     
     if include_total_score:
@@ -525,10 +525,13 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
         policy_labels = [format_policy_name(policy).replace(' ', '\n') if len(policy) > 12 else format_policy_name(policy) for policy in policies]
         ax.set_xticklabels(policy_labels, fontsize=12, fontweight='medium', color='#34495e', rotation=45, ha='right')
         
-        # Set consistent y-axis limits with padding
-        ax.set_ylim(0, 1.1)
-        ax.set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1.0])
+        # Set consistent y-axis limits with padding to accommodate error bars and labels
+        ax.set_ylim(0, 1.3)
+        ax.set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2])
         ax.tick_params(axis='y', labelsize=11, colors='#34495e')
+        
+        # Add a horizontal line indicating 100% success rate
+        ax.axhline(y=1.0, color='#27ae60', linestyle='-', alpha=0.7, linewidth=2.5, label='100% Success')
         
         # Add value labels on bars with enhanced styling
         for i, (bar, mean, std) in enumerate(zip(bars, means, stds)):
@@ -575,6 +578,7 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
     # Add legend for reference lines
     from matplotlib.lines import Line2D
     legend_elements = [
+        Line2D([0], [0], color='#27ae60', linestyle='-', alpha=0.7, linewidth=2.5, label='100% Success'),
         Line2D([0], [0], color='#e74c3c', linestyle='--', alpha=0.6, label='50% Success'),
         Line2D([0], [0], color='#27ae60', linestyle=':', alpha=0.6, label='80% Success')
     ]
@@ -625,7 +629,7 @@ def create_hand_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     for bar, mean, std in zip(bars, hand_stats['mean'], hand_stats['std']):
         height = bar.get_height()
         ax1.text(bar.get_x() + bar.get_width()/2., height + 0.02,
-                f'{mean:.2f}±{std:.2f}', ha='center', va='bottom', fontweight='bold')
+                f'{mean:.2f}'.lstrip('0') + '±' + f'{std:.2f}'.lstrip('0'), ha='center', va='bottom', fontweight='bold')
     
     # 2. Performance by hand and task
     task_hand_stats = hand_data.groupby(['Task', 'Hand'])['Score'].mean().unstack(fill_value=0)
@@ -729,7 +733,7 @@ def create_color_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     for bar, mean, std in zip(bars, color_stats['mean'], color_stats['std']):
         height = bar.get_height()
         ax1.text(bar.get_x() + bar.get_width()/2., height + 0.02,
-                f'{mean:.2f}±{std:.2f}', ha='center', va='bottom', fontweight='bold')
+                f'{mean:.2f}'.lstrip('0') + '±' + f'{std:.2f}'.lstrip('0'), ha='center', va='bottom', fontweight='bold')
     
     # 2. Performance by color and task
     task_color_stats = color_data.groupby(['Task', 'Color'])['Score'].mean().unstack(fill_value=0)
@@ -831,7 +835,7 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     for bar, mean, std in zip(bars, policy_stats['mean'], policy_stats['std']):
         height = bar.get_height()
         ax1.text(bar.get_x() + bar.get_width()/2., height + 0.02,
-                f'{mean:.2f}±{std:.2f}', ha='center', va='bottom', fontweight='bold')
+                f'{mean:.2f}'.lstrip('0') + '±' + f'{std:.2f}'.lstrip('0'), ha='center', va='bottom', fontweight='bold')
     
     # 2. Color-based performance for total score
     if len(total_score_data['Color'].unique()) > 1:
@@ -869,7 +873,7 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
                 for j, (bar, value) in enumerate(zip(bars, color_values[color])):
                     height = bar.get_height()
                     ax2.text(bar.get_x() + bar.get_width()/2., height + 0.01,
-                            f'{value:.2f}', ha='center', va='bottom', fontsize=10, fontweight='bold')
+                            f'{value:.2f}'.lstrip('0'), ha='center', va='bottom', fontsize=10, fontweight='bold')
             
             ax2.set_xticks(x2)
             ax2.set_xticklabels(extended_policies, rotation=45, ha='right', fontsize=12)

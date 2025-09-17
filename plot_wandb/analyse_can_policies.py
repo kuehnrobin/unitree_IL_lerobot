@@ -427,7 +427,7 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
                     label_text = f'{actual_minutes:.1f}min'
                 else:
                     # Show normalized score for other tasks
-                    label_text = f'{value:.2f}'
+                    label_text = f'{value:.2f}'.lstrip('0')
 
                 ax.text(angle_shifted, label_r, label_text,
                         ha=ha, va=va, fontsize=9, fontweight='bold',
@@ -674,7 +674,8 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     # Add value labels
     for bar, mean, std in zip(bars, policy_stats['mean'], policy_stats['std']):
         height = bar.get_height()
-        ax1.text(bar.get_x() + bar.get_width()/2., height + 0.02,
+        # Move labels higher to avoid overlap with error bars
+        ax1.text(bar.get_x() + bar.get_width()/2., height + std + 0.04,
                 f'{mean:.2f}±{std:.2f}', ha='center', va='bottom', fontweight='bold')
     
     # 2. Color-based performance for total score
@@ -706,12 +707,13 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
             for i, (bar, value) in enumerate(zip(bars1, red_values)):
                 height = bar.get_height()
                 ax2.text(bar.get_x() + bar.get_width()/2., height + 0.01,
-                        f'{value:.2f}', ha='center', va='bottom', fontsize=10, fontweight='bold')
+                        f'{value:.2f}'.lstrip('0'), ha='center', va='bottom', fontsize=10, fontweight='bold')
             
             for i, (bar, value) in enumerate(zip(bars2, green_values)):
                 height = bar.get_height()
+                # Move green labels back to original position
                 ax2.text(bar.get_x() + bar.get_width()/2., height + 0.01,
-                        f'{value:.2f}', ha='center', va='bottom', fontsize=10, fontweight='bold')
+                        f'{value:.2f}'.lstrip('0'), ha='center', va='bottom', fontsize=10, fontweight='bold')
             
             ax2.set_xticks(x2)
             ax2.set_xticklabels([format_policy_name(policy) for policy in extended_policies], rotation=45, ha='right', fontsize=12)
