@@ -568,10 +568,13 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
         policy_labels = [format_policy_name(policy).replace(' ', '\n') if len(policy) > 12 else format_policy_name(policy) for policy in policies]
         ax.set_xticklabels(policy_labels, fontsize=12, fontweight='medium', color='#34495e', rotation=45, ha='right')
         
-        # Set consistent y-axis limits with padding
-        ax.set_ylim(0, 1.1)
-        ax.set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1.0])
+        # Set consistent y-axis limits with padding to accommodate error bars and labels
+        ax.set_ylim(0, 1.3)
+        ax.set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2])
         ax.tick_params(axis='y', labelsize=11, colors='#34495e')
+        
+        # Add a horizontal line indicating 100% success rate
+        ax.axhline(y=1.0, color='#27ae60', linestyle='-', alpha=0.7, linewidth=2.5, label='100% Success')
         
         # Add value labels on bars with enhanced styling
         for i, (bar, mean, std) in enumerate(zip(bars, means, stds)):
@@ -618,6 +621,7 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
     # Add legend for reference lines
     from matplotlib.lines import Line2D
     legend_elements = [
+        Line2D([0], [0], color='#27ae60', linestyle='-', alpha=0.7, linewidth=2.5, label='100% Success'),
         Line2D([0], [0], color='#e74c3c', linestyle='--', alpha=0.6, label='50% Success'),
         Line2D([0], [0], color='#27ae60', linestyle=':', alpha=0.6, label='80% Success')
     ]

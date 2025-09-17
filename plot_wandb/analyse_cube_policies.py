@@ -835,7 +835,7 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     for bar, mean, std in zip(bars, policy_stats['mean'], policy_stats['std']):
         height = bar.get_height()
         ax1.text(bar.get_x() + bar.get_width()/2., height + 0.02,
-                f'{mean:.2f}'.lstrip('0') + '±' + f'{std:.2f}'.lstrip('0'), ha='center', va='bottom', fontweight='bold')
+                f'{mean:.2f}±{std:.2f}', ha='center', va='bottom', fontweight='bold')
     
     # 2. Color-based performance for total score
     if len(total_score_data['Color'].unique()) > 1:
