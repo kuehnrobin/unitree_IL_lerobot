@@ -891,12 +891,14 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
 def main():
     """Main function to run the cube policy analysis."""
     parser = argparse.ArgumentParser(description='Analyze cube manipulation policy performance')
-    parser.add_argument('csv_path', default="cubes_policies.csv",help='Path to the cubes_policies.csv file')
-    parser.add_argument('--output_dir', default='plots', help='Output directory for plots')
+    parser.add_argument('--csv_path', default="plot_wandb/cubes_policies.csv",help='Path to the cubes_policies.csv file')
+    parser.add_argument('--output_dir', default='plot_wandb/plots/cube_analysis', help='Output directory for plots')
     parser.add_argument('--plots', nargs='+', 
                        choices=['radar', 'grouped_bar', 'hand_analysis', 'color_analysis', 'total_score'],
                        default=['radar', 'grouped_bar', 'hand_analysis', 'color_analysis', 'total_score'],
                        help='Which plots to generate')
+    parser.add_argument('--no_total_score', action='store_true', 
+                       help='Exclude total score from radar chart')
     
     args = parser.parse_args()
     
@@ -917,7 +919,7 @@ def main():
     # Generate requested plots
     if 'radar' in args.plots:
         print("Creating radar chart...")
-        create_radar_chart(df, time_info, output_dir)
+        create_radar_chart(df, time_info, output_dir, include_total_score=not args.no_total_score)
     
     if 'grouped_bar' in args.plots:
         print("Creating grouped bar plots...")
