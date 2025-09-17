@@ -669,7 +669,7 @@ def create_hand_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     task_hand_stats = hand_data.groupby(['Task', 'Hand'])['Score'].mean().unstack(fill_value=0)
     
     # Filter to main tasks only
-    main_tasks = ["Hand Move to Cube", "Hand Grasp Cube", "Hand Move to Box", "Cube in Box", "Hand Back to Start Position"]
+    main_tasks = ["Hand Move to Cube", "Hand Grasp Cube", "Hand Move to Box", "Cube in Box", "Hand Back to Start Position", "Execution Time"]
     task_hand_stats = task_hand_stats.loc[task_hand_stats.index.isin(main_tasks)]
     
     x2 = np.arange(len(task_hand_stats.index))
