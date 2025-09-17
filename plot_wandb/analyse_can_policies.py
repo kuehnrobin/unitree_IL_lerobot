@@ -427,7 +427,7 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
                     label_text = f'{actual_minutes:.1f}min'
                 else:
                     # Show normalized score for other tasks
-                    label_text = f'{value:.2f}'.lstrip('0')
+                    label_text = f'{value:.2f}'
 
                 ax.text(angle_shifted, label_r, label_text,
                         ha=ha, va=va, fontsize=9, fontweight='bold',
