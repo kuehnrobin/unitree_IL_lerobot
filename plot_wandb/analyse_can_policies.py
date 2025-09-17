@@ -19,6 +19,19 @@ from scipy.stats import f_oneway, ttest_ind, chi2_contingency
 import warnings
 
 
+def format_policy_name(policy_name):
+    """
+    Format policy name to display subscripts correctly using matplotlib formatting.
+    Converts underscore notation (e.g., 'S_L') to subscript format.
+    """
+    if '_' in policy_name:
+        parts = policy_name.split('_')
+        if len(parts) == 2:
+            # Format as main text with subscript
+            return f"{parts[0]}$_{{{parts[1]}}}$"
+    return policy_name
+
+
 def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
     """
     Parse the complex CSV format with multiple policies and trials.
@@ -301,7 +314,7 @@ def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
     return df, time_info
 
 
-def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path) -> None:
+def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, include_total_score: bool = True) -> None:
     """Create a radar chart comparing all policies across subtasks including End Position and Time."""
     
     # Calculate mean scores per policy and task
@@ -314,9 +327,11 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path) -> N
         "Hand Move to Correct Box",
         "Can in Correct Box",
         "Return to Home Position",
-        "Execution Time",
-        "Total Score"
+        "Execution Time"
     ]
+    
+    if include_total_score:
+        subtasks.append("Total Score")
     for task in subtasks:
         if task not in policy_stats.columns:
             policy_stats[task] = 0
@@ -347,7 +362,7 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path) -> N
         values += values[:1]  # Complete the circle
         color = thesis_colors[idx % len(thesis_colors)]
 
-        ax.plot(angles, values, 'o-', linewidth=3, label=policy, color=color,
+        ax.plot(angles, values, 'o-', linewidth=3, label=format_policy_name(policy), color=color,
                markersize=8, markerfacecolor=color, markeredgecolor='white',
                markeredgewidth=2, alpha=0.9)
 
@@ -418,9 +433,11 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path) -> N
         "Move to\nCorrect Box",
         "Place Can in\nCorrect Box",
         "Return to\nHome Position",
-        f"Execution\nTime\n\n({time_info['min_time_minutes']:.1f}-\n{time_info['max_time_minutes']:.1f} min)",
-        "Total\nScore"
+        f"Execution\nTime\n\n({time_info['min_time_minutes']:.1f}-\n{time_info['max_time_minutes']:.1f} min)"
     ]
+    
+    if include_total_score:
+        task_labels.append("Total\nScore")
     ax.set_xticklabels(task_labels, fontsize=12, fontweight='bold', ha='center')
     ax.tick_params(axis='x', pad=30)  # push all task labels outward
 
@@ -538,7 +555,7 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
         
         # Better x-axis labels
         ax.set_xticks(x)
-        policy_labels = [policy.replace(' ', '\n') if len(policy) > 12 else policy for policy in policies]
+        policy_labels = [format_policy_name(policy).replace(' ', '\n') if len(policy) > 12 else format_policy_name(policy) for policy in policies]
         ax.set_xticklabels(policy_labels, fontsize=12, fontweight='medium', color='#34495e')
         
         # Set consistent y-axis limits with padding
@@ -638,7 +655,7 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
                    edgecolor='white', linewidth=2)
     
     ax1.set_xticks(x)
-    ax1.set_xticklabels(policy_stats.index, rotation=45, ha='right', fontsize=12)
+    ax1.set_xticklabels([format_policy_name(policy) for policy in policy_stats.index], rotation=45, ha='right', fontsize=12)
     ax1.set_ylabel('Total Score', fontsize=14, fontweight='bold')
     ax1.set_title('Total Policy Performance Score', fontsize=16, fontweight='bold')
     ax1.set_ylim(0, 1.1)
@@ -687,7 +704,7 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
                         f'{value:.2f}', ha='center', va='bottom', fontsize=10, fontweight='bold')
             
             ax2.set_xticks(x2)
-            ax2.set_xticklabels(extended_policies, rotation=45, ha='right', fontsize=12)
+            ax2.set_xticklabels([format_policy_name(policy) for policy in extended_policies], rotation=45, ha='right', fontsize=12)
             
             # Add a visual separator before the sum column
             ax2.axvline(x=len(policies_list) - 0.5, color='black', linestyle='--', alpha=0.5, linewidth=1)
@@ -728,7 +745,7 @@ def create_end_position_analysis(df: pd.DataFrame, output_dir: Path) -> None:
                    edgecolor='white', linewidth=2)
     
     ax1.set_xticks(x)
-    ax1.set_xticklabels(policy_stats.index, rotation=45, ha='right', fontsize=12)
+    ax1.set_xticklabels([format_policy_name(policy) for policy in policy_stats.index], rotation=45, ha='right', fontsize=12)
     ax1.set_ylabel('Success Rate', fontsize=14, fontweight='bold')
     ax1.set_title('Return to Home Position Success Rate', fontsize=16, fontweight='bold')
     ax1.set_ylim(0, 1.1)
@@ -754,7 +771,7 @@ def create_end_position_analysis(df: pd.DataFrame, output_dir: Path) -> None:
                            label='Green Cans', color='#2ecc71', alpha=0.8)
         
         ax2.set_xticks(x2)
-        ax2.set_xticklabels(color_policy_stats.index, rotation=45, ha='right', fontsize=12)
+        ax2.set_xticklabels([format_policy_name(policy) for policy in color_policy_stats.index], rotation=45, ha='right', fontsize=12)
         ax2.set_ylabel('Success Rate', fontsize=14, fontweight='bold')
         ax2.set_title('End Position by Can Color', fontsize=16, fontweight='bold')
         ax2.legend()
@@ -791,7 +808,7 @@ def create_time_analysis(df: pd.DataFrame, time_info: dict, output_dir: Path) ->
                    edgecolor='white', linewidth=2)
     
     ax1.set_xticks(x)
-    ax1.set_xticklabels(policy_stats.index, rotation=45, ha='right', fontsize=12)
+    ax1.set_xticklabels([format_policy_name(policy) for policy in policy_stats.index], rotation=45, ha='right', fontsize=12)
     ax1.set_ylabel('Time Efficiency Score', fontsize=14, fontweight='bold')
     ax1.set_title(f'Execution Time Efficiency\n(Range: {time_info["min_time_minutes"]:.1f}-{time_info["max_time_minutes"]:.1f} minutes)', 
                   fontsize=16, fontweight='bold')
@@ -834,7 +851,7 @@ def create_time_analysis(df: pd.DataFrame, time_info: dict, output_dir: Path) ->
         pc.set_alpha(0.7)
     
     ax2.set_xticks(range(len(policies)))
-    ax2.set_xticklabels(policies, rotation=45, ha='right', fontsize=12)
+    ax2.set_xticklabels([format_policy_name(policy) for policy in policies], rotation=45, ha='right', fontsize=12)
     ax2.set_ylabel('Time Efficiency Score', fontsize=14, fontweight='bold')
     ax2.set_title(f'Time Efficiency Distribution\n(Higher score = faster execution)', fontsize=16, fontweight='bold')
     ax2.grid(axis='y', alpha=0.3)
@@ -1247,7 +1264,7 @@ def create_statistical_plots(df: pd.DataFrame, output_dir: Path) -> None:
         pc.set_alpha(0.7)
     
     ax4.set_xticks(range(len(policies)))
-    ax4.set_xticklabels(policies, rotation=45, ha='right', fontsize=10)
+    ax4.set_xticklabels([format_policy_name(policy) for policy in policies], rotation=45, ha='right', fontsize=10)
     ax4.set_ylabel('Success Rate', fontsize=12)
     ax4.set_title('Score Distributions\nby Policy', fontsize=14, fontweight='bold')
     ax4.grid(axis='y', alpha=0.3)
@@ -1290,7 +1307,7 @@ def create_statistical_plots(df: pd.DataFrame, output_dir: Path) -> None:
                 ax5.bar(x + offset, means, width/len(colors_available), label=color.title(), alpha=0.8)
         
         ax5.set_xticks(x)
-        ax5.set_xticklabels(policies, rotation=45, ha='right', fontsize=10)
+        ax5.set_xticklabels([format_policy_name(policy) for policy in policies], rotation=45, ha='right', fontsize=10)
         ax5.set_ylabel('Mean Success Rate', fontsize=12)
         ax5.set_title('Performance by\nCan Color', fontsize=14, fontweight='bold')
         ax5.legend(fontsize=10)
@@ -1450,6 +1467,20 @@ def main():
         help="Choose which plots to create"
     )
     
+    parser.add_argument(
+        "--include_total_score",
+        action="store_true",
+        default=True,
+        help="Include total score in radar chart (default: True)"
+    )
+    
+    parser.add_argument(
+        "--no_total_score",
+        action="store_false",
+        dest="include_total_score",
+        help="Exclude total score from radar chart"
+    )
+    
     args = parser.parse_args()
     
     # Create output directory
@@ -1499,7 +1530,7 @@ def main():
     # Create plots
     if "radar" in selected_plots:
         print("\nCreating radar chart...")
-        create_radar_chart(df, time_info, output_dir)
+        create_radar_chart(df, time_info, output_dir, args.include_total_score)
     
     if "bars" in selected_plots:
         print("Creating grouped bar plots...")
