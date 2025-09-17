@@ -179,7 +179,7 @@ def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
                             pass
         
         # Process Execution Time data
-        exec_time_row_idx = start_row + len(subtasks) + 2
+        exec_time_row_idx = start_row + len(subtasks) + 2  # +2 for color and hand rows
         if exec_time_row_idx < end_row:
             exec_time_row = raw_df.iloc[exec_time_row_idx, 1:]
             
@@ -210,6 +210,40 @@ def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
                                 })
                             except ValueError:
                                 pass
+        
+        # Process Hand Back to Start Position data
+        hand_back_row_idx = start_row + len(subtasks) + 3  # +3 for color, hand, and execution time rows
+        if hand_back_row_idx < end_row:
+            hand_back_row = raw_df.iloc[hand_back_row_idx, 1:]
+            
+            for manip_idx in range(valid_manipulations):
+                if manip_idx < len(hand_back_row):
+                    back_val = hand_back_row.iloc[manip_idx]
+                    if pd.notna(back_val) and str(back_val) not in ['None', 'end', 'time', '']:
+                        back_str = str(back_val)
+                        
+                        # Handle different value types - only parse numeric values
+                        score_val = None
+                        try:
+                            # Try to parse as numeric value (0, 1, etc.)
+                            score_val = float(back_str)
+                        except ValueError:
+                            # Skip non-numeric values like "00:00" or other time formats
+                            continue
+                        
+                        if score_val is not None:
+                            # Get manipulation color and hand
+                            manip_color = colors[manip_idx] if manip_idx < len(colors) else 'unknown'
+                            manip_hand = hands[manip_idx] if manip_idx < len(hands) else 'unknown'
+                            
+                            parsed_data.append({
+                                'Policy': policy_name,
+                                'Trial': manip_idx + 1,
+                                'Color': manip_color,
+                                'Hand': manip_hand,
+                                'Task': 'Hand Back to Start Position',
+                                'Score': score_val
+                            })
     
     # Create DataFrame from parsed data
     df = pd.DataFrame(parsed_data)
@@ -247,6 +281,7 @@ def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
             "Hand Grasp Cube": 1.0,
             "Hand Move to Box": 1.0,
             "Cube in Box": 1.0,
+            "Hand Back to Start Position": 1.0,
             "Execution Time": 1.0
         }
         
@@ -298,6 +333,7 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
         "Hand Grasp Cube", 
         "Hand Move to Box",
         "Cube in Box",
+        "Hand Back to Start Position",
         "Execution Time"
     ]
     
@@ -388,7 +424,7 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
                     label_text = f'{actual_minutes:.1f}min'
                 else:
                     # Show normalized score for other tasks
-                    label_text = f'{value:.2f}'.lstrip('0')
+                    label_text = f'{value:.2f}'
 
                 ax.text(angle_shifted, label_r, label_text,
                         ha=ha, va=va, fontsize=9, fontweight='bold',
@@ -403,6 +439,7 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
         "Grasp\nCube", 
         "Move to\nBox",
         "Place Cube in\nBox",
+        "Hand Back to\nStart Position",
         f"Execution\nTime\n({time_info['min_time_minutes']:.1f}-\n{time_info['max_time_minutes']:.1f} min)"
     ]
     
@@ -410,7 +447,7 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
         task_labels.append("Total\nScore")
         
     ax.set_xticklabels(task_labels, fontsize=12, fontweight='bold', ha='center')
-    ax.tick_params(axis='x', pad=30)  # push all task labels outward
+    ax.tick_params(axis='x', pad=32)  # push all task labels outward
 
     # Increase radial limit to make room for outside labels
     ax.set_ylim(0, 1.25)
@@ -454,6 +491,7 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
         "Hand Grasp Cube", 
         "Hand Move to Box", 
         "Cube in Box",
+        "Hand Back to Start Position",
         "Execution Time"
     ]
     policies = stats['Policy'].unique()
@@ -467,10 +505,6 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
     
     # Global styling
     fig.patch.set_facecolor('white')
-    
-    # Hide the last empty subplot
-    if len(subtasks) < len(axes):
-        axes[-1].set_visible(False)
     
     # Create a subplot for each subtask
     for task_idx, task in enumerate(subtasks):
@@ -635,7 +669,7 @@ def create_hand_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     task_hand_stats = hand_data.groupby(['Task', 'Hand'])['Score'].mean().unstack(fill_value=0)
     
     # Filter to main tasks only
-    main_tasks = ["Hand Move to Cube", "Hand Grasp Cube", "Hand Move to Box", "Cube in Box"]
+    main_tasks = ["Hand Move to Cube", "Hand Grasp Cube", "Hand Move to Box", "Cube in Box", "Hand Back to Start Position"]
     task_hand_stats = task_hand_stats.loc[task_hand_stats.index.isin(main_tasks)]
     
     x2 = np.arange(len(task_hand_stats.index))
@@ -739,7 +773,7 @@ def create_color_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     task_color_stats = color_data.groupby(['Task', 'Color'])['Score'].mean().unstack(fill_value=0)
     
     # Filter to main tasks only
-    main_tasks = ["Hand Move to Cube", "Hand Grasp Cube", "Hand Move to Box", "Cube in Box"]
+    main_tasks = ["Hand Move to Cube", "Hand Grasp Cube", "Hand Move to Box", "Cube in Box", "Hand Back to Start Position"]
     task_color_stats = task_color_stats.loc[task_color_stats.index.isin(main_tasks)]
     
     x2 = np.arange(len(task_color_stats.index))
