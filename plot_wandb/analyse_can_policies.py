@@ -22,14 +22,24 @@ import warnings
 def format_policy_name(policy_name):
     """
     Format policy name to display subscripts correctly using matplotlib formatting.
-    Converts underscore notation (e.g., 'S_L') to subscript format.
+    Converts underscore notation so only the next letter after underscore becomes subscript.
+    Examples: 'S_LWA' -> 'S$_L$WA', 'R-S_LWA' -> 'R-S$_L$WA', 'A_B_C' -> 'A$_B$$_C$'
     """
-    if '_' in policy_name:
-        parts = policy_name.split('_')
-        if len(parts) == 2:
-            # Format as main text with subscript
-            return f"{parts[0]}$_{{{parts[1]}}}$"
-    return policy_name
+    result = ""
+    i = 0
+    
+    while i < len(policy_name):
+        if policy_name[i] == '_' and i + 1 < len(policy_name):
+            # Found underscore with character after it
+            subscript_char = policy_name[i + 1]
+            result += f"$_{{{subscript_char}}}$"
+            i += 2  # Skip both underscore and the subscript character
+        else:
+            # Regular character, add it to result
+            result += policy_name[i]
+            i += 1
+    
+    return result
 
 
 def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
