@@ -447,7 +447,7 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
         task_labels.append("Total\nScore")
         
     ax.set_xticklabels(task_labels, fontsize=12, fontweight='bold', ha='center')
-    ax.tick_params(axis='x', pad=32)  # push all task labels outward
+    ax.tick_params(axis='x', pad=35)  # push all task labels outward
 
     # Increase radial limit to make room for outside labels
     ax.set_ylim(0, 1.25)
@@ -663,7 +663,7 @@ def create_hand_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     for bar, mean, std in zip(bars, hand_stats['mean'], hand_stats['std']):
         height = bar.get_height()
         ax1.text(bar.get_x() + bar.get_width()/2., height + 0.02,
-                f'{mean:.2f}'.lstrip('0') + '±' + f'{std:.2f}'.lstrip('0'), ha='center', va='bottom', fontweight='bold')
+                f'{mean:.2f}±{std:.2f}', ha='center', va='bottom', fontweight='bold')
     
     # 2. Performance by hand and task
     task_hand_stats = hand_data.groupby(['Task', 'Hand'])['Score'].mean().unstack(fill_value=0)
@@ -680,6 +680,17 @@ def create_hand_analysis(df: pd.DataFrame, output_dir: Path) -> None:
                        label='Left Hand', color='#3498db', alpha=0.8)
         bars2 = ax2.bar(x2 + width/2, task_hand_stats['right'], width,
                        label='Right Hand', color='#e74c3c', alpha=0.8)
+        
+        # Add value labels on bars
+        for bar, value in zip(bars1, task_hand_stats['left']):
+            height = bar.get_height()
+            ax2.text(bar.get_x() + bar.get_width()/2., height + 0.02,
+                    f'{value:.2f}', ha='center', va='bottom', fontsize=10, fontweight='bold')
+        
+        for bar, value in zip(bars2, task_hand_stats['right']):
+            height = bar.get_height()
+            ax2.text(bar.get_x() + bar.get_width()/2., height + 0.02,
+                    f'{value:.2f}', ha='center', va='bottom', fontsize=10, fontweight='bold')
         
         ax2.set_xticks(x2)
         ax2.set_xticklabels([task.replace(' ', '\n') for task in task_hand_stats.index], 
@@ -702,10 +713,21 @@ def create_hand_analysis(df: pd.DataFrame, output_dir: Path) -> None:
             bars4 = ax3.bar(x3 + width/2, color_hand_stats['right'], width,
                            label='Right Hand', color='#e74c3c', alpha=0.8)
             
+            # Add value labels on bars
+            for bar, value in zip(bars3, color_hand_stats['left']):
+                height = bar.get_height()
+                ax3.text(bar.get_x() + bar.get_width()/2., height + 0.02,
+                        f'{value:.2f}', ha='center', va='bottom', fontsize=10, fontweight='bold')
+            
+            for bar, value in zip(bars4, color_hand_stats['right']):
+                height = bar.get_height()
+                ax3.text(bar.get_x() + bar.get_width()/2., height + 0.02,
+                        f'{value:.2f}', ha='center', va='bottom', fontsize=10, fontweight='bold')
+            
             ax3.set_xticks(x3)
             ax3.set_xticklabels([color.title() for color in color_hand_stats.index], fontsize=12)
             ax3.set_ylabel('Success Rate', fontsize=14, fontweight='bold')
-            ax3.set_title('Performance by Cube Color and Hand', fontsize=16, fontweight='bold')
+            ax3.set_title('Performance by Hand and Color', fontsize=16, fontweight='bold')
             ax3.legend()
             ax3.set_ylim(0, 1.1)
             ax3.grid(axis='y', alpha=0.3)
@@ -767,7 +789,7 @@ def create_color_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     for bar, mean, std in zip(bars, color_stats['mean'], color_stats['std']):
         height = bar.get_height()
         ax1.text(bar.get_x() + bar.get_width()/2., height + 0.02,
-                f'{mean:.2f}'.lstrip('0') + '±' + f'{std:.2f}'.lstrip('0'), ha='center', va='bottom', fontweight='bold')
+                f'{mean:.2f}±{std:.2f}', ha='center', va='bottom', fontweight='bold')
     
     # 2. Performance by color and task
     task_color_stats = color_data.groupby(['Task', 'Color'])['Score'].mean().unstack(fill_value=0)
@@ -785,6 +807,12 @@ def create_color_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         offset = (i - len(available_colors)/2 + 0.5) * width
         bars = ax2.bar(x2 + offset, task_color_stats[color], width, 
                       label=f'{color.title()} Cubes', color=color_map[color], alpha=0.8)
+        
+        # Add value labels on bars
+        for j, (bar, value) in enumerate(zip(bars, task_color_stats[color])):
+            height = bar.get_height()
+            ax2.text(bar.get_x() + bar.get_width()/2., height + 0.02,
+                    f'{value:.2f}', ha='center', va='bottom', fontsize=8, fontweight='bold')
     
     ax2.set_xticks(x2)
     ax2.set_xticklabels([task.replace(' ', '\n') for task in task_color_stats.index], 
@@ -805,6 +833,12 @@ def create_color_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         if color in policy_color_stats.columns:
             bars = ax3.bar(x3 + offset, policy_color_stats[color], width, 
                           label=f'{color.title()} Cubes', color=color_map[color], alpha=0.8)
+            
+            # Add value labels on bars
+            for bar, value in zip(bars, policy_color_stats[color]):
+                height = bar.get_height()
+                ax3.text(bar.get_x() + bar.get_width()/2., height + 0.02,
+                        f'{value:.2f}', ha='center', va='bottom', fontsize=8, fontweight='bold')
     
     ax3.set_xticks(x3)
     ax3.set_xticklabels([format_policy_name(policy) for policy in policy_color_stats.index], rotation=45, ha='right', fontsize=10)
@@ -907,7 +941,7 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
                 for j, (bar, value) in enumerate(zip(bars, color_values[color])):
                     height = bar.get_height()
                     ax2.text(bar.get_x() + bar.get_width()/2., height + 0.01,
-                            f'{value:.2f}'.lstrip('0'), ha='center', va='bottom', fontsize=10, fontweight='bold')
+                            f'{value:.2f}'.lstrip('0'), ha='center', va='bottom', fontsize=8, fontweight='bold')
             
             ax2.set_xticks(x2)
             ax2.set_xticklabels(extended_policies, rotation=45, ha='right', fontsize=12)
