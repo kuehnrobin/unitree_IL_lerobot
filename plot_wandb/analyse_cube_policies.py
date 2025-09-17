@@ -19,6 +19,29 @@ from scipy.stats import f_oneway, ttest_ind, chi2_contingency
 import warnings
 
 
+def format_policy_name(policy_name):
+    """
+    Format policy name to display subscripts correctly using matplotlib formatting.
+    Converts underscore notation so only the next letter after underscore becomes subscript.
+    Examples: 'S_LWA' -> 'S$_L$WA', 'R-S_LWA' -> 'R-S$_L$WA', 'A_B_C' -> 'A$_B$$_C$'
+    """
+    result = ""
+    i = 0
+    
+    while i < len(policy_name):
+        if policy_name[i] == '_' and i + 1 < len(policy_name):
+            # Found underscore with character after it
+            subscript_char = policy_name[i + 1]
+            result += f"$_{{{subscript_char}}}$"
+            i += 2  # Skip both underscore and the subscript character
+        else:
+            # Regular character, add it to result
+            result += policy_name[i]
+            i += 1
+    
+    return result
+
+
 def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
     """
     Parse the complex CSV format with multiple policies and trials for cube manipulation.
@@ -263,7 +286,7 @@ def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
     return df, time_info
 
 
-def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path) -> None:
+def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, include_total_score: bool = True) -> None:
     """Create a radar chart comparing all policies across subtasks for cube manipulation."""
     
     # Calculate mean scores per policy and task
@@ -275,9 +298,12 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path) -> N
         "Hand Grasp Cube", 
         "Hand Move to Box",
         "Cube in Box",
-        "Execution Time",
-        "Total Score"
+        "Execution Time"
     ]
+    
+    if include_total_score:
+        subtasks.append("Total Score")
+    
     for task in subtasks:
         if task not in policy_stats.columns:
             policy_stats[task] = 0
@@ -308,7 +334,7 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path) -> N
         values += values[:1]  # Complete the circle
         color = thesis_colors[idx % len(thesis_colors)]
 
-        ax.plot(angles, values, 'o-', linewidth=3, label=policy, color=color,
+        ax.plot(angles, values, 'o-', linewidth=3, label=format_policy_name(policy), color=color,
                markersize=8, markerfacecolor=color, markeredgecolor='white',
                markeredgewidth=2, alpha=0.9)
 
@@ -377,9 +403,12 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path) -> N
         "Grasp\nCube", 
         "Move to\nBox",
         "Place Cube in\nBox",
-        f"Execution\nTime\n\n({time_info['min_time_minutes']:.1f}-\n{time_info['max_time_minutes']:.1f} min)",
-        "Total\nScore"
+        f"Execution\nTime\n\n({time_info['min_time_minutes']:.1f}-\n{time_info['max_time_minutes']:.1f} min)"
     ]
+    
+    if include_total_score:
+        task_labels.append("Total\nScore")
+        
     ax.set_xticklabels(task_labels, fontsize=12, fontweight='bold', ha='center')
     ax.tick_params(axis='x', pad=30)  # push all task labels outward
 
@@ -493,7 +522,7 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
         
         # Better x-axis labels
         ax.set_xticks(x)
-        policy_labels = [policy.replace(' ', '\n') if len(policy) > 12 else policy for policy in policies]
+        policy_labels = [format_policy_name(policy).replace(' ', '\n') if len(policy) > 12 else format_policy_name(policy) for policy in policies]
         ax.set_xticklabels(policy_labels, fontsize=12, fontweight='medium', color='#34495e')
         
         # Set consistent y-axis limits with padding
@@ -740,7 +769,7 @@ def create_color_analysis(df: pd.DataFrame, output_dir: Path) -> None:
                           label=f'{color.title()} Cubes', color=color_map[color], alpha=0.8)
     
     ax3.set_xticks(x3)
-    ax3.set_xticklabels(policy_color_stats.index, rotation=45, ha='right', fontsize=10)
+    ax3.set_xticklabels([format_policy_name(policy) for policy in policy_color_stats.index], rotation=45, ha='right', fontsize=10)
     ax3.set_ylabel('Success Rate', fontsize=14, fontweight='bold')
     ax3.set_title('Performance by Policy and Cube Color', fontsize=16, fontweight='bold')
     ax3.legend()
@@ -792,7 +821,7 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
                    edgecolor='white', linewidth=2)
     
     ax1.set_xticks(x)
-    ax1.set_xticklabels(policy_stats.index, rotation=45, ha='right', fontsize=12)
+    ax1.set_xticklabels([format_policy_name(policy) for policy in policy_stats.index], rotation=45, ha='right', fontsize=12)
     ax1.set_ylabel('Total Score', fontsize=14, fontweight='bold')
     ax1.set_title('Total Policy Performance Score', fontsize=16, fontweight='bold')
     ax1.set_ylim(0, 1.1)
