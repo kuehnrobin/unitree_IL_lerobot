@@ -443,13 +443,13 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
         "Move to\nCorrect Box",
         "Place Can in\nCorrect Box",
         "Return to\nHome Position",
-        f"Execution\nTime\n\n({time_info['min_time_minutes']:.1f}-\n{time_info['max_time_minutes']:.1f} min)"
+        f"Execution\nTime\n({time_info['min_time_minutes']:.1f}-\n{time_info['max_time_minutes']:.1f} min)"
     ]
     
     if include_total_score:
         task_labels.append("Total\nScore")
     ax.set_xticklabels(task_labels, fontsize=12, fontweight='bold', ha='center')
-    ax.tick_params(axis='x', pad=30)  # push all task labels outward
+    ax.tick_params(axis='x', pad=32)  # push all task labels outward
 
     # Increase radial limit to make room for outside labels
     ax.set_ylim(0, 1.25)
@@ -566,7 +566,7 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
         # Better x-axis labels
         ax.set_xticks(x)
         policy_labels = [format_policy_name(policy).replace(' ', '\n') if len(policy) > 12 else format_policy_name(policy) for policy in policies]
-        ax.set_xticklabels(policy_labels, fontsize=12, fontweight='medium', color='#34495e')
+        ax.set_xticklabels(policy_labels, fontsize=12, fontweight='medium', color='#34495e', rotation=45, ha='right')
         
         # Set consistent y-axis limits with padding
         ax.set_ylim(0, 1.1)

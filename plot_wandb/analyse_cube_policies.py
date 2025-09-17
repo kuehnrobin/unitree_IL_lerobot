@@ -523,7 +523,7 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
         # Better x-axis labels
         ax.set_xticks(x)
         policy_labels = [format_policy_name(policy).replace(' ', '\n') if len(policy) > 12 else format_policy_name(policy) for policy in policies]
-        ax.set_xticklabels(policy_labels, fontsize=12, fontweight='medium', color='#34495e')
+        ax.set_xticklabels(policy_labels, fontsize=12, fontweight='medium', color='#34495e', rotation=45, ha='right')
         
         # Set consistent y-axis limits with padding
         ax.set_ylim(0, 1.1)
