@@ -31,18 +31,52 @@ plt.rcParams.update(
     }
 )
 
-COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c", "#00b1b1", "#d62728", "#9467bd", "#FF24BD"]
+COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c",  "#d62728", "#00b1b1", "#9467bd", "#FF24BD"]
 
-def load_and_clean_data(csv_path):
+def format_model_name(model_name):
+    """Format model name for display, ensuring 'A' and 'WA' stay uppercase."""
+    # Replace underscores with spaces and apply title case
+    formatted = model_name.replace("_", " ").title()
+    # Ensure 'A' stays uppercase (fix cases where title() might lowercase it)
+    formatted = formatted.replace(" a ", " A ").replace("-a-", "-A-").replace("-a ", "-A ")
+    # Handle cases at the beginning and end
+    if formatted.startswith("a "):
+        formatted = "A" + formatted[1:]
+    if formatted.endswith(" a"):
+        formatted = formatted[:-1] + "A"
+    if formatted.startswith("a-"):
+        formatted = "A" + formatted[1:]
+    if formatted.endswith("-a"):
+        formatted = formatted[:-1] + "A"
+    
+    # Handle 'WA' specifically - ensure it stays uppercase
+    formatted = formatted.replace(" Wa ", " WA ").replace("-Wa-", "-WA-").replace("-Wa ", "-WA ")
+    if formatted.startswith("Wa "):
+        formatted = "WA" + formatted[2:]
+    if formatted.endswith(" Wa"):
+        formatted = formatted[:-2] + "WA"
+    if formatted.startswith("Wa-"):
+        formatted = "WA" + formatted[2:]
+    if formatted.endswith("-Wa"):
+        formatted = formatted[:-2] + "WA"
+    
+    return formatted
+
+def load_and_clean_data(csv_path, exclude_models=None):
     """Load CSV data and clean it for plotting."""
     df = pd.read_csv(csv_path)
+    
+    if exclude_models is None:
+        exclude_models = []
 
     # Clean column names and extract model names
     models = {}
     for col in df.columns:
         if "train/l1_loss" in col and not ("MIN" in col or "MAX" in col):
             model_name = col.split(" - ")[0]
-            models[model_name] = col
+            # Skip excluded models
+            if model_name not in exclude_models:
+                models[model_name] = col
 
     return df, models
 
@@ -61,13 +95,19 @@ def create_training_loss_plot(df, models, output_dir):
         steps_k = data["Step"] / 1000
         losses = data[col_name]
 
+        # Special color assignment for R-A model
+        if model_name == "R-A":
+            line_color = "#d62728"  # Red color for R-A
+        else:
+            line_color = colors[i % len(colors)]
+
         # Plot the main line
         ax.plot(
             steps_k,
             losses,
-            label=model_name.replace("_", " ").title(),
+            label=format_model_name(model_name),
             linewidth=2.5,
-            color=colors[i % len(colors)],
+            color=line_color,
             alpha=0.8,
         )
 
@@ -79,20 +119,20 @@ def create_training_loss_plot(df, models, output_dir):
                 steps_k,
                 smoothed,
                 "--",
-                color=colors[i % len(colors)],
+                color=line_color,
                 alpha=0.6,
                 linewidth=1.5,
             )
 
     ax.set_xlabel("Training Steps (×1000)", fontweight="bold")
     ax.set_ylabel("L1 Loss", fontweight="bold")
-    ax.set_title("Training Loss Comparison Across Models", fontweight="bold", pad=20)
+    ax.set_title("Dinov2 Training Convergence", fontweight="bold", pad=20)
 
     # Improve the legend
     ax.legend(frameon=True, fancybox=True, shadow=True, loc="upper right")
 
-    # Add grid for better readability
-    ax.grid(True, alpha=0.3, linestyle="-", linewidth=0.5)
+    # Add grid for better readability - made more dominant
+    ax.grid(True, alpha=0.7, linestyle="-", linewidth=1.0)
 
     # Set x-axis to start from 0
     ax.set_xlim(left=0)
@@ -171,7 +211,7 @@ def create_individual_model_plots(df, models, output_dir, ncols: int = 3):
 
         ax.set_xlabel("Steps (×1000)", fontsize=12)
         ax.set_ylabel("L1 Loss", fontsize=12)
-        ax.set_title(model_name.replace("_", " ").title(), fontsize=14, pad=8, fontweight="bold")
+        ax.set_title(format_model_name(model_name), fontsize=14, pad=8, fontweight="bold")
         ax.grid(True, alpha=0.3)
         ax.set_xlim(left=0)
         ax.set_ylim(bottom=0)
@@ -208,7 +248,7 @@ def create_convergence_analysis_plot(df, models, output_dir):
         ax1.semilogy(
             steps_k,
             losses,
-            label=model_name.replace("_", " ").title(),
+            label=format_model_name(model_name),
             linewidth=2.5,
             color=colors[i % len(colors)],
             alpha=0.8,
@@ -237,7 +277,7 @@ def create_convergence_analysis_plot(df, models, output_dir):
         ax2.plot(
             steps[1:] / 1000,
             np.abs(loss_rate),
-            label=model_name.replace("_", " ").title(),
+            label=format_model_name(model_name),
             linewidth=2.5,
             color=colors[i % len(colors)],
             alpha=0.8,
@@ -270,7 +310,7 @@ def create_summary_statistics_plot(df, models, output_dir):
         if len(data) == 0:
             continue
 
-        model_names.append(model_name.replace("_", " ").title())
+        model_names.append(format_model_name(model_name))
         initial_losses.append(data.iloc[0])
         final_losses.append(data.iloc[-1])
         min_losses.append(data.min())
@@ -340,11 +380,12 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python plot_training_losses.py
-  python plot_training_losses.py --csv_path my_data.csv
-  python plot_training_losses.py --output_dir my_plots
-  python plot_training_losses.py --plots comparison individual
-  python plot_training_losses.py --csv_path my_data.csv --output_dir my_plots --plots all
+  python plot_training_losses_dino.py
+  python plot_training_losses_dino.py --csv_path my_data.csv
+  python plot_training_losses_dino.py --output_dir my_plots
+  python plot_training_losses_dino.py --plots comparison individual
+  python plot_training_losses_dino.py --csv_path my_data.csv --output_dir my_plots --plots all
+  python plot_training_losses_dino.py --exclude_models dino_open_tv_5e5 D-A-1e5
         """,
     )
 
@@ -352,16 +393,16 @@ Examples:
         "--csv_path",
         "-c",
         type=str,
-        default="wandb/wandb_export_2025-08-13T15_25_06.121+02_00.csv",
-        help="Path to the CSV file containing training data (default: wandb/wandb_export_2025-08-13T15_25_06.121+02_00.csv)",
+        default="plot_wandb/can_dino.csv",
+        help="Path to the CSV file containing training data (default: plot_wandb/can_dino.csv)",
     )
 
     parser.add_argument(
         "--output_dir",
         "-o",
         type=str,
-        default="plot_wandb/plots",
-        help="Directory to save output plots (default: plot_wandb/plots)",
+        default="plot_wandb/plots/dino",
+        help="Directory to save output plots (default: plot_wandb/plots/dino)",
     )
 
     parser.add_argument(
@@ -383,8 +424,8 @@ Examples:
         "--max_steps",
         "-s",
         type=int,
-        default=None,
-        help="Only use data points with Step <= this value (e.g., 80000)",
+        default=80000,
+        help="Only use data points with Step <= this value (default: 80000)",
     )
     
     parser.add_argument(
@@ -392,6 +433,13 @@ Examples:
         type=int,
         default=3,
         help="Number of columns for the individual-plots grid (default: 3)",
+    )
+
+    parser.add_argument(
+        "--exclude_models",
+        nargs="*",
+        default=["dino_open_tv_5e5"],
+        help="List of model names to exclude from plotting (default: dino_open_tv_5e5)",
     )
 
     args = parser.parse_args()
@@ -421,7 +469,7 @@ Examples:
 
     print("Loading and processing data...")
     try:
-        df, models = load_and_clean_data(csv_path)
+        df, models = load_and_clean_data(csv_path, exclude_models=args.exclude_models)
     except Exception as e:
         print(f"Error loading CSV file: {e}")
         return 1
@@ -443,6 +491,8 @@ Examples:
         return 1
 
     print(f"Found {len(models)} models: {list(models.keys())}")
+    if args.exclude_models:
+        print(f"Excluded models: {args.exclude_models}")
     print()
 
     # Set matplotlib backend for headless environments
