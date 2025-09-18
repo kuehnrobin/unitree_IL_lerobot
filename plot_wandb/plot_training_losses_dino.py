@@ -34,33 +34,26 @@ plt.rcParams.update(
 COLORS = ["#1f77b4", "#ff7f0e", "#2ca02c",  "#d62728", "#00b1b1", "#9467bd", "#FF24BD"]
 
 def format_model_name(model_name):
-    """Format model name for display, ensuring 'A' and 'WA' stay uppercase."""
-    # Replace underscores with spaces and apply title case
-    formatted = model_name.replace("_", " ").title()
-    # Ensure 'A' stays uppercase (fix cases where title() might lowercase it)
-    formatted = formatted.replace(" a ", " A ").replace("-a-", "-A-").replace("-a ", "-A ")
-    # Handle cases at the beginning and end
-    if formatted.startswith("a "):
-        formatted = "A" + formatted[1:]
-    if formatted.endswith(" a"):
-        formatted = formatted[:-1] + "A"
-    if formatted.startswith("a-"):
-        formatted = "A" + formatted[1:]
-    if formatted.endswith("-a"):
-        formatted = formatted[:-1] + "A"
+    """
+    Format model name to display subscripts correctly using matplotlib formatting.
+    Converts underscore notation so only the next letter after underscore becomes subscript.
+    Examples: 'S_LWA' -> 'S$_L$WA', 'R-S_LWA' -> 'R-S$_L$WA', 'A_B_C' -> 'A$_B$$_C$'
+    """
+    result = ""
+    i = 0
     
-    # Handle 'WA' specifically - ensure it stays uppercase
-    formatted = formatted.replace(" Wa ", " WA ").replace("-Wa-", "-WA-").replace("-Wa ", "-WA ")
-    if formatted.startswith("Wa "):
-        formatted = "WA" + formatted[2:]
-    if formatted.endswith(" Wa"):
-        formatted = formatted[:-2] + "WA"
-    if formatted.startswith("Wa-"):
-        formatted = "WA" + formatted[2:]
-    if formatted.endswith("-Wa"):
-        formatted = formatted[:-2] + "WA"
+    while i < len(model_name):
+        if model_name[i] == '_' and i + 1 < len(model_name):
+            # Found underscore with character after it
+            subscript_char = model_name[i + 1]
+            result += f"$_{{{subscript_char}}}$"
+            i += 2  # Skip both underscore and the subscript character
+        else:
+            # Regular character, add it to result
+            result += model_name[i]
+            i += 1
     
-    return formatted
+    return result
 
 def load_and_clean_data(csv_path, exclude_models=None):
     """Load CSV data and clean it for plotting."""
@@ -81,7 +74,7 @@ def load_and_clean_data(csv_path, exclude_models=None):
     return df, models
 
 
-def create_training_loss_plot(df, models, output_dir):
+def create_training_loss_plot(df, models, output_dir, title="Dinov2 Training Convergence"):
     """Create a comprehensive training loss plot."""
     fig, ax = plt.subplots(figsize=(12, 8))
 
@@ -126,7 +119,7 @@ def create_training_loss_plot(df, models, output_dir):
 
     ax.set_xlabel("Training Steps (×1000)", fontweight="bold")
     ax.set_ylabel("L1 Loss", fontweight="bold")
-    ax.set_title("Dinov2 Training Convergence", fontweight="bold", pad=20)
+    ax.set_title(title, fontweight="bold", pad=20)
 
     # Improve the legend
     ax.legend(frameon=True, fancybox=True, shadow=True, loc="upper right")
@@ -148,7 +141,7 @@ def create_training_loss_plot(df, models, output_dir):
     plt.tight_layout()
 
     # Save in both formats
-    plt.savefig(output_dir / "training_loss_comparison.png", format="png")
+    plt.savefig(output_dir / "training_loss_comparison.pdf", format="pdf")
     #plt.savefig(output_dir / "training_loss_comparison.svg", format="svg")
     plt.show()
 
@@ -208,6 +201,19 @@ def create_individual_model_plots(df, models, output_dir, ncols: int = 3):
                     ha="left",
                     bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.8),
                 )
+                
+                # Final loss annotation (bottom-right)
+                ax.text(
+                    0.95,
+                    0.02,
+                    f"Final: {final:.3f}",
+                    transform=ax.transAxes,
+                    fontsize=9,
+                    fontweight="bold",
+                    va="bottom",
+                    ha="right",
+                    bbox=dict(boxstyle="round,pad=0.2", facecolor="white", alpha=0.8),
+                )
 
         ax.set_xlabel("Steps (×1000)", fontsize=12)
         ax.set_ylabel("L1 Loss", fontsize=12)
@@ -223,9 +229,9 @@ def create_individual_model_plots(df, models, output_dir, ncols: int = 3):
         r, c = divmod(idx, ncols)
         axes[r][c].set_visible(False)
 
-    fig.suptitle("Individual Training Loss Curves", fontweight="bold", y=0.995)
-    plt.tight_layout(rect=[0, 0, 1, 0.97])
-    plt.savefig(output_dir / "individual_models_grid.png", format="png")
+    fig.suptitle("Individual Training Loss Curves", fontweight="bold", y=0.985)
+    plt.tight_layout(rect=[0, 0, 1, 0.96])
+    plt.savefig(output_dir / "individual_models_grid.pdf", format="pdf")
     # plt.savefig(output_dir / "individual_models_grid.svg", format="svg")
     plt.show()
 
@@ -291,14 +297,14 @@ def create_convergence_analysis_plot(df, models, output_dir):
     ax2.set_yscale("log")
 
     plt.tight_layout()
-    plt.savefig(output_dir / "convergence_analysis.png", format="png")
+    plt.savefig(output_dir / "convergence_analysis.pdf", format="pdf")
     #plt.savefig(output_dir / "convergence_analysis.svg", format="svg")
     plt.show()
 
 
 def create_summary_statistics_plot(df, models, output_dir):
     """Create a summary statistics visualization."""
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 6))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 7))
 
     model_names = []
     final_losses = []
@@ -368,7 +374,7 @@ def create_summary_statistics_plot(df, models, output_dir):
         )
 
     plt.tight_layout()
-    plt.savefig(output_dir / "summary_statistics.png", format="png")
+    plt.savefig(output_dir / "summary_statistics.pdf", format="pdf")
     #plt.savefig(output_dir / "summary_statistics.svg", format="svg")
     plt.show()
 
@@ -438,8 +444,16 @@ Examples:
     parser.add_argument(
         "--exclude_models",
         nargs="*",
-        default=["dino_open_tv_5e5"],
+        default=None,
         help="List of model names to exclude from plotting (default: dino_open_tv_5e5)",
+    )
+
+    parser.add_argument(
+        "--title",
+        "-t",
+        type=str,
+        default="Dinov2 Training Convergence",
+        help="Title for the training loss comparison plot (default: Dinov2 Training Convergence)",
     )
 
     args = parser.parse_args()
@@ -506,7 +520,7 @@ Examples:
     # Create selected plots
     if "comparison" in selected_plots:
         print("Creating training loss comparison plot...")
-        create_training_loss_plot(df, models, output_dir)
+        create_training_loss_plot(df, models, output_dir, title=args.title)
 
     if "individual" in selected_plots:
         print("Creating individual model plots grid...")
@@ -521,7 +535,7 @@ Examples:
         create_summary_statistics_plot(df, models, output_dir)
 
     print()
-    print(f"✓ Selected plots saved to {output_dir}/ in PNG formats")
+    print(f"✓ Selected plots saved to {output_dir}/ in PDF format")
     return 0
 
 

@@ -259,22 +259,23 @@ def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
     
     # Calculate policy-specific execution times for labeling
     policy_times = {}
-    for policy in df['Policy'].unique():
-        policy_time_data = df[(df['Policy'] == policy) & (df['Task'] == 'Execution Time')]
-        if not policy_time_data.empty:
-            # Convert normalized score back to actual time
-            mean_score = policy_time_data['Score'].mean()
-            # Inverse of normalization: time = max_time - (score * time_range)
-            actual_time_seconds = max_time - (mean_score * time_range)
-            policy_times[policy] = {
-                'seconds': actual_time_seconds,
-                'minutes': actual_time_seconds / 60.0
-            }
+    if not df.empty and 'Policy' in df.columns:
+        for policy in df['Policy'].unique():
+            policy_time_data = df[(df['Policy'] == policy) & (df['Task'] == 'Execution Time')]
+            if not policy_time_data.empty:
+                # Convert normalized score back to actual time
+                mean_score = policy_time_data['Score'].mean()
+                # Inverse of normalization: time = max_time - (score * time_range)
+                actual_time_seconds = max_time - (mean_score * time_range)
+                policy_times[policy] = {
+                    'seconds': actual_time_seconds,
+                    'minutes': actual_time_seconds / 60.0
+                }
     
     time_info['policy_times'] = policy_times
     
     # Calculate total policy scores with optional weighting
-    if not df.empty:
+    if not df.empty and 'Policy' in df.columns:
         # Define task weights (all set to 1.0 for unweighted average)
         task_weights = {
             "Hand Move to Cube": 1.0,
@@ -282,7 +283,13 @@ def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
             "Hand Move to Box": 1.0,
             "Cube in Box": 1.0,
             "Hand Back to Start Position": 1.0,
-            "Execution Time": 1.0
+            "Execution Time": 1.0,
+            # Add can manipulation tasks for lighting test compatibility
+            "Hand Move to Can": 1.0,
+            "Hand Grasp Can": 1.0,
+            "Hand Move to corrct Box": 1.0,
+            "Can in corredt Box": 1.0,
+            "Start position am ende": 1.0
         }
         
         # Calculate weighted total scores for each policy and trial
@@ -835,10 +842,18 @@ def create_color_analysis(df: pd.DataFrame, output_dir: Path) -> None:
                           label=f'{color.title()} Cubes', color=color_map[color], alpha=0.8)
             
             # Add value labels on bars
-            for bar, value in zip(bars, policy_color_stats[color]):
+            for j, (bar, value) in enumerate(zip(bars, policy_color_stats[color])):
                 height = bar.get_height()
+                # Special formatting for R-S policy in this subplot only
+                current_policy = policy_color_stats.index[j]
+                
+                if current_policy == 'R-S':
+                    label_text = f'{value:.2f}'.lstrip('0') or '0'
+                else:
+                    label_text = f'{value:.2f}'
+                
                 ax3.text(bar.get_x() + bar.get_width()/2., height + 0.02,
-                        f'{value:.2f}', ha='center', va='bottom', fontsize=8, fontweight='bold')
+                        label_text, ha='center', va='bottom', fontsize=8, fontweight='bold')
     
     ax3.set_xticks(x3)
     ax3.set_xticklabels([format_policy_name(policy) for policy in policy_color_stats.index], rotation=45, ha='right', fontsize=10)
