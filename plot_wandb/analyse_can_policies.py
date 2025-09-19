@@ -619,7 +619,7 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         ax1.set_xticks(x)
         ax1.set_xticklabels([format_policy_name(p) for p in overall_stats.index], rotation=45, ha='right', fontsize=11)
         ax1.set_ylabel('Total Score', fontsize=13, fontweight='bold')
-        ax1.set_title(f'{task_label} (Overall)', fontsize=15, fontweight='bold')
+        ax1.set_title(f'Overall {task_label}', fontsize=15, fontweight='bold')
         ax1.set_ylim(0,1.05)
         ax1.grid(axis='y', alpha=0.3)
         for bar,val,std in zip(bars, overall_stats['Score'], overall_stats['Std']):
@@ -653,7 +653,7 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         plt.savefig(output_dir/filename, bbox_inches='tight')
         plt.close()
     _compute_overall_and_colors('Total Score','total_score_with_return.pdf')
-    _compute_overall_and_colors('Total Score (No RH)','total_score_without_return.pdf')
+    _compute_overall_and_colors('Total Score Without Return Home Subtask','total_score_without_return.pdf')
 
 
 def create_end_position_analysis(df: pd.DataFrame, output_dir: Path) -> None:
