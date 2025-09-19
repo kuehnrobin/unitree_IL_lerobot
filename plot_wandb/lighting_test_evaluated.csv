@@ -1,0 +1,34 @@
+Config ID;1;;;;;;;;2;;;;;;;;3;;;;;;;;4;;;;;;;;5;;;;;;;;;Subtask Scores;Subtask Scores;Subtask Scores
+R-A;red;green;red;green;red;green;end;time;red;green;red;green;red;green;end;time;red ;green;red;green;red;green;end;time;green;red;green;red;green;red;end;time;green;red;green;red;green;red;end;time;R-A;All Cans;Green Cans;Red Cans
+Hand Move to  Can;1;1;0,5;None;None;None;None;None;1;1;1;1;1;1;None;None;1;1;1;1;1;1;None;None;1;1;1;1;1;1;None;None;1;1;1;1;1;1;None;None;Hand Move to  Can;0,981481481;1;0,964285714
+Hand Grasp Can;1;1;1;None;None;None;None;None;1;1;1;1;1;1;None;None;1;1;1;1;1;1;None;None;1;1;1;1;1;1;None;None;1;1;1;1;1;1;None;None;Hand Grasp Can;1;1;1
+Hand Move to  Correct Box;1;0;1;None;None;None;None;None;1;0,5;1;1;1;1;None;None;1;0,75;1;0,75;1;0,5;None;None;0,5;1;0,75;1;1;1;None;None;0,5;1;1;1;1;1;None;None;Hand Move to  Correct Box;0,861111111;0,711538462;1
+Can in Correct Box;1;0;1;None;None;None;None;None;1;0;1;1;1;1;None;None;1;1;1;1;1;1;None;None;0;1;1;1;1;1;None;None;0;1;1;1;1;1;None;None;Can in Correct Box;0,851851852;0,692307692;1
+Return to Home Position;None;None;None ;None;None;None;0;None;None;None;None ;None;None;None;0;04:03;None;None;None ;None;None;None;0;03:41;None;None;None ;None;None;None;0;03:35;None;None;None ;None;None;None;0;03:34;Return to Home Position;0;0;0
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;Execution Time;03:43;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;Time Score;( Missing Todo);;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;Total Score (with Return to Home Position);0,738888889;0,680769231;0,792857143
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;Total Score (without Return to Home Position);0,923611111;0,850961538;0,991071429
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Config ID;1;;;;;;;;2;;;;;;;;3;;;;;;;;4;;;;;;;;5;;;;;;;;;Subtask Scores;Subtask Scores;Subtask Scores
+R-A-AUG;red;green;red;green;red;green;end;time;red;red;green;green;red;green;end;time;red ;red;red;green;green;green;end;time;red;red;green;red;green;green;end;time;red;red;red;green;green;green;end;time;R-A-AUG;All Cans;Green Cans;Red Cans
+Hand Move to  Can;0,5;1;1;None;None;None;None;None;0;0,5;0,5;0,5;1;0,5;None;None;1;1;1;None;None;None;None;None;1;1;1;1;1;1;None;None;1;1;1;1;1;None;None;None;Hand Move to  Can;0,847826087;0,833333333;0,857142857
+Hand Grasp Can;0,5;1;1;None;None;None;None;None;1;1;1;1;1;1;None;None;1;1;1;None;None;None;None;None;1;1;1;1;1;1;None;None;1;1;1;1;1;None;None;None;Hand Grasp Can;0,97826087;1;0,964285714
+Hand Move to  Correct Box;1;0,5;1;None;None;None;None;None;1;None;0;1;1;1;None;None;1;1;1;None;None;None;None;None;1;1;0,75;1;0,5;0,5;None;None;1;1;1;1;1;None;None;None;Hand Move to  Correct Box;0,875;0,694444444;1
+Can in Correct Box;1;0;1;None;None;None;None;None;1;None;0;1;1;1;None;None;1;1;1;None;None;None;None;None;1;1;1;1;1;0;None;None;1;1;1;1;1;None;None;None;Can in Correct Box;0,863636364;0,666666667;1
+Return to Home Position;None;None;None ;None;None;None;0;03:40;None;None;None ;None;None;None;0;05:40;None;None;None ;None;None;None;None;None;None;None;None ;None;None;None;0;03:40;None;None;None ;None;None;None;0;None;Return to Home Position;0;0;0
+Config iD;Trail number (Always 6 cans maximum, or less if the trail failed);;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;Execution Time;04:20;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Row dose not exist in Data (Just for Comments);Can 1;Can 2;Can 3;Can 4;Can 5;Can 5;end (Return to Home Position Yes?);time (time it took to complete this trail);;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;Total Score (with Return to Home Position);0,712944664;0,638888889;0,764285714
+Policy Name;Can Color;Can Color;Can Color;Can Color;Can Color;Can Color;Always None;Always None;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;Total Score (without Return to Home Position);0,89118083;0,798611111;0,955357143
+Subtask 1;Value (between 0 and 1);Value (between 0 and 1);Value (between 0 and 1);Value (between 0 and 1);Value (between 0 and 1);Value (between 0 and 1);Always None;Always None;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Subtask 2;Value (between 0 and 1);Value (between 0 and 1);Value (between 0 and 1);Value (between 0 and 1);Value (between 0 and 1);Value (between 0 and 1);Always None;Always None;;;;;Average Green Cans AuG;0,743055;;Average  red;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Subtask 3;Value (between 0 and 1);Value (between 0 and 1);Value (between 0 and 1);Value (between 0 and 1);Value (between 0 and 1);Value (between 0 and 1);Always None;Always None;;;;;Average Red Cans Aug;0,9537;;Average green;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Subtask 4;Value (between 0 and 1);Value (between 0 and 1);Value (between 0 and 1);Value (between 0 and 1);Value (between 0 and 1);Value (between 0 and 1);Always None;Always None;;;;;;1,696755;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+Subtask 5;Always None;Always None;Always None;Always None;Always None;Always None;Value (0 or 1);Value Execution time;;;;;;0,8483775;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
