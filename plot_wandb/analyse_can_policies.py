@@ -40,15 +40,14 @@ def format_policy_name(policy_name):
 def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
     """Parse lighting test / can policies CSV into unified long-form DataFrame.
 
-    Updated Logic:
-    - Detect policy sections via 'Config ID'.
-    - For each of the 4 manipulation subtasks collect per-policy means for: red cans, green cans, and all cans combined (Color in {'red','green','all'}).
-    - Return to Home Position success rate (Color='all') derived from 0/1 flags in final row.
-    - Execution Time score (Color='all') = (max_time - policy_avg_time)/range so that faster policies get higher scores.
-    - Weighted Total Scores are computed per policy for Color in {'red','green','all'} when all four task means exist:
-        Total = mean( four task means (color specific) + ReturnHome(all) + ExecutionTime(all) )
-        => implicit weighting 4/6 for manipulation tasks + 1/6 ReturnHome + 1/6 Time as requested.
-    - Color specific totals reuse the same ReturnHome + ExecutionTime components (overall) unless future color-specific variants exist.
+    Enhancements:
+    - Support comma decimal separator (e.g. 0,5) by replacing with dot before float conversion.
+    - Compute TWO total scores per policy & color: 'Total Score' (with Return Home) and
+      'Total Score (No RH)' (excluding Return to Home Position component) using weighting:
+        With RH: (Sum 4 manipulation task means + ReturnHome + Time) / 6
+        Without RH: (Sum 4 manipulation task means + Time) / 5
+      (Time is already normalized; ReturnHome is success rate.)
+    - Color-specific totals use color-specific manipulation means + shared all-color Time and ReturnHome.
     """
     raw_df = pd.read_csv(csv_path, delimiter=';', header=None)
 
@@ -91,44 +90,41 @@ def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
     if not policy_rows:
         raise ValueError('No policy rows detected. Check CSV format.')
 
-    # First pass: collect all execution times for normalization
+    # Gather all times for normalization
     all_times = []
-    for policy_row, _ in policy_rows:
-        end_pos_row_idx = policy_row + len(canonical_tasks) + 1  # after 4 tasks + return row
-        if end_pos_row_idx < len(raw_df):
-            row = raw_df.iloc[end_pos_row_idx, 1:]
+    for pr, _ in policy_rows:
+        end_idx = pr + len(canonical_tasks) + 1
+        if end_idx < len(raw_df):
+            row = raw_df.iloc[end_idx, 1:]
             # Iterate over trial blocks (8 columns per trial)
-            for block_start in range(0, len(row), 8):
-                time_idx = block_start + 7
-                if time_idx < len(row):
-                    val = row.iloc[time_idx]
+            for start in range(0, len(row), 8):
+                t_idx = start + 7
+                if t_idx < len(row):
+                    val = row.iloc[t_idx]
                     if pd.notna(val):
                         s = str(val).strip()
                         if ':' in s and s.lower() not in ['none', 'end', 'time', '']:
                             try:
                                 mm, ss = s.split(':')
-                                t_sec = int(mm) * 60 + int(ss)
-                                all_times.append(t_sec)
+                                all_times.append(int(mm)*60 + int(ss))
                             except ValueError:
                                 pass
     if all_times:
-        min_time = min(all_times)
-        max_time = max(all_times)
+        min_time, max_time = min(all_times), max(all_times)
         time_range = max_time - min_time if max_time > min_time else 1
     else:
-        # Fallback default range (15 minutes window)
         min_time, max_time, time_range = 0, 900, 900
 
     parsed_rows = []
 
-    for policy_row, policy_name in policy_rows:
-        color_row = raw_df.iloc[policy_row, 1:]
+    for pr, policy_name in policy_rows:
+        color_row = raw_df.iloc[pr, 1:]
         # Build colors list; only keep 'red' or 'green'
-        colors = [c.lower().strip() if pd.notna(c) and str(c).lower().strip() in ['red', 'green'] else None for c in color_row]
+        colors = [c.lower().strip() if pd.notna(c) and str(c).lower().strip() in ['red','green'] else None for c in color_row]
 
         # Process the four skill tasks
         for t_idx in range(4):
-            task_row_idx = policy_row + 1 + t_idx
+            task_row_idx = pr + 1 + t_idx
             if task_row_idx >= len(raw_df):
                 continue
             raw_label = str(raw_df.iloc[task_row_idx, 0])
@@ -138,14 +134,17 @@ def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
             row_vals = raw_df.iloc[task_row_idx, 1:]
             red_scores, green_scores, all_scores = [], [], []
             for col_idx, val in enumerate(row_vals):
-                if col_idx < len(colors) and colors[col_idx] in ['red', 'green']:
+                if col_idx < len(colors) and colors[col_idx] in ['red','green']:
                     if pd.notna(val):
-                        s = str(val).strip()
-                        if s.lower() in ['none', 'end', 'time', '']:
+                        s = str(val).strip().replace(',', '.')
+                        if s.lower() in ['none','end','time','']:
                             continue
                         try:
                             num = float(s)
                         except ValueError:
+                            continue
+                        # clamp improbable >1 values if any (defensive)
+                        if num > 1.0:
                             continue
                         all_scores.append(num)
                         if colors[col_idx] == 'red':
@@ -154,105 +153,92 @@ def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
                             green_scores.append(num)
             # Append aggregated means
             if all_scores:
-                parsed_rows.append({'Policy': policy_name, 'Trial': 1, 'Color': 'all', 'Task': task_name, 'Score': float(np.mean(all_scores))})
+                parsed_rows.append({'Policy':policy_name,'Trial':1,'Color':'all','Task':task_name,'Score':float(np.mean(all_scores))})
             if red_scores:
-                parsed_rows.append({'Policy': policy_name, 'Trial': 1, 'Color': 'red', 'Task': task_name, 'Score': float(np.mean(red_scores))})
+                parsed_rows.append({'Policy':policy_name,'Trial':1,'Color':'red','Task':task_name,'Score':float(np.mean(red_scores))})
             if green_scores:
-                parsed_rows.append({'Policy': policy_name, 'Trial': 1, 'Color': 'green', 'Task': task_name, 'Score': float(np.mean(green_scores))})
+                parsed_rows.append({'Policy':policy_name,'Trial':1,'Color':'green','Task':task_name,'Score':float(np.mean(green_scores))})
 
         # Return to Home Position row
-        end_pos_row_idx = policy_row + len(canonical_tasks) + 1
-        if end_pos_row_idx < len(raw_df):
-            raw_label = str(raw_df.iloc[end_pos_row_idx, 0])
+        end_idx = pr + len(canonical_tasks) + 1
+        if end_idx < len(raw_df):
+            raw_label = str(raw_df.iloc[end_idx, 0])
             if normalize_task(raw_label) == 'Return to Home Position':
-                end_row_vals = raw_df.iloc[end_pos_row_idx, 1:]
-                success_scores = []
-                times = []
-                for col_idx, val in enumerate(end_row_vals):
-                    if pd.isna(val):
+                vals = raw_df.iloc[end_idx, 1:]
+                success, times = [], []
+                for v in vals:
+                    if pd.isna(v):
                         continue
-                    s = str(val).strip()
-                    if s.lower() in ['none', 'end', 'time', '']:
+                    s = str(v).strip()
+                    if s.lower() in ['none','end','time','']:
                         continue
                     if ':' in s:
                         try:
                             mm, ss = s.split(':')
-                            t_sec = int(mm) * 60 + int(ss)
-                            times.append(t_sec)
+                            times.append(int(mm)*60 + int(ss))
                         except ValueError:
                             pass
                     else:
-                        # success 0/1
                         try:
-                            sc = float(s)
-                            if sc in [0.0, 1.0]:
-                                success_scores.append(sc)
+                            sc = float(s.replace(',','.'))
+                            if sc in [0.0,1.0]:
+                                success.append(sc)
                         except ValueError:
                             pass
-                if success_scores:
-                    parsed_rows.append({'Policy': policy_name, 'Trial': 1, 'Color': 'all', 'Task': 'Return to Home Position', 'Score': float(np.mean(success_scores))})
+                if success:
+                    parsed_rows.append({'Policy':policy_name,'Trial':1,'Color':'all','Task':'Return to Home Position','Score':float(np.mean(success))})
                 if times:
-                    avg_time = float(np.mean(times))
-                    time_score = (max_time - avg_time) / time_range if time_range > 0 else 0.0
-                    parsed_rows.append({'Policy': policy_name, 'Trial': 1, 'Color': 'all', 'Task': 'Execution Time', 'Score': time_score})
+                    avg_t = float(np.mean(times))
+                    time_score = (max_time - avg_t)/time_range if time_range>0 else 0.0
+                    parsed_rows.append({'Policy':policy_name,'Trial':1,'Color':'all','Task':'Execution Time','Score':time_score})
 
     df = pd.DataFrame(parsed_rows)
 
-    # Policy times (inverse normalization) for labeling
+    # policy times map
     policy_times = {}
     for policy in df['Policy'].unique():
-        row = df[(df['Policy'] == policy) & (df['Task'] == 'Execution Time') & (df['Color'] == 'all')]
-        if not row.empty:
-            score = row['Score'].iloc[0]
-            actual_seconds = max_time - score * time_range
-            policy_times[policy] = {'seconds': actual_seconds, 'minutes': actual_seconds / 60.0}
+        r = df[(df['Policy']==policy)&(df['Task']=='Execution Time')&(df['Color']=='all')]
+        if not r.empty:
+            sc = r['Score'].iloc[0]
+            actual = max_time - sc * time_range
+            policy_times[policy] = {'seconds':actual,'minutes':actual/60.0}
 
-    time_info = {
-        'min_time_seconds': min_time,
-        'max_time_seconds': max_time,
-        'time_range_seconds': time_range,
-        'min_time_minutes': min_time / 60.0,
-        'max_time_minutes': max_time / 60.0,
-        'policy_times': policy_times
-    }
+    time_info = {'min_time_seconds':min_time,'max_time_seconds':max_time,'time_range_seconds':time_range,'min_time_minutes':min_time/60.0,'max_time_minutes':max_time/60.0,'policy_times':policy_times}
 
-    # Weighted Total Scores: for each policy compute color-specific totals and overall
-    # Total = mean of six components: four task means (color specific) + ReturnHome(all) + ExecutionTime(all)
-    task_names_four = ['Hand Move to Can','Hand Grasp Can','Hand Move to Correct Box','Can in Correct Box']
-    total_rows=[]
+    # Compute total scores (with & without Return Home)
+    tasks_four = canonical_tasks
+    total_rows = []
     for policy in df['Policy'].unique():
-        # fetch common components
-        home_row=df[(df['Policy']==policy)&(df['Task']=='Return to Home Position')& (df['Color']=='all')]
-        time_row=df[(df['Policy']==policy)&(df['Task']=='Execution Time')& (df['Color']=='all')]
-        if home_row.empty or time_row.empty: continue
-        home_score=home_row['Score'].iloc[0]; time_score=time_row['Score'].iloc[0]
-        # Helper to gather per-color
-        def color_total(color_tag):
-            vals=[]
-            for t in task_names_four:
-                r=df[(df['Policy']==policy)&(df['Task']==t)&(df['Color']==color_tag)]
-                if r.empty: return None  # if any missing skip color total
-                vals.append(r['Score'].iloc[0])
-            components = vals + [home_score, time_score]
-            total = float(np.mean(components))  # equivalent to weighting 4/6 vs 1/6,1/6
-            std = float(np.std(components, ddof=1)) if len(components)>1 else 0.0
-            return total, std
-        # all-color overall using 'all' task rows
-        all_result=color_total('all')
-        if all_result:
-            total, std = all_result
-            total_rows.append({'Policy':policy,'Trial':1,'Color':'all','Task':'Total Score','Score':total,'Std':std})
-        red_result=color_total('red')
-        if red_result:
-            total, std = red_result
-            total_rows.append({'Policy':policy,'Trial':1,'Color':'red','Task':'Total Score','Score':total,'Std':std})
-        green_result=color_total('green')
-        if green_result:
-            total, std = green_result
-            total_rows.append({'Policy':policy,'Trial':1,'Color':'green','Task':'Total Score','Score':total,'Std':std})
+        # required shared components
+        home_row = df[(df['Policy']==policy)&(df['Task']=='Return to Home Position')&(df['Color']=='all')]
+        time_row = df[(df['Policy']==policy)&(df['Task']=='Execution Time')&(df['Color']=='all')]
+        home_score = home_row['Score'].iloc[0] if not home_row.empty else None
+        time_score = time_row['Score'].iloc[0] if not time_row.empty else None
+        for color_tag in ['all','red','green']:
+            # collect manipulation task means for this color
+            manip = []
+            for t in tasks_four:
+                r = df[(df['Policy']==policy)&(df['Task']==t)&(df['Color']==color_tag)]
+                if r.empty:
+                    manip = []
+                    break
+                manip.append(r['Score'].iloc[0])
+            if len(manip)!=4 or time_score is None:
+                continue
+            # total without RH
+            components_no = manip + [time_score]
+            total_no = float(np.mean(components_no))  # (sum manip + time)/5
+            std_no = float(np.std(components_no, ddof=1)) if len(components_no)>1 else 0.0
+            total_rows.append({'Policy':policy,'Trial':1,'Color':color_tag,'Task':'Total Score (No RH)','Score':total_no,'Std':std_no})
+            if home_score is not None:
+                components_with = manip + [home_score, time_score]
+                total_with = float(np.mean(components_with))  # (sum manip + home + time)/6
+                std_with = float(np.std(components_with, ddof=1)) if len(components_with)>1 else 0.0
+                total_rows.append({'Policy':policy,'Trial':1,'Color':color_tag,'Task':'Total Score','Score':total_with,'Std':std_with})
     if total_rows:
-        total_df = pd.DataFrame(total_rows)
-        df = pd.concat([df, total_df[['Policy','Trial','Color','Task','Score']]], ignore_index=True)
+        totals_df = pd.DataFrame(total_rows)
+        df = pd.concat([df, totals_df[['Policy','Trial','Color','Task','Score']]], ignore_index=True)
+
     return df, time_info
 
 
@@ -577,68 +563,97 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
 
 
 def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
-    """Two-panel total score analysis with error bars and color breakdown."""
-    total_data = df[df['Task']=='Total Score']
-    if total_data.empty:
-        print('No Total Score data found')
-        return
-    plt.style.use('default')
-    fig,(ax1,ax2)=plt.subplots(1,2,figsize=(16,7),dpi=150)
-    # Panel 1: Overall (Color=all)
-    overall = total_data[total_data['Color']=='all'].copy()
-    if overall.empty:
-        print('No overall (all) Total Score rows.')
-    overall_stats = overall.groupby('Policy')['Score'].agg(['mean']).rename(columns={'mean':'Score'})
-    # Derive pseudo-std from per-color totals if available (average of red/green deviation) or set 0
-    std_map={}
-    for policy in overall_stats.index:
-        reds = total_data[(total_data['Policy']==policy)&(total_data['Color'].isin(['red','green']))]['Score']
-        if len(reds)==2:
-            std_map[policy]=float(np.std(reds.values.tolist()+[overall_stats.loc[policy,'Score']], ddof=1))
+    """Generate two analyses: (1) with Return Home, (2) without Return Home.
+    Each produces a two-panel figure: overall (Color=all) + color breakdown (red vs green).
+    Saves:
+        total_score_with_return.pdf
+        total_score_without_return.pdf
+    """
+    def _compute_overall_and_colors(task_label: str, filename: str):
+        data = df[df['Task']==task_label]
+        if data.empty:
+            print(f'No data for {task_label}')
+            return
+        plt.style.use('default')
+        fig,(ax1,ax2)=plt.subplots(1,2,figsize=(16,7),dpi=150)
+        overall = data[data['Color']=='all'].copy()
+        if overall.empty:
+            print(f'No overall rows for {task_label}')
+        # Reconstruct component std (exact): recompute components used for that total
+        # We need manipulation tasks + (Time [+ReturnHome])
+        policies = sorted(overall['Policy'].unique())
+        task_is_with = task_label == 'Total Score'
+        comp_map = {}
+        for policy in policies:
+            # gather components
+            manip_vals = []
+            for t in ['Hand Move to Can','Hand Grasp Can','Hand Move to Correct Box','Can in Correct Box']:
+                rr=df[(df['Policy']==policy)&(df['Task']==t)&(df['Color']=='all')]
+                if rr.empty: manip_vals=[]; break
+                manip_vals.append(rr['Score'].iloc[0])
+            if not manip_vals: continue
+            time_row = df[(df['Policy']==policy)&(df['Task']=='Execution Time')&(df['Color']=='all')]
+            if time_row.empty: continue
+            time_sc = time_row['Score'].iloc[0]
+            comps = manip_vals + [time_sc]
+            if task_is_with:
+                rh_row = df[(df['Policy']==policy)&(df['Task']=='Return to Home Position')&(df['Color']=='all')]
+                if rh_row.empty: continue
+                rh_sc = rh_row['Score'].iloc[0]
+                comps = manip_vals + [rh_sc, time_sc]
+            comp_map[policy] = comps
+        stats_rows=[]
+        for policy in policies:
+            row = overall[overall['Policy']==policy]
+            if row.empty or policy not in comp_map: continue
+            mean_val = row['Score'].iloc[0]
+            std_val = float(np.std(comp_map[policy], ddof=1)) if len(comp_map[policy])>1 else 0.0
+            stats_rows.append({'Policy':policy,'Score':mean_val,'Std':std_val})
+        if not stats_rows:
+            print(f'No stats rows for {task_label}')
+            return
+        overall_stats = pd.DataFrame(stats_rows).set_index('Policy')
+        colors_palette=['#3498db','#e74c3c','#2ecc71','#f39c12','#9b59b6','#1abc9c','#34495e','#e67e22','#ff69b4']
+        x = np.arange(len(overall_stats.index))
+        bars=ax1.bar(x, overall_stats['Score'], yerr=overall_stats['Std'], capsize=8,color=colors_palette[:len(x)],edgecolor='white',linewidth=2,alpha=0.9)
+        ax1.set_xticks(x)
+        ax1.set_xticklabels([format_policy_name(p) for p in overall_stats.index], rotation=45, ha='right', fontsize=11)
+        ax1.set_ylabel('Total Score', fontsize=13, fontweight='bold')
+        ax1.set_title(f'{task_label} (Overall)', fontsize=15, fontweight='bold')
+        ax1.set_ylim(0,1.05)
+        ax1.grid(axis='y', alpha=0.3)
+        for bar,val,std in zip(bars, overall_stats['Score'], overall_stats['Std']):
+            ax1.text(bar.get_x()+bar.get_width()/2., val + (std if std>0 else 0)+0.02, f'{val:.3f}', ha='center', va='bottom', fontweight='bold')
+        # Color breakdown
+        color_subset = data[data['Color'].isin(['red','green'])]
+        if not color_subset.empty:
+            pivot = color_subset.pivot_table(index='Policy', columns='Color', values='Score', aggfunc='mean')
+            pivot.loc['Average'] = pivot.mean(axis=0)
+            x2 = np.arange(len(pivot.index))
+            width=0.35
+            red_vals = pivot['red'] if 'red' in pivot.columns else np.zeros(len(pivot))
+            green_vals = pivot['green'] if 'green' in pivot.columns else np.zeros(len(pivot))
+            bars1=ax2.bar(x2-width/2, red_vals,width,label='Red',color='#e74c3c',alpha=0.85,edgecolor='white',linewidth=1.5)
+            bars2=ax2.bar(x2+width/2, green_vals,width,label='Green',color='#2ecc71',alpha=0.85,edgecolor='white',linewidth=1.5)
+            for b,v in zip(bars1, red_vals):
+                ax2.text(b.get_x()+b.get_width()/2., v+0.015, f'{v:.2f}', ha='center', va='bottom', fontsize=9, fontweight='bold')
+            for b,v in zip(bars2, green_vals):
+                ax2.text(b.get_x()+b.get_width()/2., v+0.015, f'{v:.2f}', ha='center', va='bottom', fontsize=9, fontweight='bold')
+            ax2.set_xticks(x2)
+            ax2.set_xticklabels([format_policy_name(p) if p!='Average' else 'Average' for p in pivot.index], rotation=45, ha='right', fontsize=11)
+            ax2.set_ylabel('Total Score', fontsize=13, fontweight='bold')
+            ax2.set_title(f'{task_label} by Can Color', fontsize=15, fontweight='bold')
+            ax2.set_ylim(0,1.05)
+            ax2.grid(axis='y', alpha=0.3)
+            ax2.legend()
+            ax2.axvline(len(pivot.index)-1.5, color='black', linestyle='--', alpha=0.35)
         else:
-            std_map[policy]=0.0
-    overall_stats['Std']=[std_map[p] for p in overall_stats.index]
-    colors_palette=['#3498db','#e74c3c','#2ecc71','#f39c12','#9b59b6','#1abc9c','#34495e','#e67e22','#ff69b4']
-    x=np.arange(len(overall_stats.index))
-    bars=ax1.bar(x, overall_stats['Score'], yerr=overall_stats['Std'], capsize=8, color=colors_palette[:len(x)], edgecolor='white', linewidth=2, alpha=0.9)
-    ax1.set_xticks(x)
-    ax1.set_xticklabels([format_policy_name(p) for p in overall_stats.index], rotation=45, ha='right', fontsize=11)
-    ax1.set_ylabel('Total Score', fontsize=13, fontweight='bold')
-    ax1.set_title('Overall Policy Total Score', fontsize=15, fontweight='bold')
-    ax1.set_ylim(0,1.05)
-    ax1.grid(axis='y', alpha=0.3)
-    for bar,val,std in zip(bars,overall_stats['Score'],overall_stats['Std']):
-        ax1.text(bar.get_x()+bar.get_width()/2., val + (std if std>0 else 0)+0.02, f'{val:.3f}', ha='center', va='bottom', fontweight='bold')
-    # Panel 2: Color-based breakdown (red vs green + average)
-    color_subset = total_data[total_data['Color'].isin(['red','green'])]
-    if not color_subset.empty:
-        pivot = color_subset.pivot_table(index='Policy', columns='Color', values='Score', aggfunc='mean')
-        # Add overall average row
-        pivot.loc['Average'] = pivot.mean(axis=0)
-        x2 = np.arange(len(pivot.index))
-        width=0.35
-        red_vals = pivot['red'] if 'red' in pivot.columns else np.zeros(len(pivot))
-        green_vals = pivot['green'] if 'green' in pivot.columns else np.zeros(len(pivot))
-        bars1=ax2.bar(x2 - width/2, red_vals, width, label='Red Cans', color='#e74c3c', alpha=0.85, edgecolor='white', linewidth=1.5)
-        bars2=ax2.bar(x2 + width/2, green_vals, width, label='Green Cans', color='#2ecc71', alpha=0.85, edgecolor='white', linewidth=1.5)
-        for b,val in zip(bars1, red_vals):
-            ax2.text(b.get_x()+b.get_width()/2., val+0.015, f'{val:.2f}', ha='center', va='bottom', fontsize=9, fontweight='bold')
-        for b,val in zip(bars2, green_vals):
-            ax2.text(b.get_x()+b.get_width()/2., val+0.015, f'{val:.2f}', ha='center', va='bottom', fontsize=9, fontweight='bold')
-        ax2.set_xticks(x2)
-        ax2.set_xticklabels([format_policy_name(p) if p!='Average' else 'Average' for p in pivot.index], rotation=45, ha='right', fontsize=11)
-        ax2.set_ylabel('Total Score', fontsize=13, fontweight='bold')
-        ax2.set_title('Total Score by Can Color', fontsize=15, fontweight='bold')
-        ax2.set_ylim(0,1.05)
-        ax2.grid(axis='y', alpha=0.3)
-        ax2.legend()
-        # separator line before average
-        ax2.axvline(len(pivot.index)-1.5, color='black', linestyle='--', alpha=0.4)
-    else:
-        ax2.set_visible(False)
-    plt.tight_layout()
-    plt.savefig(output_dir/'total_score_analysis.pdf', bbox_inches='tight')
-    plt.close()
+            ax2.set_visible(False)
+        plt.tight_layout()
+        plt.savefig(output_dir/filename, bbox_inches='tight')
+        plt.close()
+    _compute_overall_and_colors('Total Score','total_score_with_return.pdf')
+    _compute_overall_and_colors('Total Score (No RH)','total_score_without_return.pdf')
 
 
 def create_end_position_analysis(df: pd.DataFrame, output_dir: Path) -> None:
@@ -699,51 +714,42 @@ def create_time_analysis(df: pd.DataFrame, time_info: dict, output_dir: Path) ->
 
 
 def create_summary_statistics(df: pd.DataFrame, output_dir: Path) -> None:
-    """Create and save summary statistics."""
-    
-    # If Total Score exists, base overall performance on that only (Color='all')
-    if 'Total Score' in df['Task'].unique():
-        overall_source = df[(df['Task']=='Total Score') & (df['Color']=='all')].copy()
-        overall_source_grouped = overall_source.groupby('Policy')['Score'].agg(['count','mean','std'])
-        # Fill required columns for consistency
-        overall_stats = overall_source_grouped[['mean','std']]
+    """Create and save summary statistics including both total score variants if present."""
+    # Overall Performance by Total Score (with RH) if present, else fallback to other
+    lines = []
+    has_with = 'Total Score' in df['Task'].unique()
+    has_without = 'Total Score (No RH)' in df['Task'].unique()
+    if has_with:
+        overall_with = df[(df['Task']=='Total Score')&(df['Color']=='all')].groupby('Policy')['Score'].agg(['mean','std'])
     else:
-        overall_stats = df.groupby('Policy')['Score'].agg(['count','mean','std','min','max']).round(3)
+        overall_with = pd.DataFrame()
+    if has_without:
+        overall_without = df[(df['Task']=='Total Score (No RH)')&(df['Color']=='all')].groupby('Policy')['Score'].agg(['mean','std'])
+    else:
+        overall_without = pd.DataFrame()
     task_stats = df[df['Color']=='all'].groupby(['Policy','Task'])['Score'].agg(['count','mean','std']).round(3)
     color_stats = df.groupby(['Policy','Color'])['Score'].agg(['count','mean','std']).round(3)
-    with open(output_dir / 'summary_statistics.txt', 'w') as f:
-        f.write("CAN MANIPULATION POLICY ANALYSIS REPORT\n")
-        f.write("=" * 50 + "\n\n")
-        f.write("1. OVERALL PERFORMANCE BY POLICY (Total Score)\n")
-        f.write("-" * 35 + "\n")
-        if 'Total Score' in df['Task'].unique():
-            f.write(overall_stats[['mean','std']].round(3).to_string())
-        else:
-            f.write(overall_stats.to_string())
-        f.write("\n\n2. PERFORMANCE BY POLICY AND TASK (Color=all)\n")
-        f.write("-" * 35 + "\n")
-        f.write(task_stats.to_string())
-        f.write("\n\n3. PERFORMANCE BY POLICY AND COLOR (raw aggregates)\n")
-        f.write("-" * 35 + "\n")
-        f.write(color_stats.to_string())
-        f.write("\n\n4. BEST PERFORMING POLICY PER TASK (Color=all)\n")
-        f.write("-" * 35 + "\n")
-        best_per_task = df[df['Color']=='all'].groupby(['Task','Policy'])['Score'].mean().unstack().idxmax(axis=1)
-        for task, best_policy in best_per_task.items():
-            best_score = df[df['Color']=='all'].groupby(['Task','Policy'])['Score'].mean().unstack().loc[task, best_policy]
-            f.write(f"{task}: {best_policy} (Score: {best_score:.3f})\n")
+    with open(output_dir/'summary_statistics.txt','w') as f:
+        f.write('CAN MANIPULATION POLICY ANALYSIS REPORT\n' + '='*55 + '\n\n')
+        if has_with:
+            f.write('1. OVERALL TOTAL SCORE (With Return Home)\n'+'-'*45+'\n')
+            f.write(overall_with.round(3).to_string())
+            f.write('\n\n')
+        if has_without:
+            f.write('2. OVERALL TOTAL SCORE (Without Return Home)\n'+'-'*48+'\n')
+            f.write(overall_without.round(3).to_string())
+            f.write('\n\n')
+        f.write('3. PERFORMANCE BY POLICY AND TASK (Color=all)\n'+'-'*45+'\n')
+        f.write(task_stats.to_string()); f.write('\n\n')
+        f.write('4. PERFORMANCE BY POLICY AND COLOR (raw aggregates)\n'+'-'*50+'\n')
+        f.write(color_stats.to_string()); f.write('\n')
     print(f"Summary statistics saved to: {output_dir / 'summary_statistics.txt'}")
-    print("\nKEY FINDINGS:\n" + "="*50)
-    if 'Total Score' in df['Task'].unique():
-        print("\nOverall Performance by Policy (Total Score):")
-        print(overall_stats['mean'].sort_values(ascending=False))
-    else:
-        print("\nOverall Performance by Policy (raw mean of all entries):")
-        print(overall_stats['mean'].sort_values(ascending=False))
-    print("\nBest Policy per Task (Color=all):")
-    for task, best_policy in best_per_task.items():
-        best_score = df[df['Color']=='all'].groupby(['Task','Policy'])['Score'].mean().unstack().loc[task, best_policy]
-        print(f"  {task}: {best_policy} ({best_score:.3f})")
+    if has_with:
+        print('\nOverall (With RH):')
+        print(overall_with['mean'].sort_values(ascending=False))
+    if has_without:
+        print('\nOverall (No RH):')
+        print(overall_without['mean'].sort_values(ascending=False))
 
 
 def main():
