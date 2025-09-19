@@ -47,7 +47,7 @@ def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
     Parse the complex CSV format with multiple policies and trials.
     
     Args:
-        csv_path: Path to the lighting_test.csv file
+        csv_path: Path to the can_policies.csv file
         
     Returns:
         Tuple of:
@@ -57,7 +57,7 @@ def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
     # Read raw CSV
     raw_df = pd.read_csv(csv_path, delimiter=';', header=None)
     
-    # Define the subtasks we're tracking (from the CSV comments)
+    # Define the subtasks we're tracking
     subtasks = [
         "Hand Move to Can",
         "Hand Grasp Can", 
@@ -71,123 +71,109 @@ def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
     # First pass: collect all execution times for relative normalization
     all_execution_times = []
     
-    # Find policy start rows - look for policy names in the first column
+    # Process each policy section
     policy_start_rows = []
     for idx, row in raw_df.iterrows():
-        if pd.notna(row[0]) and str(row[0]).strip() != '':
-            # Skip comment/explanation rows
-            cell_value = str(row[0]).strip()
-            if (cell_value not in ['Config ID', 'Config iD', 'Row dose not exist in Data (Just for Comments)', 
-                                  'Policy Name', 'Subtask 1', 'Subtask 2', 'Subtask 3', 'Subtask 4', 'Subtask 5'] 
-                and not cell_value.startswith('Trail number')):
-                policy_start_rows.append(idx)
-    
-    print(f"Found policies at rows: {policy_start_rows}")
+        if pd.notna(row[0]) and any(policy in str(row[0]).lower() for policy in ['cans_r', 'r-', 'dino']):
+            policy_start_rows.append(idx)
     
     # First pass: collect all execution times for relative normalization
     for policy_idx, start_row in enumerate(policy_start_rows):
-        # Process Return to Home Position row to extract execution times
-        home_pos_row_idx = start_row + len(subtasks) + 1  # +1 for the color row
-        if home_pos_row_idx < len(raw_df):
-            home_pos_row = raw_df.iloc[home_pos_row_idx, 1:]  # Skip first column (task name)
+        # Find the end of this policy section
+        end_row = policy_start_rows[policy_idx + 1] if policy_idx + 1 < len(policy_start_rows) else len(raw_df)
+        
+        # Extract color sequence (first row after policy name)
+        color_row = raw_df.iloc[start_row, 1:]
+        colors = [str(c).lower() if pd.notna(c) and str(c).lower() in ['red', 'green', 'black'] else None 
+                 for c in color_row]
+        
+        # Count trials (number of color entries / 8, since each trial has 8 columns including 'end' and 'time')
+        valid_colors = [c for c in colors if c is not None]
+        n_trials = len(valid_colors) // 6  # 6 colors per trial
+        
+        # Process End Position data to extract execution times
+        end_pos_row_idx = start_row + len(subtasks) + 1
+        if end_pos_row_idx < end_row:
+            end_pos_row = raw_df.iloc[end_pos_row_idx, 1:]
             
-            # Process 5 trials, each with 8 columns
-            for trial_idx in range(5):
-                col_start = trial_idx * 8
-                time_col_idx = col_start + 7  # Time is in the 8th column of each trial
+            trial_idx = 0
+            for col_idx in range(0, len(end_pos_row), 8):  # Every 8 columns is a new trial
+                if trial_idx >= n_trials:
+                    break
                 
-                if time_col_idx < len(home_pos_row):
-                    time_val = home_pos_row.iloc[time_col_idx]
-                    if pd.notna(time_val) and str(time_val).strip() not in ['None', 'end', 'time', '']:
-                        time_str = str(time_val).strip()
-                        # Parse time format like "04:03" to seconds
+                if col_idx + 7 < len(end_pos_row):  # Time data
+                    time_val = end_pos_row.iloc[col_idx + 7]
+                    if pd.notna(time_val) and str(time_val) not in ['None', 'end', 'time', '']:
+                        time_str = str(time_val)
+                        # Parse time format like "05:40" to seconds
                         if ':' in time_str:
                             try:
                                 time_parts = time_str.split(':')
                                 time_seconds = int(time_parts[0]) * 60 + int(time_parts[1])
                                 all_execution_times.append(time_seconds)
-                            except (ValueError, IndexError):
+                            except ValueError:
                                 pass
+                
+                trial_idx += 1
     
     # Calculate min and max execution times for relative normalization
     if all_execution_times:
         min_time = min(all_execution_times)
         max_time = max(all_execution_times)
-        time_range = max_time - min_time if max_time > min_time else 1
+        time_range = max_time - min_time if max_time > min_time else 1  # Avoid division by zero
     else:
-        min_time, max_time, time_range = 180, 350, 170  # Default values based on visible data
+        min_time, max_time, time_range = 0, 900, 900  # Fallback to old method
     
-    print(f"Time range: {min_time/60:.1f} - {max_time/60:.1f} minutes")
+    # Second pass: actual data processing with relative time normalization
     
-    # Second pass: actual data processing
     for policy_idx, start_row in enumerate(policy_start_rows):
-        # Extract policy name
-        policy_name = str(raw_df.iloc[start_row, 0]).strip()
+        # Extract policy name - handle abbreviated names like R-3456-P
+        policy_name = str(raw_df.iloc[start_row, 0]).replace('cans_', '').upper()
         
-        print(f"Processing policy: {policy_name}")
+        # Find the end of this policy section
+        end_row = policy_start_rows[policy_idx + 1] if policy_idx + 1 < len(policy_start_rows) else len(raw_df)
         
-        # Extract color sequence (row after policy name)
-        color_row_idx = start_row + 1
-        if color_row_idx >= len(raw_df):
-            continue
-            
-        color_row = raw_df.iloc[color_row_idx, 1:]  # Skip first column
-        colors = []
+        # Extract color sequence (first row after policy name)
+        color_row = raw_df.iloc[start_row, 1:]
+        colors = [str(c).lower() if pd.notna(c) and str(c).lower() in ['red', 'green', 'black'] else None 
+                 for c in color_row]
         
-        # Parse colors for all 5 trials (8 columns each)
-        for trial_idx in range(5):
-            col_start = trial_idx * 8
-            trial_colors = []
-            
-            # Get colors for first 6 columns of this trial
-            for col_offset in range(6):
-                col_idx = col_start + col_offset
-                if col_idx < len(color_row):
-                    color_val = color_row.iloc[col_idx]
-                    if pd.notna(color_val):
-                        color_str = str(color_val).strip().lower()
-                        if color_str in ['red', 'green']:
-                            trial_colors.append(color_str)
-            
-            # Determine dominant color for this trial
-            if trial_colors:
-                dominant_color = max(set(trial_colors), key=trial_colors.count)
-                colors.append(dominant_color)
-            else:
-                colors.append('unknown')
-        
-        print(f"Trial colors: {colors}")
+        # Count trials (number of color entries / 8, since each trial has 8 columns including 'end' and 'time')
+        valid_colors = [c for c in colors if c is not None]
+        n_trials = len(valid_colors) // 6  # 6 colors per trial
         
         # Process each subtask
         for task_offset, task_name in enumerate(subtasks):
-            task_row_idx = start_row + 2 + task_offset  # +2 to skip policy name and color row
-            if task_row_idx >= len(raw_df):
+            task_row_idx = start_row + 1 + task_offset
+            if task_row_idx >= end_row:
                 continue
                 
-            task_row = raw_df.iloc[task_row_idx, 1:]  # Skip task name column
+            task_row = raw_df.iloc[task_row_idx, 1:]
             
-            # Process each trial
-            for trial_idx in range(5):
-                col_start = trial_idx * 8
-                
-                # Collect scores for first 6 columns of this trial
+            # Extract scores for each trial
+            trial_idx = 0
+            for col_idx in range(0, len(task_row), 8):  # Every 8 columns is a new trial
+                if trial_idx >= n_trials:
+                    break
+                    
+                # Get the 6 scores for this trial (excluding 'end' and 'time' columns)
                 trial_scores = []
-                
-                for col_offset in range(6):
-                    col_idx = col_start + col_offset
-                    if col_idx < len(task_row):
-                        score = task_row.iloc[col_idx]
-                        if pd.notna(score) and str(score).strip() not in ['None', 'end', 'time', '']:
+                for score_idx in range(6):
+                    if col_idx + score_idx < len(task_row):
+                        score = task_row.iloc[col_idx + score_idx]
+                        if pd.notna(score) and str(score) not in ['None', 'end', 'time', '']:
                             try:
-                                score_val = float(score)
-                                trial_scores.append(score_val)
+                                trial_scores.append(float(score))
                             except ValueError:
                                 pass
                 
                 # Calculate mean score for this trial and task
                 if trial_scores:
                     mean_score = np.mean(trial_scores)
-                    trial_color = colors[trial_idx] if trial_idx < len(colors) else 'unknown'
+                    
+                    # Get trial color (every 6 colors is a new trial)
+                    color_idx = trial_idx * 6
+                    trial_color = valid_colors[color_idx] if color_idx < len(valid_colors) else 'unknown'
                     
                     parsed_data.append({
                         'Policy': policy_name,
@@ -196,47 +182,51 @@ def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
                         'Task': task_name,
                         'Score': mean_score
                     })
-        
-        # Process Return to Home Position data
-        home_pos_row_idx = start_row + 2 + len(subtasks)  # After all subtask rows
-        if home_pos_row_idx < len(raw_df):
-            home_pos_row = raw_df.iloc[home_pos_row_idx, 1:]  # Skip task name column
-            
-            for trial_idx in range(5):
-                col_start = trial_idx * 8
                 
-                # Extract end position score (7th column of each trial)
+                trial_idx += 1
+        
+        # Process End Position data (last subtask row)
+        end_pos_row_idx = start_row + len(subtasks) + 1
+        if end_pos_row_idx < end_row:
+            end_pos_row = raw_df.iloc[end_pos_row_idx, 1:]
+            
+            trial_idx = 0
+            for col_idx in range(0, len(end_pos_row), 8):  # Every 8 columns is a new trial
+                if trial_idx >= n_trials:
+                    break
+                
+                # Extract end position score (usually in the 7th column of each trial)
                 end_pos_score = None
                 time_score = None
                 
-                end_pos_col_idx = col_start + 6  # End position (7th column)
-                time_col_idx = col_start + 7     # Time (8th column)
-                
-                if end_pos_col_idx < len(home_pos_row):
-                    end_pos_val = home_pos_row.iloc[end_pos_col_idx]
-                    if pd.notna(end_pos_val) and str(end_pos_val).strip() not in ['None', 'end', 'time', '']:
+                if col_idx + 6 < len(end_pos_row):  # End position score
+                    end_pos_val = end_pos_row.iloc[col_idx + 6]
+                    if pd.notna(end_pos_val) and str(end_pos_val) not in ['None', 'end', 'time', '']:
                         try:
                             end_pos_score = float(end_pos_val)
                         except ValueError:
-                            end_pos_score = 1.0 if str(end_pos_val).strip() == '1' else 0.0
+                            end_pos_score = 1.0 if str(end_pos_val) == '1' else 0.0
                 
-                if time_col_idx < len(home_pos_row):
-                    time_val = home_pos_row.iloc[time_col_idx]
-                    if pd.notna(time_val) and str(time_val).strip() not in ['None', 'end', 'time', '']:
-                        time_str = str(time_val).strip()
+                if col_idx + 7 < len(end_pos_row):  # Time data
+                    time_val = end_pos_row.iloc[col_idx + 7]
+                    if pd.notna(time_val) and str(time_val) not in ['None', 'end', 'time', '']:
+                        time_str = str(time_val)
+                        # Parse time format like "05:40" to seconds
                         if ':' in time_str:
                             try:
                                 time_parts = time_str.split(':')
                                 time_seconds = int(time_parts[0]) * 60 + int(time_parts[1])
-                                # Convert to relative normalized score (faster = higher score)
+                                # Convert to relative normalized score (fastest policy = 1.0, slowest policy = 0.0)
+                                # Lower time = higher score using relative normalization
                                 time_score = (max_time - time_seconds) / time_range if time_range > 0 else 0.0
-                            except (ValueError, IndexError):
+                            except ValueError:
                                 pass
                 
-                trial_color = colors[trial_idx] if trial_idx < len(colors) else 'unknown'
-                
-                # Add Return to Home Position data
+                # Add End Position data
                 if end_pos_score is not None:
+                    color_idx = trial_idx * 6
+                    trial_color = valid_colors[color_idx] if color_idx < len(valid_colors) else 'unknown'
+                    
                     parsed_data.append({
                         'Policy': policy_name,
                         'Trial': trial_idx + 1,
@@ -245,8 +235,11 @@ def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
                         'Score': end_pos_score
                     })
                 
-                # Add Execution Time data
+                # Add Time data
                 if time_score is not None:
+                    color_idx = trial_idx * 6
+                    trial_color = valid_colors[color_idx] if color_idx < len(valid_colors) else 'unknown'
+                    
                     parsed_data.append({
                         'Policy': policy_name,
                         'Trial': trial_idx + 1,
@@ -254,15 +247,11 @@ def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
                         'Task': 'Execution Time',
                         'Score': time_score
                     })
+                
+                trial_idx += 1
     
     # Create DataFrame from parsed data
     df = pd.DataFrame(parsed_data)
-    
-    print(f"Parsed {len(df)} data points")
-    if not df.empty:
-        print(f"Policies: {df['Policy'].unique()}")
-        print(f"Tasks: {df['Task'].unique()}")
-        print(f"Colors: {df['Color'].unique()}")
     
     # Store time information for axis labeling
     time_info = {
@@ -275,18 +264,17 @@ def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
     
     # Calculate policy-specific execution times for labeling
     policy_times = {}
-    if not df.empty:
-        for policy in df['Policy'].unique():
-            policy_time_data = df[(df['Policy'] == policy) & (df['Task'] == 'Execution Time')]
-            if not policy_time_data.empty:
-                # Convert normalized score back to actual time
-                mean_score = policy_time_data['Score'].mean()
-                # Inverse of normalization: time = max_time - (score * time_range)
-                actual_time_seconds = max_time - (mean_score * time_range)
-                policy_times[policy] = {
-                    'seconds': actual_time_seconds,
-                    'minutes': actual_time_seconds / 60.0
-                }
+    for policy in df['Policy'].unique():
+        policy_time_data = df[(df['Policy'] == policy) & (df['Task'] == 'Execution Time')]
+        if not policy_time_data.empty:
+            # Convert normalized score back to actual time
+            mean_score = policy_time_data['Score'].mean()
+            # Inverse of normalization: time = max_time - (score * time_range)
+            actual_time_seconds = max_time - (mean_score * time_range)
+            policy_times[policy] = {
+                'seconds': actual_time_seconds,
+                'minutes': actual_time_seconds / 60.0
+            }
     
     time_info['policy_times'] = policy_times
     
@@ -1476,7 +1464,7 @@ def main():
     parser.add_argument(
         "--csv_path", "-c",
         type=str,
-        default="plot_wandb/lighting_test.csv",
+        default="plot_wandb/can_policies_time.csv",
         help="Path to the CSV file containing policy test results"
     )
     
