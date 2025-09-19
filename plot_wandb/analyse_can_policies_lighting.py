@@ -318,47 +318,31 @@ def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
     
     time_info['policy_times'] = policy_times
     
-    # Calculate total policy scores with optional weighting
+    # Calculate total policy scores (simple average of subtasks using only 'all' color rows)
     if not df.empty:
-        # Define task weights (all set to 1.0 for unweighted average)
-        task_weights = {
-            "Hand Move to Can": 1.0,
-            "Hand Grasp Can": 1.0,
-            "Hand Move to Correct Box": 1.0,
-            "Can in Correct Box": 1.0,
-            "Return to Home Position": 1.0,
-            "Execution Time": 1.0
-        }
-        
-        # Calculate weighted total scores for each policy and color
+        subtasks_for_total = [
+            "Hand Move to Can",
+            "Hand Grasp Can",
+            "Hand Move to Correct Box",
+            "Can in Correct Box",
+            "Return to Home Position",
+            "Execution Time"
+        ]
         for policy in df['Policy'].unique():
-            for color in df['Color'].unique():
-                policy_color_data = df[(df['Policy'] == policy) & (df['Color'] == color)]
-                
-                if len(policy_color_data) > 0:
-                    # Calculate weighted average score
-                    total_score = 0
-                    total_weight = 0
-                    
-                    for task in task_weights.keys():
-                        task_data = policy_color_data[policy_color_data['Task'] == task]
-                        if len(task_data) > 0:
-                            task_score = task_data['Score'].iloc[0]
-                            weight = task_weights[task]
-                            total_score += task_score * weight
-                            total_weight += weight
-                    
-                    if total_weight > 0:
-                        weighted_average = total_score / total_weight
-                        
-                        # Add total score as a new task
-                        df = pd.concat([df, pd.DataFrame([{
-                            'Policy': policy,
-                            'Trial': 1,
-                            'Color': color,
-                            'Task': 'Total Score',
-                            'Score': weighted_average
-                        }])], ignore_index=True)
+            scores = []
+            for task in subtasks_for_total:
+                row = df[(df['Policy'] == policy) & (df['Task'] == task) & (df['Color'] == 'all')]
+                if not row.empty:
+                    scores.append(row['Score'].iloc[0])
+            if scores:
+                total_score = float(np.mean(scores))
+                df = pd.concat([df, pd.DataFrame([{
+                    'Policy': policy,
+                    'Trial': 1,
+                    'Color': 'all',
+                    'Task': 'Total Score',
+                    'Score': total_score
+                }])], ignore_index=True)
     
     return df, time_info
 
@@ -388,7 +372,7 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
     policy_stats = policy_stats[subtasks]  # Reorder columns
     
     # Professional color scheme
-    thesis_colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f']
+    thesis_colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f', '#17becf']
     
     # Set up radar chart with better proportions
     N = len(subtasks)
@@ -545,7 +529,7 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
     policies = stats['Policy'].unique()
     
     # Professional color scheme for thesis
-    thesis_colors = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#34495e', '#e67e22']
+    thesis_colors = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#34495e', '#e67e22', '#ff69b4']
     
     # Set up the plot with better spacing and professional styling - now 3x2 grid
     fig, axes = plt.subplots(3, 2, figsize=(18, 20), dpi=150)
@@ -657,19 +641,7 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
     fig.text(0.5, 0.92, 'Mean Success Rate ± Standard Deviation by Subtask', 
              ha='center', va='top', fontsize=14, style='italic', color='#7f8c8d')
     
-    # Add legend for reference lines
-    from matplotlib.lines import Line2D
-    legend_elements = [
-        Line2D([0], [0], color='#27ae60', linestyle='-', alpha=0.7, linewidth=2.5, label='100% Success'),
-        Line2D([0], [0], color='#e74c3c', linestyle='--', alpha=0.6, label='50% Success'),
-        Line2D([0], [0], color='#27ae60', linestyle=':', alpha=0.6, label='80% Success')
-    ]
-    
-    # Position legend in the bottom right
-    fig.legend(handles=legend_elements, loc='lower right', bbox_to_anchor=(0.98, 0.02),
-              frameon=True, fancybox=True, shadow=True, fontsize=11)
-    
-    # Professional layout with proper spacing
+    # Add tight layout
     plt.tight_layout(rect=[0, 0.03, 1, 0.91])
     
     # Save in multiple formats for thesis use
@@ -700,7 +672,7 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     # 1. Bar plot of total scores
     policy_stats = total_score_data.groupby('Policy')['Score'].agg(['mean', 'std', 'count'])
     
-    colors = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#34495e', '#e67e22']
+    colors = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#34495e', '#e67e22', '#ff69b4']
     x = np.arange(len(policy_stats.index))
     
     bars = ax1.bar(x, policy_stats['mean'], yerr=policy_stats['std'], 
@@ -792,7 +764,7 @@ def create_end_position_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     # 1. Bar plot of end position success rates
     policy_stats = end_pos_data.groupby('Policy')['Score'].agg(['mean', 'std', 'count'])
     
-    colors = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#34495e', '#e67e22']
+    colors = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#34495e', '#e67e22', '#ff69b4']
     x = np.arange(len(policy_stats.index))
     
     bars = ax1.bar(x, policy_stats['mean'], yerr=policy_stats['std'], 
@@ -855,7 +827,7 @@ def create_time_analysis(df: pd.DataFrame, time_info: dict, output_dir: Path) ->
     # 1. Bar plot of time efficiency (higher score = faster execution)
     policy_stats = time_data.groupby('Policy')['Score'].agg(['mean', 'std', 'count'])
     
-    colors = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#34495e', '#e67e22']
+    colors = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#34495e', '#e67e22', '#ff69b4']
     x = np.arange(len(policy_stats.index))
     
     bars = ax1.bar(x, policy_stats['mean'], yerr=policy_stats['std'], 
@@ -1596,12 +1568,11 @@ def main():
         create_summary_statistics(df, output_dir)
     
     if "statistics" in selected_plots:
-        print("Performing statistical analysis...")
-        perform_statistical_analysis(df, output_dir)
-    
+        print("Statistical analysis disabled.")
+        # perform_statistical_analysis(df, output_dir)
     if "stat_plots" in selected_plots:
-        print("Creating statistical visualization plots...")
-        create_statistical_plots(df, output_dir)
+        print("Statistical plots disabled.")
+        # create_statistical_plots(df, output_dir)
     
     if "end_position" in selected_plots:
         print("Creating end position analysis...")
