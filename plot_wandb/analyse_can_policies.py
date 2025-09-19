@@ -604,7 +604,7 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     ax1.set_xticks(x)
     ax1.set_xticklabels([format_policy_name(p) for p in overall_stats.index], rotation=45, ha='right', fontsize=11)
     ax1.set_ylabel('Total Score', fontsize=13, fontweight='bold')
-    ax1.set_title('Overall Policy Total Score (Weighted)', fontsize=15, fontweight='bold')
+    ax1.set_title('Overall Policy Total Score', fontsize=15, fontweight='bold')
     ax1.set_ylim(0,1.05)
     ax1.grid(axis='y', alpha=0.3)
     for bar,val,std in zip(bars,overall_stats['Score'],overall_stats['Std']):
@@ -627,7 +627,7 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
             ax2.text(b.get_x()+b.get_width()/2., val+0.015, f'{val:.2f}', ha='center', va='bottom', fontsize=9, fontweight='bold')
         ax2.set_xticks(x2)
         ax2.set_xticklabels([format_policy_name(p) if p!='Average' else 'Average' for p in pivot.index], rotation=45, ha='right', fontsize=11)
-        ax2.set_ylabel('Weighted Total Score', fontsize=13, fontweight='bold')
+        ax2.set_ylabel('Total Score', fontsize=13, fontweight='bold')
         ax2.set_title('Total Score by Can Color', fontsize=15, fontweight='bold')
         ax2.set_ylim(0,1.05)
         ax2.grid(axis='y', alpha=0.3)
