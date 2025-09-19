@@ -226,13 +226,13 @@ def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
             if len(manip)!=4 or time_score is None:
                 continue
             # total without RH
-            components_no = manip + [time_score]
-            total_no = float(np.mean(components_no))  # (sum manip + time)/5
+            components_no = manip + [time_score]  # (sum manip + time)/5
+            total_no = float(np.mean(components_no))
             std_no = float(np.std(components_no, ddof=1)) if len(components_no)>1 else 0.0
             total_rows.append({'Policy':policy,'Trial':1,'Color':color_tag,'Task':'Total Score (No RH)','Score':total_no,'Std':std_no})
             if home_score is not None:
-                components_with = manip + [home_score, time_score]
-                total_with = float(np.mean(components_with))  # (sum manip + home + time)/6
+                components_with = manip + [home_score, time_score]  # (sum manip + home + time)/6
+                total_with = float(np.mean(components_with))
                 std_with = float(np.std(components_with, ddof=1)) if len(components_with)>1 else 0.0
                 total_rows.append({'Policy':policy,'Trial':1,'Color':color_tag,'Task':'Total Score','Score':total_with,'Std':std_with})
     if total_rows:
@@ -252,6 +252,7 @@ POLICY_COLORS = [
     '#1abc9c',  # Teal
     '#34495e',  # Slate Grey
     '#ff69b4',  # Pink
+    '#00bcd4',  # Cyan
 ]
 POLICY_COLOR_MAP = {}
 
@@ -279,9 +280,6 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
             policy_stats[task] = 0
     
     policy_stats = policy_stats[subtasks]  # Reorder columns
-    
-    # Professional color scheme
-    thesis_colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd', '#8c564b', '#e377c2', '#7f7f7f']
     
     # Set up radar chart with better proportions
     N = len(subtasks)
@@ -436,9 +434,6 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
     ]
     policies = stats['Policy'].unique()
     
-    # Professional color scheme for thesis
-    thesis_colors = ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6', '#1abc9c', '#34495e', '#e67e22']
-    
     # Set up the plot with better spacing and professional styling - now 3x2 grid
     fig, axes = plt.subplots(3, 2, figsize=(18, 20), dpi=150)
     axes = axes.flatten()
@@ -527,10 +522,7 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
             # Style the label
             ax.text(bar.get_x() + bar.get_width()/2., label_y,
                    label_text, ha='center', va='bottom', 
-                   fontsize=11, fontweight='bold', color='#2c3e50',
-                   bbox=dict(boxstyle='round,pad=0.3', facecolor='white', 
-                           edgecolor=thesis_colors[i % len(thesis_colors)], 
-                           alpha=0.9, linewidth=1.5))
+                   fontsize=11, fontweight='bold', color='#2c3e50')
         
         # Add horizontal reference lines for common thresholds
         for threshold, color, style in [(0.5, '#e74c3c', '--'), (0.8, '#27ae60', ':')]:
@@ -631,7 +623,9 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         overall_stats = pd.DataFrame(stats_rows).set_index('Policy')
         colors_palette=['#3498db','#e74c3c','#2ecc71','#f39c12','#9b59b6','#1abc9c','#34495e','#e67e22','#ff69b4']
         x = np.arange(len(overall_stats.index))
-        bars=ax1.bar(x, overall_stats['Score'], yerr=overall_stats['Std'], capsize=8,color=colors_palette[:len(x)],edgecolor='white',linewidth=2,alpha=0.9)
+        bars=ax1.bar(x, overall_stats['Score'], yerr=overall_stats['Std'], capsize=8,
+                     color=[POLICY_COLOR_MAP.get(p, POLICY_COLORS[i % len(POLICY_COLORS)]) for i,p in enumerate(overall_stats.index)],
+                     edgecolor='white',linewidth=2,alpha=0.9)
         ax1.set_xticks(x)
         ax1.set_xticklabels([format_policy_name(p) for p in overall_stats.index], rotation=45, ha='right', fontsize=11)
         ax1.set_ylabel('Total Score', fontsize=13, fontweight='bold')
@@ -692,7 +686,7 @@ def create_end_position_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     plt.figure(figsize=(10,6), dpi=140)
     colors = plt.get_cmap('tab10')
     x = np.arange(len(stats_df))
-    bars = plt.bar(x, stats_df['mean'], color=[colors(i % 10) for i in range(len(stats_df))], edgecolor='white', linewidth=1.5)
+    bars = plt.bar(x, stats_df['mean'], color=[POLICY_COLOR_MAP.get(p, POLICY_COLORS[i % len(POLICY_COLORS)]) for i,p in enumerate(stats_df['Policy'])], edgecolor='white', linewidth=1.5)
     plt.xticks(x, [format_policy_name(p) for p in stats_df['Policy']], rotation=45, ha='right')
     plt.ylabel('Success Rate')
     plt.ylim(0,1.05)
@@ -723,7 +717,7 @@ def create_time_analysis(df: pd.DataFrame, time_info: dict, output_dir: Path) ->
     plt.figure(figsize=(10,6), dpi=140)
     colors = plt.get_cmap('tab20')
     x = np.arange(len(stats_df))
-    bars = plt.bar(x, stats_df['mean'], color=[colors(i % 20) for i in range(len(stats_df))], edgecolor='white', linewidth=1.2)
+    bars = plt.bar(x, stats_df['mean'], color=[POLICY_COLOR_MAP.get(p, POLICY_COLORS[i % len(POLICY_COLORS)]) for i,p in enumerate(stats_df['Policy'])], edgecolor='white', linewidth=1.2)
     plt.xticks(x, [format_policy_name(p) for p in stats_df['Policy']], rotation=45, ha='right')
     plt.ylabel('Normalized Time Score')
     plt.ylim(0,1.05)
