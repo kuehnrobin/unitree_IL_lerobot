@@ -74,7 +74,7 @@ def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
     # Process each policy section
     policy_start_rows = []
     for idx, row in raw_df.iterrows():
-        if pd.notna(row[0]) and any(policy in str(row[0]).upper() for policy in ['R-']):
+        if pd.notna(row[0]) and 'cans_' in str(row[0]).lower():
             policy_start_rows.append(idx)
     
     # First pass: collect all execution times for relative normalization
@@ -87,8 +87,23 @@ def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
         colors = [str(c).lower() if pd.notna(c) and str(c).lower() in ['red', 'green'] else None 
                  for c in color_row]
         
-        # There are 5 trials, each with 8 columns (6 colors + end + time)
-        n_trials = 5
+        # Dynamically detect number of trials by counting color groups
+        # Each trial has 8 columns (6 colors + end + time)
+        # Count non-empty columns and divide by 8, but be careful about partial trials
+        valid_color_positions = [i for i, c in enumerate(colors) if c is not None]
+        
+        if valid_color_positions:
+            # Find the last valid color position and estimate number of trials
+            last_valid_pos = max(valid_color_positions)
+            n_trials = (last_valid_pos // 8) + 1  # +1 because positions are 0-indexed
+        else:
+            n_trials = 0  # No valid colors found
+        
+        # Verify trial count by checking if there are at least n_trials * 8 columns
+        available_cols = len(color_row)
+        max_possible_trials = available_cols // 8
+        n_trials = min(n_trials, max_possible_trials)
+        
         valid_colors = [c for c in colors if c is not None]
         
         # Process End Position data to extract execution times
@@ -138,9 +153,26 @@ def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
         colors = [str(c).lower() if pd.notna(c) and str(c).lower() in ['red', 'green'] else None 
                  for c in color_row]
         
-        # There are 5 trials, each with 8 columns (6 colors + end + time)
-        n_trials = 5
+        # Dynamically detect number of trials by counting color groups
+        # Each trial has 8 columns (6 colors + end + time)
+        # Count non-empty columns and divide by 8, but be careful about partial trials
+        valid_color_positions = [i for i, c in enumerate(colors) if c is not None]
+        
+        if valid_color_positions:
+            # Find the last valid color position and estimate number of trials
+            last_valid_pos = max(valid_color_positions)
+            n_trials = (last_valid_pos // 8) + 1  # +1 because positions are 0-indexed
+        else:
+            n_trials = 0  # No valid colors found
+        
+        # Verify trial count by checking if there are at least n_trials * 8 columns
+        available_cols = len(color_row)
+        max_possible_trials = available_cols // 8
+        n_trials = min(n_trials, max_possible_trials)
+        
         valid_colors = [c for c in colors if c is not None]
+        
+        print(f"Processing policy: {policy_name} - Detected {n_trials} trials")
         
         # Process each subtask
         for task_offset, task_name in enumerate(subtasks):
