@@ -242,6 +242,20 @@ def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
     return df, time_info
 
 
+# Uniform policy color palette (last orange replaced with pink)
+POLICY_COLORS = [
+    '#3498db',  # Blue
+    '#e74c3c',  # Red
+    '#2ecc71',  # Green
+    '#f39c12',  # Orange
+    '#9b59b6',  # Purple
+    '#1abc9c',  # Teal
+    '#34495e',  # Slate Grey
+    '#ff69b4',  # Pink
+]
+POLICY_COLOR_MAP = {}
+
+
 def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, include_total_score: bool = True) -> None:
     """Create a radar chart comparing all policies across subtasks including End Position and Time."""
     
@@ -286,10 +300,8 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
     # Plot each policy with enhanced styling
     n_policies = len(policy_stats)
     for idx, (policy, scores) in enumerate(policy_stats.iterrows()):
-        values = scores.tolist()
-        values += values[:1]  # Complete the circle
-        color = thesis_colors[idx % len(thesis_colors)]
-
+        color = POLICY_COLOR_MAP.get(policy, POLICY_COLORS[idx % len(POLICY_COLORS)])
+        values = scores.tolist(); values += values[:1]
         ax.plot(angles, values, 'o-', linewidth=3, label=format_policy_name(policy), color=color,
                markersize=8, markerfacecolor=color, markeredgecolor='white',
                markeredgewidth=2, alpha=0.9)
@@ -454,17 +466,17 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
                 stds.append(0)
         
         # Create beautiful bars with enhanced styling
+        bar_colors = [POLICY_COLOR_MAP.get(p, POLICY_COLORS[i % len(POLICY_COLORS)]) for i,p in enumerate(policies)]
         bars = ax.bar(x, means, yerr=stds, capsize=8,
-                     color=[thesis_colors[i % len(thesis_colors)] for i in range(len(policies))],
-                     alpha=0.85, edgecolor='white', linewidth=2,
-                     error_kw={'elinewidth': 2, 'capthick': 2, 'ecolor': '#2c3e50', 'alpha': 0.8})
+                      color=bar_colors,
+                      alpha=0.85, edgecolor='white', linewidth=2,
+                      error_kw={'elinewidth': 2, 'capthick': 2, 'ecolor': '#2c3e50', 'alpha': 0.8})
         
         # Add gradient effect to bars
         for i, bar in enumerate(bars):
             # Add subtle gradient by varying alpha
             gradient = plt.Rectangle((bar.get_x(), 0), bar.get_width(), bar.get_height(),
-                                   facecolor=thesis_colors[i % len(thesis_colors)], 
-                                   alpha=0.3, edgecolor='none')
+                                     facecolor=bar.get_facecolor(), alpha=0.3, edgecolor='none')
             ax.add_patch(gradient)
         
         # Enhanced subplot styling
@@ -622,22 +634,19 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         ax1.set_xticks(x)
         ax1.set_xticklabels([format_policy_name(p) for p in overall_stats.index], rotation=45, ha='right', fontsize=11)
         ax1.set_ylabel('Total Score', fontsize=13, fontweight='bold')
-        ax1.set_title(f'Overall {task_label}', fontsize=15, fontweight='bold')
+        # Title adjustments
+        if task_label == 'Total Score':
+            ax1.set_title('Overall Total Score', fontsize=15, fontweight='bold')
+        elif task_label == 'Total Score (No RH)':
+            ax1.set_title('Overall Total Score Without RH Subtask', fontsize=15, fontweight='bold')
+        else:
+            ax1.set_title(f'Overall {task_label}', fontsize=15, fontweight='bold')
         ax1.set_ylim(0,1.05)
         ax1.grid(axis='y', alpha=0.3)
-        # UPDATED: center labels at mean with mean±std
-        for bar,val,std in zip(bars, overall_stats['Score'], overall_stats['Std']):
-            ax1.text(
-                bar.get_x()+bar.get_width()/2.,
-                val,
-                f'{val:.3f}±{std:.3f}',
-                ha='center',
-                va='center',
-                fontsize=10,
-                fontweight='bold',
-                color='#2c3e50',
-                #bbox=dict(boxstyle='round,pad=0.25', facecolor='white', edgecolor='black', alpha=0.85, linewidth=1.0)
-            )
+        # Move labels just above bar (not error bar) and remove box
+        for bar, val, std in zip(bars, overall_stats['Score'], overall_stats['Std']):
+            ax1.text(bar.get_x()+bar.get_width()/2., val + 0.015, f'{val:.3f}±{std:.3f}',
+                     ha='center', va='bottom', fontsize=10, fontweight='bold', color='#2c3e50')
         # Color breakdown
         color_subset = data[data['Color'].isin(['red','green'])]
         if not color_subset.empty:
@@ -668,7 +677,7 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         plt.savefig(output_dir/filename, bbox_inches='tight')
         plt.close()
     _compute_overall_and_colors('Total Score','total_score_with_return.pdf')
-    _compute_overall_and_colors('Total Score Without Return Home Subtask','total_score_without_return.pdf')
+    _compute_overall_and_colors('Total Score (No RH)','total_score_without_return.pdf')
 
 
 def create_end_position_analysis(df: pd.DataFrame, output_dir: Path) -> None:
@@ -826,6 +835,9 @@ def main():
     # Parse the CSV data
     try:
         df, time_info = parse_csv_data(args.csv_path)
+        # Build global color map once policies known
+        global POLICY_COLOR_MAP
+        POLICY_COLOR_MAP = {p: POLICY_COLORS[i % len(POLICY_COLORS)] for i, p in enumerate(sorted(df['Policy'].unique()))}
         print(f"Successfully parsed {len(df)} data points")
         print(f"Policies found: {df['Policy'].unique()}")
         print(f"Tasks found: {df['Task'].unique()}")
@@ -863,18 +875,9 @@ def main():
     if "bars" in selected_plots:
         print("Creating grouped bar plots...")
         create_grouped_bar_plot(df, time_info, output_dir)
-    if "summary" in selected_plots:
-        print("Generating summary statistics...")
-        create_summary_statistics(df, output_dir)
-    if "end_position" in selected_plots:
-        print("Creating end position analysis...")
-        create_end_position_analysis(df, output_dir)
-    if "time_analysis" in selected_plots:
-        print("Creating time analysis...")
-        create_time_analysis(df, time_info, output_dir)
     if "total_score" in selected_plots:
-        print("Creating total score analysis...")
         create_total_score_analysis(df, output_dir)
+    # ...existing code...
     print(f"\nAnalysis complete! Results saved to: {output_dir.absolute()}")
     return 0
 
