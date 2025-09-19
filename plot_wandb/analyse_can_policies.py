@@ -585,27 +585,30 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         task_is_with = task_label == 'Total Score'
         comp_map = {}
         for policy in policies:
-            # gather components
             manip_vals = []
             for t in ['Hand Move to Can','Hand Grasp Can','Hand Move to Correct Box','Can in Correct Box']:
                 rr=df[(df['Policy']==policy)&(df['Task']==t)&(df['Color']=='all')]
                 if rr.empty: manip_vals=[]; break
                 manip_vals.append(rr['Score'].iloc[0])
-            if not manip_vals: continue
+            if not manip_vals:
+                continue
             time_row = df[(df['Policy']==policy)&(df['Task']=='Execution Time')&(df['Color']=='all')]
-            if time_row.empty: continue
+            if time_row.empty:
+                continue
             time_sc = time_row['Score'].iloc[0]
             comps = manip_vals + [time_sc]
             if task_is_with:
                 rh_row = df[(df['Policy']==policy)&(df['Task']=='Return to Home Position')&(df['Color']=='all')]
-                if rh_row.empty: continue
+                if rh_row.empty:
+                    continue
                 rh_sc = rh_row['Score'].iloc[0]
                 comps = manip_vals + [rh_sc, time_sc]
             comp_map[policy] = comps
         stats_rows=[]
         for policy in policies:
             row = overall[overall['Policy']==policy]
-            if row.empty or policy not in comp_map: continue
+            if row.empty or policy not in comp_map:
+                continue
             mean_val = row['Score'].iloc[0]
             std_val = float(np.std(comp_map[policy], ddof=1)) if len(comp_map[policy])>1 else 0.0
             stats_rows.append({'Policy':policy,'Score':mean_val,'Std':std_val})
@@ -622,8 +625,19 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         ax1.set_title(f'Overall {task_label}', fontsize=15, fontweight='bold')
         ax1.set_ylim(0,1.05)
         ax1.grid(axis='y', alpha=0.3)
+        # UPDATED: center labels at mean with mean±std
         for bar,val,std in zip(bars, overall_stats['Score'], overall_stats['Std']):
-            ax1.text(bar.get_x()+bar.get_width()/2., val + (std if std>0 else 0)+0.02, f'{val:.3f}', ha='center', va='bottom', fontweight='bold')
+            ax1.text(
+                bar.get_x()+bar.get_width()/2.,
+                val,
+                f'{val:.3f}±{std:.3f}',
+                ha='center',
+                va='center',
+                fontsize=10,
+                fontweight='bold',
+                color='#2c3e50',
+                #bbox=dict(boxstyle='round,pad=0.25', facecolor='white', edgecolor='black', alpha=0.85, linewidth=1.0)
+            )
         # Color breakdown
         color_subset = data[data['Color'].isin(['red','green'])]
         if not color_subset.empty:
@@ -633,8 +647,9 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
             width=0.35
             red_vals = pivot['red'] if 'red' in pivot.columns else np.zeros(len(pivot))
             green_vals = pivot['green'] if 'green' in pivot.columns else np.zeros(len(pivot))
-            bars1=ax2.bar(x2-width/2, red_vals,width,label='Red',color='#e74c3c',alpha=0.85,edgecolor='white',linewidth=1.5)
-            bars2=ax2.bar(x2+width/2, green_vals,width,label='Green',color='#2ecc71',alpha=0.85,edgecolor='white',linewidth=1.5)
+            # UPDATED LEGEND LABELS
+            bars1=ax2.bar(x2-width/2, red_vals,width,label='Red Cans',color='#e74c3c',alpha=0.85,edgecolor='white',linewidth=1.5)
+            bars2=ax2.bar(x2+width/2, green_vals,width,label='Green Cans',color='#2ecc71',alpha=0.85,edgecolor='white',linewidth=1.5)
             for b,v in zip(bars1, red_vals):
                 ax2.text(b.get_x()+b.get_width()/2., v+0.015, f'{v:.2f}', ha='center', va='bottom', fontsize=9, fontweight='bold')
             for b,v in zip(bars2, green_vals):
