@@ -300,12 +300,13 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
     # Plot each policy with enhanced styling
     n_policies = len(policy_stats)
     for idx, (policy, scores) in enumerate(policy_stats.iterrows()):
+        # Use universal color map
         color = POLICY_COLOR_MAP.get(policy, POLICY_COLORS[idx % len(POLICY_COLORS)])
-        values = scores.tolist(); values += values[:1]
+        values = scores.tolist()
+        values += values[:1]
         ax.plot(angles, values, 'o-', linewidth=3, label=format_policy_name(policy), color=color,
                markersize=8, markerfacecolor=color, markeredgecolor='white',
                markeredgewidth=2, alpha=0.9)
-
         ax.fill(angles, values, alpha=0.08, color=color)
 
         # Enhanced dynamic label positioning: spread labels by policy index
@@ -646,7 +647,7 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         # Move labels just above bar (not error bar) and remove box
         for bar, val, std in zip(bars, overall_stats['Score'], overall_stats['Std']):
             ax1.text(bar.get_x()+bar.get_width()/2., val + 0.015, f'{val:.3f}±{std:.3f}',
-                     ha='center', va='bottom', fontsize=10, fontweight='bold', color='#2c3e50')
+                     ha='center', va='bottom', fontsize=8, fontweight='bold', color='#2c3e50')
         # Color breakdown
         color_subset = data[data['Color'].isin(['red','green'])]
         if not color_subset.empty:
