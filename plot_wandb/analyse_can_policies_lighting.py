@@ -74,7 +74,7 @@ def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
     # Process each policy section
     policy_start_rows = []
     for idx, row in raw_df.iterrows():
-        if pd.notna(row[0]) and any(policy in str(row[0]).lower() for policy in ['cans_r', 'r-', 'dino']):
+        if pd.notna(row[0]) and any(policy in str(row[0]).upper() for policy in ['R-']):
             policy_start_rows.append(idx)
     
     # First pass: collect all execution times for relative normalization
@@ -84,12 +84,12 @@ def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
         
         # Extract color sequence (first row after policy name)
         color_row = raw_df.iloc[start_row, 1:]
-        colors = [str(c).lower() if pd.notna(c) and str(c).lower() in ['red', 'green', 'black'] else None 
+        colors = [str(c).lower() if pd.notna(c) and str(c).lower() in ['red', 'green'] else None 
                  for c in color_row]
         
-        # Count trials (number of color entries / 8, since each trial has 8 columns including 'end' and 'time')
+        # There are 5 trials, each with 8 columns (6 colors + end + time)
+        n_trials = 5
         valid_colors = [c for c in colors if c is not None]
-        n_trials = len(valid_colors) // 6  # 6 colors per trial
         
         # Process End Position data to extract execution times
         end_pos_row_idx = start_row + len(subtasks) + 1
@@ -135,12 +135,12 @@ def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
         
         # Extract color sequence (first row after policy name)
         color_row = raw_df.iloc[start_row, 1:]
-        colors = [str(c).lower() if pd.notna(c) and str(c).lower() in ['red', 'green', 'black'] else None 
+        colors = [str(c).lower() if pd.notna(c) and str(c).lower() in ['red', 'green'] else None 
                  for c in color_row]
         
-        # Count trials (number of color entries / 8, since each trial has 8 columns including 'end' and 'time')
+        # There are 5 trials, each with 8 columns (6 colors + end + time)
+        n_trials = 5
         valid_colors = [c for c in colors if c is not None]
-        n_trials = len(valid_colors) // 6  # 6 colors per trial
         
         # Process each subtask
         for task_offset, task_name in enumerate(subtasks):
@@ -150,105 +150,113 @@ def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
                 
             task_row = raw_df.iloc[task_row_idx, 1:]
             
-            # Extract scores for each trial
-            trial_idx = 0
-            for col_idx in range(0, len(task_row), 8):  # Every 8 columns is a new trial
-                if trial_idx >= n_trials:
-                    break
-                    
-                # Get the 6 scores for this trial (excluding 'end' and 'time' columns)
-                trial_scores = []
-                for score_idx in range(6):
-                    if col_idx + score_idx < len(task_row):
-                        score = task_row.iloc[col_idx + score_idx]
-                        if pd.notna(score) and str(score) not in ['None', 'end', 'time', '']:
-                            try:
-                                trial_scores.append(float(score))
-                            except ValueError:
-                                pass
-                
-                # Calculate mean score for this trial and task
-                if trial_scores:
-                    mean_score = np.mean(trial_scores)
-                    
-                    # Get trial color (every 6 colors is a new trial)
-                    color_idx = trial_idx * 6
-                    trial_color = valid_colors[color_idx] if color_idx < len(valid_colors) else 'unknown'
-                    
-                    parsed_data.append({
-                        'Policy': policy_name,
-                        'Trial': trial_idx + 1,
-                        'Color': trial_color,
-                        'Task': task_name,
-                        'Score': mean_score
-                    })
-                
-                trial_idx += 1
+            # Collect all scores by color across all trials
+            red_scores = []
+            green_scores = []
+            all_scores = []
+            
+            for col_idx in range(len(task_row)):
+                if col_idx < len(colors) and colors[col_idx] is not None:
+                    score = task_row.iloc[col_idx]
+                    if pd.notna(score) and str(score) not in ['None', 'end', 'time', '']:
+                        try:
+                            score_val = float(score)
+                            all_scores.append(score_val)
+                            
+                            if colors[col_idx] == 'red':
+                                red_scores.append(score_val)
+                            elif colors[col_idx] == 'green':
+                                green_scores.append(score_val)
+                        except ValueError:
+                            pass
+            
+            # Add overall score (all colors combined)
+            if all_scores:
+                overall_mean = np.mean(all_scores)
+                parsed_data.append({
+                    'Policy': policy_name,
+                    'Trial': 1,
+                    'Color': 'all',
+                    'Task': task_name,
+                    'Score': overall_mean
+                })
+            
+            # Add red-specific score
+            if red_scores:
+                red_mean = np.mean(red_scores)
+                parsed_data.append({
+                    'Policy': policy_name,
+                    'Trial': 1,
+                    'Color': 'red',
+                    'Task': task_name,
+                    'Score': red_mean
+                })
+            
+            # Add green-specific score  
+            if green_scores:
+                green_mean = np.mean(green_scores)
+                parsed_data.append({
+                    'Policy': policy_name,
+                    'Trial': 1,
+                    'Color': 'green',
+                    'Task': task_name,
+                    'Score': green_mean
+                })
         
-        # Process End Position data (last subtask row)
+        # Process End Position data (last subtask row)  
         end_pos_row_idx = start_row + len(subtasks) + 1
         if end_pos_row_idx < end_row:
             end_pos_row = raw_df.iloc[end_pos_row_idx, 1:]
             
-            trial_idx = 0
-            for col_idx in range(0, len(end_pos_row), 8):  # Every 8 columns is a new trial
-                if trial_idx >= n_trials:
-                    break
-                
-                # Extract end position score (usually in the 7th column of each trial)
-                end_pos_score = None
-                time_score = None
-                
-                if col_idx + 6 < len(end_pos_row):  # End position score
-                    end_pos_val = end_pos_row.iloc[col_idx + 6]
-                    if pd.notna(end_pos_val) and str(end_pos_val) not in ['None', 'end', 'time', '']:
+            # Collect all success scores (0/1) and execution times across all trials
+            success_scores = []
+            execution_times = []
+            
+            for col_idx in range(len(end_pos_row)):
+                val = end_pos_row.iloc[col_idx]
+                if pd.notna(val) and str(val) not in ['None', 'end', 'time', '']:
+                    val_str = str(val)
+                    
+                    # Check if it's a time value (contains ':')
+                    if ':' in val_str:
                         try:
-                            end_pos_score = float(end_pos_val)
+                            time_parts = val_str.split(':')
+                            time_seconds = int(time_parts[0]) * 60 + int(time_parts[1])
+                            execution_times.append(time_seconds)
                         except ValueError:
-                            end_pos_score = 1.0 if str(end_pos_val) == '1' else 0.0
-                
-                if col_idx + 7 < len(end_pos_row):  # Time data
-                    time_val = end_pos_row.iloc[col_idx + 7]
-                    if pd.notna(time_val) and str(time_val) not in ['None', 'end', 'time', '']:
-                        time_str = str(time_val)
-                        # Parse time format like "05:40" to seconds
-                        if ':' in time_str:
-                            try:
-                                time_parts = time_str.split(':')
-                                time_seconds = int(time_parts[0]) * 60 + int(time_parts[1])
-                                # Convert to relative normalized score (fastest policy = 1.0, slowest policy = 0.0)
-                                # Lower time = higher score using relative normalization
-                                time_score = (max_time - time_seconds) / time_range if time_range > 0 else 0.0
-                            except ValueError:
-                                pass
-                
-                # Add End Position data
-                if end_pos_score is not None:
-                    color_idx = trial_idx * 6
-                    trial_color = valid_colors[color_idx] if color_idx < len(valid_colors) else 'unknown'
-                    
-                    parsed_data.append({
-                        'Policy': policy_name,
-                        'Trial': trial_idx + 1,
-                        'Color': trial_color,
-                        'Task': 'Return to Home Position',
-                        'Score': end_pos_score
-                    })
-                
-                # Add Time data
-                if time_score is not None:
-                    color_idx = trial_idx * 6
-                    trial_color = valid_colors[color_idx] if color_idx < len(valid_colors) else 'unknown'
-                    
-                    parsed_data.append({
-                        'Policy': policy_name,
-                        'Trial': trial_idx + 1,
-                        'Color': trial_color,
-                        'Task': 'Execution Time',
-                        'Score': time_score
-                    })
-                
-                trial_idx += 1
+                            pass
+                    else:
+                        # Try to parse as success score (should be 0 or 1)
+                        try:
+                            score_val = float(val_str)
+                            if score_val in [0.0, 1.0]:  # Only accept valid success scores
+                                success_scores.append(score_val)
+                        except ValueError:
+                            pass
+            
+            # Add Return to Home Position score (no color distinction)
+            if success_scores:
+                home_pos_mean = np.mean(success_scores)
+                parsed_data.append({
+                    'Policy': policy_name,
+                    'Trial': 1,
+                    'Color': 'all',
+                    'Task': 'Return to Home Position',
+                    'Score': home_pos_mean
+                })
+            
+            # Add Execution Time score (no color distinction)
+            if execution_times:
+                avg_time = np.mean(execution_times)
+                # Convert to relative normalized score
+                time_score = (max_time - avg_time) / time_range if time_range > 0 else 0.0
+                parsed_data.append({
+                    'Policy': policy_name,
+                    'Trial': 1,
+                    'Color': 'all',
+                    'Task': 'Execution Time',
+                    'Score': time_score
+                })
     
     # Create DataFrame from parsed data
     df = pd.DataFrame(parsed_data)
@@ -290,19 +298,18 @@ def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
             "Execution Time": 1.0
         }
         
-        # Calculate weighted total scores for each policy and trial
+        # Calculate weighted total scores for each policy and color
         for policy in df['Policy'].unique():
-            for trial in df[df['Policy'] == policy]['Trial'].unique():
-                policy_trial_data = df[(df['Policy'] == policy) & (df['Trial'] == trial)]
+            for color in df['Color'].unique():
+                policy_color_data = df[(df['Policy'] == policy) & (df['Color'] == color)]
                 
-                if len(policy_trial_data) > 0:
+                if len(policy_color_data) > 0:
                     # Calculate weighted average score
                     total_score = 0
                     total_weight = 0
-                    trial_color = policy_trial_data['Color'].iloc[0]
                     
                     for task in task_weights.keys():
-                        task_data = policy_trial_data[policy_trial_data['Task'] == task]
+                        task_data = policy_color_data[policy_color_data['Task'] == task]
                         if len(task_data) > 0:
                             task_score = task_data['Score'].iloc[0]
                             weight = task_weights[task]
@@ -315,8 +322,8 @@ def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
                         # Add total score as a new task
                         df = pd.concat([df, pd.DataFrame([{
                             'Policy': policy,
-                            'Trial': trial,
-                            'Color': trial_color,
+                            'Trial': 1,
+                            'Color': color,
                             'Task': 'Total Score',
                             'Score': weighted_average
                         }])], ignore_index=True)
