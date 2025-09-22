@@ -399,7 +399,7 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
     legend.get_title().set_fontweight('bold')
 
     # Titles: bring closer to the figure at left
-    fig.suptitle('Policy Performance Comparison on Can Sorting Task',
+    fig.suptitle('Policy Performance Comparison on Can Sorting Task (Lighting Test)',
                  x=0.26, y=1.0, size=18, fontweight='bold', color='#2c3e50', ha='left')
     fig.text(0.33, 0.98, 'Success Rate by Subtask (0.0 = Failure, 1.0 = Success)', 
              ha='left', va='top', fontsize=12, style='italic', color='#6c757d')
@@ -534,7 +534,7 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
             spine.set_linewidth(1.5)
     
     # Professional main title with subtitle
-    fig.suptitle('ACT Policy Performance Analysis: Can Sorting Task', 
+    fig.suptitle('ACT Policy Performance Analysis: Can Sorting Task (Lighting Test)', 
                 fontsize=22, fontweight='bold', y=0.96, color='#2c3e50')
     
     # Add subtitle
@@ -630,10 +630,10 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         ax1.set_xticklabels([format_policy_name(p) for p in overall_stats.index], rotation=45, ha='right', fontsize=11)
         ax1.set_ylabel('Total Score', fontsize=13, fontweight='bold')
         # Title adjustments
-        if task_label == 'Total Score':
+        if task_label == 'Total Score Sort Cans(Lighting Test)':
             ax1.set_title('Overall Total Score', fontsize=15, fontweight='bold')
         elif task_label == 'Total Score (No RH)':
-            ax1.set_title('Overall Total Score Without RH Subtask', fontsize=15, fontweight='bold')
+            ax1.set_title('Overall Total Score Without RH Subtask (Lighting Test)', fontsize=15, fontweight='bold')
         else:
             ax1.set_title(f'Overall {task_label}', fontsize=15, fontweight='bold')
         ax1.set_ylim(0,1.05)
