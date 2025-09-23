@@ -467,7 +467,7 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
     legend.get_title().set_fontweight('bold')
 
     # Titles
-    fig.suptitle('Policy Performance Comparison on Cube Sorting Task', x=0.26, y=1.0, size=22, fontweight='bold', color='#2c3e50', ha='left')
+    fig.suptitle('Policy Performance Comparison on Grasp Cube and Place in Box Task', x=0.26, y=1.0, size=22, fontweight='bold', color='#2c3e50', ha='left')
     fig.text(0.33, 0.985, 'Success Rate by Subtask (0.0 = Failure, 1.0 = Success)', 
              ha='left', va='top', fontsize=14, style='italic', color='#6c757d')
 
@@ -579,7 +579,7 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
             spine.set_edgecolor('#bdc3c7'); spine.set_linewidth(1.6)
     
     # Professional main title with subtitle
-    fig.suptitle('ACT Policy Performance Analysis: Cube Sorting Task', fontsize=24, fontweight='bold', y=0.97, color='#2c3e50')
+    fig.suptitle('ACT Policy Performance Analysis: Grasp Cube and Place in Box Task', fontsize=24, fontweight='bold', y=0.97, color='#2c3e50')
     
     # Add subtitle
     fig.text(0.5, 0.93, 'Mean Success Rate ± Standard Deviation by Subtask', 
