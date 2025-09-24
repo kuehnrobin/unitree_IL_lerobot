@@ -679,7 +679,7 @@ def create_hand_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     ax1.set_xticklabels(['Left Hand', 'Right Hand'], fontsize=22)
     # Only show y-axis label for left subplot
     ax1.set_ylabel('Success Rate', fontsize=26, fontweight='bold', color='#2c3e50')
-    ax1.set_title('Overall Performance by Hand', fontsize=28, fontweight='bold', pad=25, color='#2c3e50')
+    ax1.set_title('Overall Performance by Hand', fontsize=25, fontweight='bold', pad=25, color='#2c3e50')
     ax1.set_ylim(0, 1.22)
     ax1.grid(axis='y', alpha=0.4)
     ax1.tick_params(axis='y', labelsize=20, colors='#34495e', width=2, length=6)
@@ -711,7 +711,7 @@ def create_hand_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         ax2.set_xticklabels([task.replace(' ', '\n') for task in task_hand_stats.index], fontsize=20)
         # Hide y-axis label for right subplot but keep ticks
         ax2.tick_params(axis='y', labelsize=0, width=2, length=6)
-        ax2.set_title('Performance by Task and Hand', fontsize=28, fontweight='bold', pad=25, color='#2c3e50')
+        ax2.set_title('Performance by Task and Hand', fontsize=25, fontweight='bold', pad=25, color='#2c3e50')
         ax2.set_ylim(0, 1.27)
         ax2.grid(axis='y', alpha=0.4)
         ax2.tick_params(axis='x', labelsize=20)
@@ -745,7 +745,7 @@ def create_hand_analysis(df: pd.DataFrame, output_dir: Path) -> None:
             ax3.set_xticks(x3)
             ax3.set_xticklabels([color.title() for color in color_hand_stats.index], fontsize=22)
             ax3.set_ylabel('Success Rate', fontsize=26, fontweight='bold', color='#2c3e50')
-            ax3.set_title('Performance by Hand and Color', fontsize=28, fontweight='bold', pad=25, color='#2c3e50')
+            ax3.set_title('Performance by Hand and Color', fontsize=25, fontweight='bold', pad=25, color='#2c3e50')
             ax3.set_ylim(0, 1.22)
             ax3.grid(axis='y', alpha=0.4)
             ax3.tick_params(axis='y', labelsize=20, colors='#34495e', width=2, length=6)
@@ -757,7 +757,7 @@ def create_hand_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     
     wedges, texts, autotexts = ax4.pie(hand_counts.values, labels=None,  # Remove individual labels 
                                       autopct='%1.1f%%', colors=colors_pie, startangle=90, textprops={'fontsize': 20})
-    ax4.set_title('Hand Usage Distribution', fontsize=28, fontweight='bold', pad=25, color='#2c3e50')
+    ax4.set_title('Hand Usage Distribution', fontsize=25, fontweight='bold', pad=25, color='#2c3e50')
     
     # Enhance pie chart text with bigger fonts
     for autotext in autotexts:
@@ -798,7 +798,7 @@ def create_hand_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     
     # Position legend under the pie chart with bigger text
     if legend_elements:
-        legend = fig.legend(handles=legend_elements, loc='lower right', bbox_to_anchor=(0.98, 0.12),
+        legend = fig.legend(handles=legend_elements, loc='lower right', bbox_to_anchor=(0.98, 0.05),
                            frameon=True, fancybox=True, shadow=True, fontsize=22,
                            title='Hand Usage', title_fontsize=24, ncol=1)
         legend.get_frame().set_facecolor('#f8f9fa')
@@ -841,7 +841,7 @@ def create_color_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     ax1.set_xticklabels([color.title() + ' Cubes' for color in color_stats.index], fontsize=22)
     # Only show y-axis label for left subplot
     ax1.set_ylabel('Success Rate', fontsize=26, fontweight='bold', color='#2c3e50')
-    ax1.set_title('Performance by Cube Color', fontsize=28, fontweight='bold', pad=25, color='#2c3e50')
+    ax1.set_title('Performance by Cube Color', fontsize=22, fontweight='bold', pad=25, color='#2c3e50')
     ax1.set_ylim(0, 1.22)
     ax1.grid(axis='y', alpha=0.4)
     ax1.tick_params(axis='y', labelsize=20, colors='#34495e', width=2, length=6)
@@ -873,7 +873,7 @@ def create_color_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     ax2.set_xticklabels([task.replace(' ', '\n') for task in task_color_stats.index], fontsize=20)
     # Hide y-axis label for right subplot but keep ticks
     ax2.tick_params(axis='y', labelsize=0, width=2, length=6)
-    ax2.set_title('Performance by Task and Cube Color', fontsize=28, fontweight='bold', pad=25, color='#2c3e50')
+    ax2.set_title('Performance by Task and Cube Color', fontsize=22, fontweight='bold', pad=25, color='#2c3e50')
     ax2.set_ylim(0, 1.27)
     ax2.grid(axis='y', alpha=0.4)
     ax2.tick_params(axis='x', labelsize=20)
@@ -895,7 +895,7 @@ def create_color_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     ax3.set_xticks(x3)
     ax3.set_xticklabels([format_policy_name(policy) for policy in policy_color_stats.index], rotation=45, ha='right', fontsize=20)
     ax3.set_ylabel('Success Rate', fontsize=26, fontweight='bold', color='#2c3e50')
-    ax3.set_title('Performance by Policy and Cube Color', fontsize=28, fontweight='bold', pad=25, color='#2c3e50')
+    ax3.set_title('Performance by Policy and Cube Color', fontsize=28, fontweight='bold', pad=22, color='#2c3e50')
     ax3.set_ylim(0, 1.27)
     ax3.grid(axis='y', alpha=0.4)
     ax3.tick_params(axis='y', labelsize=20, colors='#34495e', width=2, length=6)
@@ -908,7 +908,7 @@ def create_color_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     wedges, texts, autotexts = ax4.pie(color_counts.values, 
                                       labels=None,  # Remove individual labels from pie
                                       autopct='%1.1f%%', colors=pie_colors, startangle=90, textprops={'fontsize': 20})
-    ax4.set_title('Cube Color Distribution', fontsize=28, fontweight='bold', pad=25, color='#2c3e50')
+    ax4.set_title('Cube Color Distribution', fontsize=22, fontweight='bold', pad=25, color='#2c3e50')
     
     # Enhance pie chart text with bigger fonts
     for autotext in autotexts:
@@ -949,7 +949,7 @@ def create_color_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     
     # Position legend under the pie chart with bigger text
     if legend_elements:
-        legend = fig.legend(handles=legend_elements, loc='lower right', bbox_to_anchor=(0.98, 0.12),
+        legend = fig.legend(handles=legend_elements, loc='lower right', bbox_to_anchor=(0.98, 0.05),
                            frameon=True, fancybox=True, shadow=True, fontsize=22,
                            title='Cube Colors', title_fontsize=24, ncol=1)
         legend.get_frame().set_facecolor('#f8f9fa')
