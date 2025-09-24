@@ -383,7 +383,7 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
 
         ax.fill(angles, values, alpha=0.07, color=color)
 
-        # Enhanced dynamic label positioning
+        # Enhanced dynamic label positioning with consistent radius
         for j, (angle, value) in enumerate(zip(angles[:-1], values[:-1])):
             if value > 0.05:
                 angle_deg = (angle * 180 / pi) % 360
@@ -392,28 +392,23 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
 
                 # Stronger angle jitter at top/bottom to spread horizontally more
                 if angle_deg <= 45 or (135 < angle_deg <= 225) or angle_deg >= 315:
-                    angle_jitter = 0.50
+                    angle_jitter = 0.40
                 else:
-                    angle_jitter = 0.33
+                    angle_jitter = 0.30
                 angle_shifted = angle + norm_idx * angle_jitter
 
-                # Push labels further outward
-                base_tb = 0.18 if value < 0.3 else 0.16
-                base_lr = 0.16
-                signed_radial = 0.04 * norm_idx
-                outside_min_top = 1.12
-                outside_min_lr  = 1.12
-                outside_min_bot = 1.10
-                outside_max = 1.2  # keep below tick label at left that we move to ~1.24
+                # Use consistent radius for all labels
+                label_r = 1.15  # Fixed radius for all labels
 
+                # Determine text alignment based on angle
                 if angle_deg <= 45 or angle_deg >= 315:
-                    label_r = min(max(value + base_tb + abs(signed_radial), outside_min_top), outside_max); ha, va = 'center', 'bottom'
+                    ha, va = 'center', 'bottom'
                 elif 45 < angle_deg <= 135:
-                    label_r = min(max(value + base_lr + abs(signed_radial), outside_min_lr), outside_max); ha, va = 'left', 'center'
+                    ha, va = 'left', 'center'
                 elif 135 < angle_deg <= 225:
-                    label_r = min(max(value + base_tb + abs(signed_radial), outside_min_bot), outside_max); ha, va = 'center', 'top'
+                    ha, va = 'center', 'top'
                 else:
-                    label_r = min(max(value + base_lr + abs(signed_radial), outside_min_lr), outside_max); ha, va = 'right', 'center'
+                    ha, va = 'right', 'center'
 
                 # Determine label text based on task type
                 task_name = subtasks[j] if j < len(subtasks) else "Unknown"
