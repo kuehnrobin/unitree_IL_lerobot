@@ -18,6 +18,17 @@ from scipy import stats
 from scipy.stats import f_oneway, ttest_ind, chi2_contingency
 import warnings
 
+color_names = [
+    '#3498db',  # Blue (Bright Blue)
+    '#e377c2',  # Pink (Medium Orchid/Pink)
+    '#e74c3c',  # Red (Alizarin/Tomato Red)
+    '#2ecc71',  # Green (Emerald Green)
+    '#f39c12',  # Orange (Orange/Carrot Orange)
+    '#9b59b6',  # Purple (Amethyst Purple)
+    '#1abc9c',  # Teal (Turquoise/Teal)
+    '#34495e',  # Slate Gray (Dark Slate Blue/Charcoal)
+    '#e67e22'   # Dark Orange (Pumpkin/Burnt Orange)
+]
 
 def format_policy_name(policy_name):
     """
