@@ -686,10 +686,12 @@ def create_hand_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     ax1.tick_params(axis='x', labelsize=22)
     
     # Add value labels with bigger text
-    for bar, mean, std in zip(bars, hand_stats['mean'], hand_stats['std']):
+    for i, (bar, mean, std) in enumerate(zip(bars, hand_stats['mean'], hand_stats['std'])):
         height = bar.get_height()
         ax1.text(bar.get_x() + bar.get_width()/2., height + 0.035, f'{mean:.2f}±{std:.2f}', 
-                ha='center', va='bottom', fontweight='bold', fontsize=20)
+                ha='center', va='bottom', fontweight='bold', fontsize=20,
+                bbox=dict(boxstyle='round,pad=0.3', facecolor='white', edgecolor=colors[i % len(colors)], 
+                         alpha=0.92, linewidth=1.4))
     
     # 2. Performance by hand and task
     task_hand_stats = hand_data.groupby(['Task', 'Hand'])['Score'].mean().unstack(fill_value=0)
@@ -798,7 +800,7 @@ def create_hand_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     
     # Position legend under the pie chart with bigger text
     if legend_elements:
-        legend = fig.legend(handles=legend_elements, loc='lower right', bbox_to_anchor=(0.98, 0.05),
+        legend = fig.legend(handles=legend_elements, loc='lower right', bbox_to_anchor=(1.02, 0.02),
                            frameon=True, fancybox=True, shadow=True, fontsize=22,
                            title='Hand Usage', title_fontsize=24, ncol=1)
         legend.get_frame().set_facecolor('#f8f9fa')
@@ -848,10 +850,12 @@ def create_color_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     ax1.tick_params(axis='x', labelsize=22)
     
     # Add value labels with bigger text
-    for bar, mean, std in zip(bars, color_stats['mean'], color_stats['std']):
+    for i, (bar, mean, std) in enumerate(zip(bars, color_stats['mean'], color_stats['std'])):
         height = bar.get_height()
         ax1.text(bar.get_x() + bar.get_width()/2., height + 0.035, f'{mean:.2f}±{std:.2f}', 
-                ha='center', va='bottom', fontweight='bold', fontsize=20)
+                ha='center', va='bottom', fontweight='bold', fontsize=20,
+                bbox=dict(boxstyle='round,pad=0.3', facecolor='white', edgecolor=bar_colors[i % len(bar_colors)], 
+                         alpha=0.92, linewidth=1.4))
     
     # 2. Performance by color and task
     task_color_stats = color_data.groupby(['Task', 'Color'])['Score'].mean().unstack(fill_value=0)
