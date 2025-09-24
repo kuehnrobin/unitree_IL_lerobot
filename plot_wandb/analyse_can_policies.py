@@ -338,9 +338,9 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
 
                 # Enhanced angle jitter for better label distribution
                 if angle_deg <= 45 or (135 < angle_deg <= 225) or angle_deg >= 315:
-                    angle_jitter = 0.45  # Stronger jitter for top/bottom
+                    angle_jitter = 0.07  # Stronger jitter for top/bottom
                 else:
-                    angle_jitter = 0.30  # Moderate jitter for left/right
+                    angle_jitter = 0.05  # Moderate jitter for left/right
                 angle_shifted = angle + norm_idx * angle_jitter
 
                 # Use consistent radius for all labels - professional positioning
@@ -710,36 +710,35 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         
         # Enhanced subplot styling for overall performance
         ax1.set_facecolor('#fafafa')
-        ax1.grid(axis='y', linestyle='--', alpha=0.4, linewidth=1, color='#bdc3c7')
+        ax1.grid(axis='y', linestyle='--', alpha=0.45, linewidth=1, color='#bdc3c7')
         ax1.set_axisbelow(True)
         
         x = np.arange(len(overall_stats.index))
-        bars = ax1.bar(x, overall_stats['Score'], yerr=overall_stats['Std'], capsize=10,
+        bars = ax1.bar(x, overall_stats['Score'], yerr=overall_stats['Std'], capsize=12,
                        color=[POLICY_COLOR_MAP.get(p, POLICY_COLORS[i % len(POLICY_COLORS)]) for i,p in enumerate(overall_stats.index)],
-                       edgecolor='white', linewidth=2.5, alpha=0.85,
-                       error_kw={'elinewidth': 3, 'capthick': 3, 'ecolor': '#34495e', 'alpha': 0.8})
+                       edgecolor='white', linewidth=2, alpha=0.85,
+                       error_kw={'elinewidth': 2, 'capthick': 2, 'ecolor': '#2c3e50', 'alpha': 0.8})
         
         # Professional reference lines
-        ax1.axhline(y=0.5, color='#e74c3c', linestyle='--', alpha=0.6, linewidth=2, zorder=0)
-        ax1.axhline(y=0.8, color='#f39c12', linestyle=':', alpha=0.7, linewidth=2, zorder=0)  
-        ax1.axhline(y=1.0, color='#27ae60', linestyle='-', alpha=0.8, linewidth=2.5, zorder=0)
+        ax1.axhline(y=0.5, color='#e74c3c', linestyle='--', alpha=0.7, linewidth=2.5)
+        ax1.axhline(y=0.8, color='#27ae60', linestyle=':', alpha=0.7, linewidth=2.5)  
+        ax1.axhline(y=1.0, color='#27ae60', linestyle='-', alpha=0.7, linewidth=2.5)
         
         ax1.set_xticks(x)
-        ax1.set_xticklabels([format_policy_name(p) for p in overall_stats.index], 
-                           rotation=45, ha='right', fontsize=12, fontweight='medium', color='#34495e')
-        ax1.set_ylabel('Total Score', fontsize=14, fontweight='bold', color='#2c3e50')
+        ax1.set_xticklabels([])  # Remove policy names from x-axis
+        ax1.set_ylabel('Total Score', fontsize=26, fontweight='bold', color='#2c3e50')
         
         # Title adjustments with enhanced styling
         if task_label == 'Total Score Sort Cans(Lighting Test)':
-            ax1.set_title('Overall Total Score', fontsize=16, fontweight='bold', color='#2c3e50', pad=20)
+            ax1.set_title('Total Policy Performance Score', fontsize=25, fontweight='bold', color='#2c3e50', pad=25)
         elif task_label == 'Total Score (No RH)':
-            ax1.set_title('Overall Total Score Without RH Subtask (Lighting Test)', fontsize=16, fontweight='bold', color='#2c3e50', pad=20)
+            ax1.set_title('Total Score Without RH Subtask', fontsize=25, fontweight='bold', color='#2c3e50', pad=25)
         else:
-            ax1.set_title(f'Overall {task_label}', fontsize=16, fontweight='bold', color='#2c3e50', pad=20)
+            ax1.set_title(f'Total Policy Performance Score', fontsize=25, fontweight='bold', color='#2c3e50', pad=25)
         
-        ax1.set_ylim(0, 1.2)
+        ax1.set_ylim(0, 1.30)
         ax1.set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1.0])
-        ax1.tick_params(axis='y', labelsize=11, colors='#34495e')
+        ax1.tick_params(axis='y', labelsize=20, colors='#34495e', width=2, length=6)
         
         # Enhanced styling for subplot borders  
         for spine in ax1.spines.values():
@@ -750,24 +749,25 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         for i, (bar, val, std, policy) in enumerate(zip(bars, overall_stats['Score'], overall_stats['Std'], overall_stats.index)):
             # Mean value label on bar top with policy color
             policy_color = POLICY_COLOR_MAP.get(policy, POLICY_COLORS[i % len(POLICY_COLORS)])
-            ax1.text(bar.get_x() + bar.get_width()/2., val + 0.02, f'{val:.3f}',
-                    ha='center', va='bottom', fontsize=11, fontweight='bold',
-                    bbox=dict(boxstyle='round,pad=0.3', facecolor='white', 
-                             edgecolor=policy_color, alpha=0.95, linewidth=1.5))
+            ax1.text(bar.get_x() + bar.get_width()/2., val + 0.025, f'{val:.2f}',
+                    ha='center', va='bottom', fontsize=18, fontweight='bold',
+                    bbox=dict(boxstyle='round,pad=0.25', facecolor='white', 
+                             edgecolor=policy_color, alpha=0.92, linewidth=1.4))
             
             # Standard deviation label on error bar top with neutral styling
             # Skip R-S policy to prevent overlap
             if not (policy.startswith('R-S') and std > 0):
-                ax1.text(bar.get_x() + bar.get_width()/2., val + std + 0.06, f'±{std:.3f}',
-                        ha='center', va='bottom', fontsize=9, fontweight='medium',
-                        bbox=dict(boxstyle='round,pad=0.25', facecolor='#f8f9fa', 
-                                 edgecolor='#6c757d', alpha=0.9, linewidth=1))
+                ax1.text(bar.get_x() + bar.get_width()/2., val + std + 0.035, f'±{std:.2f}',
+                        ha='center', va='bottom', fontsize=16, fontweight='medium',
+                        bbox=dict(boxstyle='round,pad=0.3', facecolor='#f8f9fa', 
+                                 edgecolor='#95a5a6', alpha=0.90, linewidth=1.2),
+                        color="#000000")
         
         # Enhanced color breakdown subplot
         color_subset = data[data['Color'].isin(['red','green'])]
         if not color_subset.empty:
             ax2.set_facecolor('#fafafa')
-            ax2.grid(axis='y', linestyle='--', alpha=0.4, linewidth=1, color='#bdc3c7')
+            ax2.grid(axis='y', linestyle='--', alpha=0.45, linewidth=1, color='#bdc3c7')
             ax2.set_axisbelow(True)
             
             pivot = color_subset.pivot_table(index='Policy', columns='Color', values='Score', aggfunc='mean')
@@ -779,9 +779,9 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
             green_vals = pivot['green'] if 'green' in pivot.columns else np.zeros(len(pivot))
             
             # Professional reference lines for second subplot
-            ax2.axhline(y=0.5, color='#e74c3c', linestyle='--', alpha=0.6, linewidth=2, zorder=0)
-            ax2.axhline(y=0.8, color='#f39c12', linestyle=':', alpha=0.7, linewidth=2, zorder=0)
-            ax2.axhline(y=1.0, color='#27ae60', linestyle='-', alpha=0.8, linewidth=2.5, zorder=0)
+            ax2.axhline(y=0.5, color='#e74c3c', linestyle='--', alpha=0.7, linewidth=2.5)
+            ax2.axhline(y=0.8, color='#27ae60', linestyle=':', alpha=0.7, linewidth=2.5)
+            ax2.axhline(y=1.0, color='#27ae60', linestyle='-', alpha=0.7, linewidth=2.5)
             
             bars1 = ax2.bar(x2-width/2, red_vals, width, label='Red Cans', color='#e74c3c', 
                            alpha=0.85, edgecolor='white', linewidth=2)
@@ -791,23 +791,35 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
             # Removed value labels from color breakdown for cleaner presentation
             
             ax2.set_xticks(x2)
-            ax2.set_xticklabels([format_policy_name(p) if p!='Average' else 'Average' for p in pivot.index], 
-                               rotation=45, ha='right', fontsize=12, fontweight='medium', color='#34495e')
-            ax2.set_ylabel('Total Score', fontsize=14, fontweight='bold', color='#2c3e50')
-            ax2.set_title(f'{task_label} by Can Color', fontsize=16, fontweight='bold', color='#2c3e50', pad=20)
-            ax2.set_ylim(0, 1.2)
-            ax2.set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1.0])
-            ax2.tick_params(axis='y', labelsize=11, colors='#34495e')
+            # Color the x-axis labels with corresponding policy colors
+            policy_names = [format_policy_name(p) if p!='Average' else 'Average' for p in pivot.index]
+            ax2.set_xticklabels(policy_names, rotation=38, ha='right', fontsize=20, fontweight='bold')
             
-            # Enhanced legend with professional styling
-            legend = ax2.legend(loc='upper right', fontsize=11, frameon=True, fancybox=True, 
-                              shadow=True, framealpha=0.95)
+            # Color the tick labels with policy colors
+            for i, (tick, policy) in enumerate(zip(ax2.get_xticklabels(), pivot.index)):
+                if policy == 'Average':
+                    tick.set_color('#2c3e50')  # Dark color for average
+                else:
+                    tick.set_color(POLICY_COLOR_MAP.get(policy, POLICY_COLORS[i % len(POLICY_COLORS)]))
+            
+            # Hide y-axis label for right subplot but keep ticks
+            ax2.tick_params(axis='y', labelsize=0, width=2, length=6)
+            ax2.set_title(f'{task_label} by Can Color', fontsize=25, fontweight='bold', color='#2c3e50', pad=25)
+            ax2.set_ylim(0, 1.30)
+            ax2.set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1.0])
+            ax2.tick_params(axis='x', labelsize=20)
+            
+            # Enhanced legend with professional styling - smaller and positioned better
+            legend = ax2.legend(fontsize=18, loc='upper right', bbox_to_anchor=(0.50, 0.99), frameon=True, fancybox=True, 
+                              shadow=True, title='Can Colors', title_fontsize=20)
             legend.get_frame().set_facecolor('#f8f9fa')
             legend.get_frame().set_edgecolor('#dee2e6')
-            legend.get_frame().set_linewidth(1.5)
+            legend.get_frame().set_linewidth(1.4)
+            legend.get_title().set_fontweight('bold')
+            legend.get_title().set_color('#2c3e50')
             
-            # Professional visual separator
-            ax2.axvline(len(pivot.index)-1.5, color='#34495e', linestyle='--', alpha=0.6, linewidth=2)
+            # Professional visual separator - before average column
+            ax2.axvline(len(pivot.index)-1.5, color='#2c3e50', linestyle='--', alpha=0.7, linewidth=2)
             
             # Enhanced styling for second subplot borders
             for spine in ax2.spines.values():
@@ -815,6 +827,24 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
                 spine.set_linewidth(1.5)
         else:
             ax2.set_visible(False)
+        
+        # Add beautiful separations between plots
+        ax1.spines['right'].set_edgecolor('#2c3e50')
+        ax1.spines['right'].set_linewidth(3)
+        ax2.spines['left'].set_edgecolor('#2c3e50')
+        ax2.spines['left'].set_linewidth(3)
+        
+        # Style other borders
+        for spine_name in ['top', 'bottom']:
+            ax1.spines[spine_name].set_edgecolor('#bdc3c7')
+            ax1.spines[spine_name].set_linewidth(1.6)
+            ax2.spines[spine_name].set_edgecolor('#bdc3c7')
+            ax2.spines[spine_name].set_linewidth(1.6)
+        # Left and right borders for outer edges
+        ax1.spines['left'].set_edgecolor('#bdc3c7')
+        ax1.spines['left'].set_linewidth(1.6)
+        ax2.spines['right'].set_edgecolor('#bdc3c7')
+        ax2.spines['right'].set_linewidth(1.6)
         
         # Enhanced main titles and reference line legends
         main_title = 'ACT Policy Performance Analysis: Can Sorting Task'
@@ -825,29 +855,44 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         else:
             subtitle = f'{task_label} Analysis'
         
-        fig.suptitle(main_title, fontsize=18, fontweight='bold', y=0.95, color='#2c3e50')
-        fig.text(0.5, 0.91, subtitle, ha='center', va='top', fontsize=14, 
+        fig.suptitle(main_title, fontsize=28, fontweight='bold', y=0.985, color='#2c3e50')
+        fig.text(0.5, 0.965, subtitle, ha='center', va='top', fontsize=20, 
                 style='italic', color='#7f8c8d')
         
-        # Professional multi-row legend with reference lines
+        # Create policy legend at bottom left
+        from matplotlib.patches import Rectangle
+        policy_legend_elements = []
+        for i, policy in enumerate(overall_stats.index):
+            policy_legend_elements.append(
+                Rectangle((0, 0), 1, 1, facecolor=POLICY_COLOR_MAP.get(policy, POLICY_COLORS[i % len(POLICY_COLORS)]), 
+                         alpha=0.85, edgecolor='white', linewidth=1,
+                         label=format_policy_name(policy))
+            )
+        
+        # Add reference lines to legend
         from matplotlib.lines import Line2D
-        legend_elements = [
-            Line2D([0], [0], color='#27ae60', linestyle='-', linewidth=2.5, 
-                   label='100% Success', alpha=0.8),
-            Line2D([0], [0], color='#f39c12', linestyle=':', linewidth=2, 
-                   label='80% Success', alpha=0.7),
-            Line2D([0], [0], color='#e74c3c', linestyle='--', linewidth=2, 
-                   label='50% Success', alpha=0.6)
+        reference_legend_elements = [
+            Line2D([0], [0], color='#27ae60', linestyle='-', alpha=0.7, linewidth=2.5, label='100% Success'),
+            Line2D([0], [0], color='#e74c3c', linestyle='--', alpha=0.7, linewidth=2.5, label='50% Success'),
+            Line2D([0], [0], color='#27ae60', linestyle=':', alpha=0.7, linewidth=2.5, label='80% Success')
         ]
         
-        # Position legend at bottom with 4 columns
-        fig.legend(handles=legend_elements, loc='lower center', 
-                  bbox_to_anchor=(0.5, 0.02), ncol=3, frameon=True, 
-                  fancybox=True, shadow=True, fontsize=11,
-                  title='Success Rate Thresholds', title_fontsize=12)
+        # Combine all legend elements
+        all_legend_elements = policy_legend_elements + reference_legend_elements
+        
+        # Position legend at bottom left in multiple rows
+        legend = fig.legend(handles=all_legend_elements, loc='lower left', bbox_to_anchor=(-0.01, 0.16),
+                           frameon=True, fancybox=True, shadow=True, fontsize=18, 
+                           ncol=(len(all_legend_elements) + 3) // 4, columnspacing=1.5, handletextpad=0.8,
+                           title='ACT Policies & Reference Lines', title_fontsize=20)
+        legend.get_frame().set_facecolor('#f8f9fa')
+        legend.get_frame().set_edgecolor('#dee2e6')
+        legend.get_frame().set_linewidth(1.4)
+        legend.get_title().set_fontweight('bold')
+        legend.get_title().set_color('#2c3e50')
         
         # Professional layout with proper spacing
-        plt.tight_layout(rect=[0, 0.08, 1, 0.88])
+        plt.tight_layout(rect=[0, 0.15, 1, 0.96])
         
         plt.savefig(output_dir/filename, bbox_inches='tight', facecolor='white', edgecolor='none')
         plt.close()
