@@ -1021,7 +1021,7 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         
         # Mean label on top of actual bar (horizontal) - moved up to see bar end
         ax1.text(bar.get_x() + bar.get_width()/2., bar_height + 0.025, f'{mean:.2f}', 
-                ha='center', va='bottom', fontweight='bold', fontsize=16, rotation=0,
+                ha='center', va='bottom', fontweight='bold', fontsize=18, rotation=0,
                 bbox=dict(boxstyle='round,pad=0.25', facecolor='white', edgecolor=colors[i % len(colors)], 
                          alpha=0.92, linewidth=1.4))
         
@@ -1029,7 +1029,7 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         if policy_name != 'R-S':  # Skip std label for R-S policy to avoid overlap
             error_bar_top = bar_height + std
             ax1.text(bar.get_x() + bar.get_width()/2., error_bar_top + 0.035, f'±{std:.2f}', 
-                    ha='center', va='bottom', fontweight='normal', fontsize=13, rotation=0,
+                    ha='center', va='bottom', fontweight='medium', fontsize=16, rotation=0,
                     bbox=dict(boxstyle='round,pad=0.3', facecolor='#f8f9fa', edgecolor='#95a5a6', 
                              alpha=0.90, linewidth=1.2),
                     color="#000000")
