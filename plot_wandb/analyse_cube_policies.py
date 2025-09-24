@@ -563,9 +563,13 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
         for i, (bar, mean, std) in enumerate(zip(bars, means, stds)):
             height = bar.get_height()
             label_y = height + std + 0.05
-            if task == "Execution Time" and policies[i] in time_info.get('policy_times', {}):
-                label_text = f"{time_info['policy_times'][policies[i]]['minutes']:.1f}min"
-                rotation = 45  # Tilt execution time labels
+            if task == "Execution Time":
+                if policies[i] in time_info.get('policy_times', {}):
+                    label_text = f"{time_info['policy_times'][policies[i]]['minutes']:.1f}min"
+                else:
+                    # Handle special case for policies without time data (like R-S)
+                    label_text = "No Time"
+                rotation = 90  # Tilt execution time labels 90 degrees
             else:
                 label_text = f"{mean:.3f}"  # Keep three digits after decimal
                 rotation = 0  # Keep other labels horizontal
