@@ -492,16 +492,18 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
     
     # Professional color scheme for thesis
     thesis_colors = ['#3498db','#e377c2','#e74c3c','#2ecc71','#f39c12','#9b59b6','#1abc9c','#34495e','#e67e22']
-    # Set up the plot with better spacing and professional styling - now 3x2 grid
-    fig, axes = plt.subplots(3, 2, figsize=(23, 25), dpi=150)
-    axes = axes.flatten()
+    
+    # Optimized for A4 format - taller and narrower with better aspect ratio
+    fig, axes = plt.subplots(3, 2, figsize=(16, 30), dpi=150)
     
     # Global styling
     fig.patch.set_facecolor('white')
     
     # Create a subplot for each subtask
     for task_idx, task in enumerate(subtasks):
-        ax = axes[task_idx]
+        ax = axes[task_idx // 2, task_idx % 2]
+        row_idx = task_idx // 2
+        col_idx = task_idx % 2
         
         task_data = stats[stats['Task'] == task]
         
@@ -525,7 +527,6 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
         
         # Add gradient effect to bars
         for i, bar in enumerate(bars):
-            # Add subtle gradient by varying alpha
             gradient = plt.Rectangle((bar.get_x(), 0), bar.get_width(), bar.get_height(),
                                    facecolor=thesis_colors[i % len(thesis_colors)], alpha=0.30, edgecolor='none')
             ax.add_patch(gradient)
@@ -537,64 +538,104 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
         
         # Customize subplot titles with better formatting
         task_title = task.replace(' to ', ' to\n') if len(task) > 20 else task
-        ax.set_title(f'{task_title}', fontsize=21, fontweight='bold', pad=20, color='#2c3e50')
+        ax.set_title(f'{task_title}', fontsize=24, fontweight='bold', pad=25, color='#2c3e50')
         
-        # Enhanced axis labels
-        ax.set_ylabel('Success Rate', fontsize=19, fontweight='medium', color='#2c3e50')
-        ax.set_xlabel('Policy', fontsize=19, fontweight='medium', color='#2c3e50')
+        # Only show y-axis label and ticks for left column (shared for the row)
+        if col_idx == 0:  # Left column
+            ax.set_ylabel('Success Rate', fontsize=22, fontweight='bold', color='#2c3e50')
+            ax.tick_params(axis='y', labelsize=18, colors='#34495e', width=2, length=6)
+        else:  # Right column - hide y-axis labels but keep ticks
+            ax.tick_params(axis='y', labelsize=0, width=2, length=6)
         
-        # Better x-axis labels
+        # Remove x-axis labels and "Policy" label to save space
         ax.set_xticks(x)
-        policy_labels = [format_policy_name(policy).replace(' ', '\n') if len(policy) > 12 else format_policy_name(policy) for policy in policies]
-        ax.set_xticklabels(policy_labels, fontsize=17, fontweight='medium', color='#34495e', rotation=38, ha='right')
+        ax.set_xticklabels([])  # No individual policy labels
+        ax.tick_params(axis='x', length=0)  # Hide x-axis tick marks
         
-        # Set consistent y-axis limits with padding to accommodate error bars and labels
+        # Set consistent y-axis limits
         ax.set_ylim(0, 1.42)
         ax.set_yticks([0,0.2,0.4,0.6,0.8,1.0,1.2])
-        ax.tick_params(axis='y', labelsize=16, colors='#34495e')
         
         # Add a horizontal line indicating 100% success rate
-        ax.axhline(y=1.0, color='#27ae60', linestyle='-', alpha=0.7, linewidth=2.5, label='100% Success')
+        ax.axhline(y=1.0, color='#27ae60', linestyle='-', alpha=0.7, linewidth=2.5)
         
         # Add value labels on bars with enhanced styling
         for i, (bar, mean, std) in enumerate(zip(bars, means, stds)):
-            height = bar.get_height(); label_y = height + std + 0.05
+            height = bar.get_height()
+            label_y = height + std + 0.05
             if task == "Execution Time" and policies[i] in time_info.get('policy_times', {}):
                 label_text = f"{time_info['policy_times'][policies[i]]['minutes']:.1f}min"
             else:
                 label_text = f"{mean:.3f}"
-            ax.text(bar.get_x() + bar.get_width()/2., label_y, label_text, ha='center', va='bottom', fontsize=15, fontweight='bold', color='#2c3e50',
-                    bbox=dict(boxstyle='round,pad=0.34', facecolor='white', edgecolor=thesis_colors[i % len(thesis_colors)], alpha=0.92, linewidth=1.6))
+            ax.text(bar.get_x() + bar.get_width()/2., label_y, label_text, ha='center', va='bottom', 
+                    fontsize=13, fontweight='bold', color='#2c3e50',
+                    bbox=dict(boxstyle='round,pad=0.3', facecolor='white', edgecolor=thesis_colors[i % len(thesis_colors)], 
+                             alpha=0.92, linewidth=1.4))
         
         # Add horizontal reference lines for common thresholds
         for threshold, color, style in [(0.5, '#e74c3c', '--'), (0.8, '#27ae60', ':')]:
             ax.axhline(y=threshold, color=color, linestyle=style, alpha=0.55, linewidth=1.7)
         
-        # Add subtle border to subplot
-        for spine in ax.spines.values():
-            spine.set_edgecolor('#bdc3c7'); spine.set_linewidth(1.6)
+        # Add visual separation between subplots in the same row
+        if col_idx == 0:  # Left subplot - add right border
+            ax.spines['right'].set_edgecolor('#2c3e50')
+            ax.spines['right'].set_linewidth(3)
+        else:  # Right subplot - add left border  
+            ax.spines['left'].set_edgecolor('#2c3e50')
+            ax.spines['left'].set_linewidth(3)
+            
+        # Style other borders
+        for spine_name in ['top', 'bottom']:
+            ax.spines[spine_name].set_edgecolor('#bdc3c7')
+            ax.spines[spine_name].set_linewidth(1.6)
+        if col_idx == 0:
+            ax.spines['left'].set_edgecolor('#bdc3c7')
+            ax.spines['left'].set_linewidth(1.6)
+        else:
+            ax.spines['right'].set_edgecolor('#bdc3c7')
+            ax.spines['right'].set_linewidth(1.6)
     
     # Professional main title with subtitle
-    fig.suptitle('ACT Policy Performance Analysis: Grasp Cube and Place in Box Task', fontsize=27, fontweight='bold', y=0.97, color='#2c3e50')
+    fig.suptitle('ACT Policy Performance Analysis: Grasp Cube and Place in Box Task', 
+                fontsize=28, fontweight='bold', y=0.985, color='#2c3e50')
     
     # Add subtitle
-    fig.text(0.5, 0.93, 'Mean Success Rate ± Standard Deviation by Subtask', 
-             ha='center', va='top', fontsize=19, style='italic', color='#7f8c8d')
+    fig.text(0.5, 0.965, 'Mean Success Rate ± Standard Deviation by Subtask', 
+             ha='center', va='top', fontsize=20, style='italic', color='#7f8c8d')
     
-    # Add legend for reference lines
+    # Create combined legend with policies and reference lines
     from matplotlib.lines import Line2D
-    legend_elements = [
+    from matplotlib.patches import Rectangle
+    
+    # Policy legend elements
+    policy_legend_elements = []
+    for i, policy in enumerate(policies):
+        policy_legend_elements.append(
+            Rectangle((0, 0), 1, 1, facecolor=thesis_colors[i % len(thesis_colors)], 
+                     alpha=0.85, edgecolor='white', linewidth=1,
+                     label=format_policy_name(policy))
+        )
+    
+    # Reference lines legend elements  
+    reference_legend_elements = [
         Line2D([0], [0], color='#27ae60', linestyle='-', alpha=0.7, linewidth=2.5, label='100% Success'),
-        Line2D([0], [0], color='#e74c3c', linestyle='--', alpha=0.6, label='50% Success'),
-        Line2D([0], [0], color='#27ae60', linestyle=':', alpha=0.6, label='80% Success')
+        Line2D([0], [0], color='#e74c3c', linestyle='--', alpha=0.6, linewidth=1.7, label='50% Success'),
+        Line2D([0], [0], color='#27ae60', linestyle=':', alpha=0.6, linewidth=1.7, label='80% Success')
     ]
     
-    # Position legend in the bottom right
-    fig.legend(handles=legend_elements, loc='lower right', bbox_to_anchor=(0.985, 0.02),
-              frameon=True, fancybox=True, shadow=True, fontsize=16)
+    # Combine all legend elements
+    all_legend_elements = policy_legend_elements + reference_legend_elements
     
-    # Professional layout with proper spacing
-    plt.tight_layout(rect=[0, 0.035, 1, 0.915])
+    # Position legend at bottom right with better formatting
+    legend = fig.legend(handles=all_legend_elements, loc='lower right', bbox_to_anchor=(0.98, 0.01),
+                       frameon=True, fancybox=True, shadow=True, fontsize=14, ncol=2,
+                       columnspacing=1.5, handletextpad=0.8)
+    legend.get_frame().set_facecolor('#f8f9fa')
+    legend.get_frame().set_edgecolor('#dee2e6')
+    legend.get_frame().set_linewidth(1.4)
+    
+    # Professional layout with proper spacing optimized for A4
+    plt.tight_layout(rect=[0, 0.08, 1, 0.96])
     
     plt.savefig(output_dir / 'grouped_bar_plot_with_errors.pdf', bbox_inches='tight', facecolor='white', edgecolor='none')
 
