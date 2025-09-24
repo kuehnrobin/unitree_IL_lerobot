@@ -985,7 +985,8 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     # 1. Bar plot of total scores
     policy_stats = total_score_data.groupby('Policy')['Score'].agg(['mean', 'std', 'count'])
     
-    colors = ['#3498db','#e74c3c','#2ecc71','#f39c12','#9b59b6','#1abc9c','#34495e','#e67e22']
+    #colors = ['#3498db','#e74c3c','#2ecc71','#f39c12','#9b59b6','#1abc9c','#34495e','#e67e22']
+    colors = ['#3498db','#e377c2','#e74c3c','#2ecc71','#f39c12','#9b59b6','#1abc9c','#34495e','#e67e22']
     x = np.arange(len(policy_stats.index))
     
     bars = ax1.bar(x, policy_stats['mean'], yerr=policy_stats['std'], capsize=9, color=colors[:len(policy_stats)], alpha=0.85, edgecolor='white', linewidth=2)
