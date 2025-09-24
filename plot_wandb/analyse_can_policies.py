@@ -241,19 +241,32 @@ def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
 
     return df, time_info
 
-
+#colors = ['#3498db','#e377c2','#e74c3c','#2ecc71','#f39c12','#9b59b6','#1abc9c','#34495e','#e67e22']
 # Uniform policy color palette (last orange replaced with pink)
+# POLICY_COLORS = [
+#     '#3498db',  # Blue R-A    # Passt
+#     '#00bcd4',  # Red R-A-AUG # Neue Farbe z.B. cyan?
+#     '#e74c3c',  # Red R-A-AUG  # Raus weil R-S_LWA-P nicht verwendet
+#     '#2ecc71',  # Green R-A-P # Raus weil R-S_LWA-PV_AT_A nicht verwendet
+#     '#f39c12',  # Orange R-SW # Raus weil R-S_LWA-PV_AT_A nicht verwendet
+#     '#9b59b6',  # Purple R-S_LWA
+#     '#1abc9c',  # Teal R-WA # Muss purple werden
+#     '#34495e',  # Slate Grey R-WA-P # Muss Teal werden
+#     '#ff69b4',  # Pink R-WA-PV_AT_A # Pink Raus weil R-S nicht verwendet # Den Eintrag zu Slate gray
+#     '#00bcd4',  # Cyan R-W_RA
+# ]
 POLICY_COLORS = [
-    '#3498db',  # Blue
-    '#e74c3c',  # Red
-    '#2ecc71',  # Green
-    '#f39c12',  # Orange
-    '#9b59b6',  # Purple
-    '#1abc9c',  # Teal
-    '#34495e',  # Slate Grey
-    '#ff69b4',  # Pink
-    '#00bcd4',  # Cyan
+    '#3498db',  # Blue R-A    # Passt
+    '#4b0082',  # Indigo R-A-AUG # Bright yellow-gold, distinct from all other colors
+    '#228b22',  # Forest Green R-A-P # Professional green tone
+    '#dc143c',  # Crimson R-SW # Deep red, distinct from other reds
+    '#ffd700',  # Gold  R-S_LWA # Deep purple-blue, distinct from purple
+    '#9b59b6',  # Purple R-WA # Passt
+    '#1abc9c',  # Teal R-WA-P # Passt
+    '#34495e',  # Slate Gray R-WA-PV_AT_A # Passt
+    '#ff6347',  # Tomato R-W_RA # Orange-red, easily distinguishable
 ]
+
 POLICY_COLOR_MAP = {}
 
 
@@ -302,69 +315,67 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
         color = POLICY_COLOR_MAP.get(policy, POLICY_COLORS[idx % len(POLICY_COLORS)])
         values = scores.tolist()
         values += values[:1]
-        ax.plot(angles, values, 'o-', linewidth=3, label=format_policy_name(policy), color=color,
-               markersize=8, markerfacecolor=color, markeredgecolor='white',
-               markeredgewidth=2, alpha=0.9)
-        ax.fill(angles, values, alpha=0.08, color=color)
+        
+        # Enhanced styling with thinner lines and smaller markers for professional appearance
+        ax.plot(angles, values, 'o-', linewidth=1.8, label=format_policy_name(policy), color=color,
+               markersize=6, markerfacecolor=color, markeredgecolor='white',
+               markeredgewidth=1.4, alpha=0.9)
+        ax.fill(angles, values, alpha=0.07, color=color)
 
-        # Enhanced dynamic label positioning: spread labels by policy index
-        # so multiple policies at the same angle don't overlap.
+        # Enhanced dynamic label positioning with consistent radius
         for j, (angle, value) in enumerate(zip(angles[:-1], values[:-1])):
-            if value > 0.05:
+            # Enhanced condition for showing labels with better logic for zero values
+            should_show_label = value > 0.05
+            if policy.startswith('R-S') and value <= 0.05:
+                task_name = subtasks[j] if j < len(subtasks) else "Unknown"
+                if task_name != "Hand Move to Can":  # Skip first task for R-S policy
+                    should_show_label = True
+            
+            if should_show_label:
                 angle_deg = (angle * 180 / pi) % 360
                 # Normalized policy offset in [-1, 1]
                 norm_idx = (idx - (n_policies - 1) / 2) / ((n_policies - 1) / 2) if n_policies > 1 else 0.0
 
-                # Stronger angle jitter at top/bottom to spread horizontally more
+                # Enhanced angle jitter for better label distribution
                 if angle_deg <= 45 or (135 < angle_deg <= 225) or angle_deg >= 315:
-                    angle_jitter = 0.34  # increased spread for top/bottom spokes
+                    angle_jitter = 0.45  # Stronger jitter for top/bottom
                 else:
-                    angle_jitter = 0.22  # left/right
+                    angle_jitter = 0.30  # Moderate jitter for left/right
                 angle_shifted = angle + norm_idx * angle_jitter
 
-                # Place numeric labels outside the data region but inside figure
-                base_tb = 0.12 if value < 0.3 else 0.10
-                base_lr = 0.10
-                signed_radial = 0.03 * norm_idx
-                outside_min_top = 1.10
-                outside_min_lr  = 1.12
-                outside_min_bot = 1.12
-                outside_max = 1.18  # keep below tick label at left that we move to ~1.24
+                # Use consistent radius for all labels - professional positioning
+                label_r = 1.1  # Fixed radius for all labels
 
+                # Determine text alignment based on angle for optimal readability
                 if angle_deg <= 45 or angle_deg >= 315:
-                    label_r = max(value + base_tb + abs(signed_radial), outside_min_top)
-                    label_r = min(label_r, outside_max)
                     ha, va = 'center', 'bottom'
                 elif 45 < angle_deg <= 135:
-                    label_r = max(value + base_lr + abs(signed_radial), outside_min_lr)
-                    label_r = min(label_r, outside_max)
                     ha, va = 'left', 'center'
                 elif 135 < angle_deg <= 225:
-                    label_r = max(value + base_tb + abs(signed_radial), outside_min_bot)
-                    label_r = min(label_r, outside_max)
                     ha, va = 'center', 'top'
                 else:
-                    label_r = max(value + base_lr + abs(signed_radial), outside_min_lr)
-                    label_r = min(label_r, outside_max)
                     ha, va = 'right', 'center'
 
-                # Determine label text based on task type
+                # Determine label text based on task type with enhanced formatting
                 task_name = subtasks[j] if j < len(subtasks) else "Unknown"
-                if task_name == "Execution Time" and policy in time_info.get('policy_times', {}):
-                    # Show actual time in minutes for execution time
-                    actual_minutes = time_info['policy_times'][policy]['minutes']
-                    label_text = f'{actual_minutes:.1f}min'
+                if task_name == "Execution Time":
+                    if policy in time_info.get('policy_times', {}):
+                        # Show actual time in minutes for policies with time data
+                        actual_minutes = time_info['policy_times'][policy]['minutes']
+                        label_text = f"{actual_minutes:.1f}min"
+                    else:
+                        # Show "No Time" for policies without time data (like R-S)
+                        label_text = "No Time"
                 else:
                     # Show normalized score for other tasks
-                    label_text = f'{value:.2f}'
+                    label_text = f"{value:.2f}"
 
-                ax.text(angle_shifted, label_r, label_text,
-                        ha=ha, va=va, fontsize=9, fontweight='bold',
-                        bbox=dict(boxstyle='round,pad=0.22', facecolor='white',
-                                  edgecolor=color, alpha=0.85, linewidth=1.2),
+                # Enhanced label styling with professional bbox
+                ax.text(angle_shifted, label_r, label_text, ha=ha, va=va, fontsize=12, fontweight='bold',
+                        bbox=dict(boxstyle='round,pad=0.26', facecolor='white', edgecolor=color, alpha=0.9, linewidth=1.2),
                         zorder=10, clip_on=False)
 
-    # Enhanced axis customization
+    # Enhanced axis customization with professional styling
     ax.set_xticks(angles[:-1])
     task_labels = [
         "Move to\nCan",
@@ -377,36 +388,37 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
     
     if include_total_score:
         task_labels.append("Total\nScore")
-    ax.set_xticklabels(task_labels, fontsize=12, fontweight='bold', ha='center')
-    ax.tick_params(axis='x', pad=32)  # push all task labels outward
-
-    # Increase radial limit to make room for outside labels
-    ax.set_ylim(0, 1.25)
-    ax.set_yticks([0.2, 0.4, 0.6, 0.8, 1.0])
-    ax.set_yticklabels(['0.2', '0.4', '0.6', '0.8', '1.0'], fontsize=11, alpha=0.8, fontweight='medium')
-
-    # Add radial grid lines at specific values
-    for tick in [0.2, 0.4, 0.6, 0.8, 1.0]:
-        ax.plot([0, 2*pi], [tick, tick], color='gray', alpha=0.3, linewidth=0.8)
     
-    # Legend stays outside bottom-right
-    legend = ax.legend(loc='lower right', bbox_to_anchor=(1.00, -0.06),
+    # Enhanced label styling with larger fonts and better positioning
+    ax.set_xticklabels(task_labels, fontsize=14, fontweight='bold', ha='center')
+    ax.tick_params(axis='x', pad=45)  # Increased padding for professional appearance
+
+    # Enhanced radial axis with consistent styling
+    ax.set_ylim(0, 1.3)
+    ax.set_yticks([0.2, 0.4, 0.6, 0.8, 1.0])
+    ax.set_yticklabels(['0.2', '0.4', '0.6', '0.8', '1.0'], fontsize=14, alpha=0.95, fontweight='medium')
+
+    # Enhanced radial grid lines with professional appearance
+    for tick in [0.2, 0.4, 0.6, 0.8, 1.0]:
+        ax.plot([0, 2*pi], [tick, tick], color='gray', alpha=0.22, linewidth=0.8)
+    
+    # Professional legend with enhanced positioning and styling
+    legend = ax.legend(loc='lower right', bbox_to_anchor=(1.05, -0.15),
                       borderaxespad=0.0, frameon=True, fancybox=True, shadow=True,
-                      fontsize=10, title='ACT Policies', title_fontsize=11)
+                      fontsize=13, title='ACT Policies', title_fontsize=13)
     legend.get_frame().set_facecolor('#f8f9fa')
     legend.get_frame().set_edgecolor('#dee2e6')
-    legend.get_frame().set_linewidth(1.5)
+    legend.get_frame().set_linewidth(1.4)
     legend.get_title().set_fontweight('bold')
 
-    # Titles: bring closer to the figure at left
+    # Enhanced titles with professional positioning
     fig.suptitle('Policy Performance Comparison on Can Sorting Task (Lighting Test)',
-                 x=0.26, y=1.0, size=18, fontweight='bold', color='#2c3e50', ha='left')
-    fig.text(0.33, 0.98, 'Success Rate by Subtask (0.0 = Failure, 1.0 = Success)', 
-             ha='left', va='top', fontsize=12, style='italic', color='#6c757d')
+                 x=0.23, y=1.0, size=18, fontweight='bold', color='#2c3e50', ha='left')
+    fig.text(0.33, 0.975, 'Success Rate by Subtask (0.0 = Failure, 1.0 = Success)', 
+             ha='left', va='top', fontsize=14, style='italic', color='#6c757d')
 
-    #plt.tight_layout(pad=2, rect=[0.15, 0.00, 0.83, 0.88])
-    plt.tight_layout(rect=[0.00, 0.00, 1.00, 0.8])  # Changed from default to reserve top space
-    plt.tight_layout()
+    # Professional layout optimization
+    plt.tight_layout(rect=[0.00, 0.00, 1.00, 0.97])
     # Save with multiple formats for thesis use
     plt.savefig(output_dir / 'radar_chart_policy_comparison.png', 
                 dpi=150, bbox_inches='tight', facecolor='white', edgecolor='none')
@@ -434,8 +446,8 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
     ]
     policies = stats['Policy'].unique()
     
-    # Set up the plot with better spacing and professional styling - now 3x2 grid
-    fig, axes = plt.subplots(3, 2, figsize=(18, 20), dpi=150)
+    # Optimized for A4 format - taller and narrower with better aspect ratio
+    fig, axes = plt.subplots(3, 2, figsize=(16, 20), dpi=150)
     axes = axes.flatten()
     
     # Global styling
@@ -444,6 +456,8 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
     # Create a subplot for each subtask
     for task_idx, task in enumerate(subtasks):
         ax = axes[task_idx]
+        row_idx = task_idx // 2
+        col_idx = task_idx % 2
         
         task_data = stats[stats['Task'] == task]
         
@@ -461,100 +475,136 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
                 means.append(0)
                 stds.append(0)
         
-        # Create beautiful bars with enhanced styling
+        # Create beautiful bars with enhanced styling using consistent colors
         bar_colors = [POLICY_COLOR_MAP.get(p, POLICY_COLORS[i % len(POLICY_COLORS)]) for i,p in enumerate(policies)]
         bars = ax.bar(x, means, yerr=stds, capsize=8,
                       color=bar_colors,
                       alpha=0.85, edgecolor='white', linewidth=2,
                       error_kw={'elinewidth': 2, 'capthick': 2, 'ecolor': '#2c3e50', 'alpha': 0.8})
         
-        # Add gradient effect to bars
+        # Add gradient effect to bars for professional appearance
         for i, bar in enumerate(bars):
-            # Add subtle gradient by varying alpha
             gradient = plt.Rectangle((bar.get_x(), 0), bar.get_width(), bar.get_height(),
-                                     facecolor=bar.get_facecolor(), alpha=0.3, edgecolor='none')
+                                   facecolor=bar.get_facecolor(), alpha=0.30, edgecolor='none')
             ax.add_patch(gradient)
         
         # Enhanced subplot styling
         ax.set_facecolor('#fafafa')
-        ax.grid(axis='y', linestyle='--', alpha=0.4, linewidth=1, color='#bdc3c7')
+        ax.grid(axis='y', linestyle='--', alpha=0.45, linewidth=1, color='#bdc3c7')
         ax.set_axisbelow(True)
         
         # Customize subplot titles with better formatting
         task_title = task.replace(' to ', ' to\n') if len(task) > 20 else task
-        ax.set_title(f'{task_title}', fontsize=16, fontweight='bold', 
-                    pad=15, color='#2c3e50')
+        ax.set_title(f'{task_title}', fontsize=24, fontweight='bold', 
+                    pad=25, color='#2c3e50')
         
-        # Enhanced axis labels
-        ax.set_ylabel('Success Rate', fontsize=14, fontweight='medium', color='#2c3e50')
-        ax.set_xlabel('Policy', fontsize=14, fontweight='medium', color='#2c3e50')
+        # Only show y-axis label and ticks for left column (shared for the row)
+        if col_idx == 0:  # Left column
+            ax.set_ylabel('Success Rate', fontsize=22, fontweight='bold', color='#2c3e50')
+            ax.tick_params(axis='y', labelsize=18, colors='#34495e', width=2, length=6)
+        else:  # Right column - hide y-axis labels but keep ticks
+            ax.tick_params(axis='y', labelsize=0, width=2, length=6)
         
-        # Better x-axis labels
+        # Remove x-axis labels to save space - policy info is in the legend
         ax.set_xticks(x)
-        policy_labels = [format_policy_name(policy).replace(' ', '\n') if len(policy) > 12 else format_policy_name(policy) for policy in policies]
-        ax.set_xticklabels(policy_labels, fontsize=12, fontweight='medium', color='#34495e', rotation=45, ha='right')
+        ax.set_xticklabels([])  # No individual policy labels
+        ax.tick_params(axis='x', length=0)  # Hide x-axis tick marks
         
-        # Set consistent y-axis limits with padding to accommodate error bars and labels
-        ax.set_ylim(0, 1.3)
+        # Set consistent y-axis limits with professional spacing
+        ax.set_ylim(0, 1.42)
         ax.set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1.0, 1.2])
-        ax.tick_params(axis='y', labelsize=11, colors='#34495e')
         
         # Add a horizontal line indicating 100% success rate
-        ax.axhline(y=1.0, color='#27ae60', linestyle='-', alpha=0.7, linewidth=2.5, label='100% Success')
+        ax.axhline(y=1.0, color='#27ae60', linestyle='-', alpha=0.7, linewidth=2.5)
         
         # Add value labels on bars with enhanced styling
         for i, (bar, mean, std) in enumerate(zip(bars, means, stds)):
             height = bar.get_height()
+            label_y = height + std + 0.05
             
-            # Position label above error bar
-            label_y = height + std + 0.03
-            
-            # Determine label text based on task type
-            policy = policies[i]
-            if task == "Execution Time" and policy in time_info.get('policy_times', {}):
-                # Show actual time in minutes for execution time
-                actual_minutes = time_info['policy_times'][policy]['minutes']
-                label_text = f'{actual_minutes:.1f}min'
+            # Determine label text based on task type with enhanced formatting
+            if task == "Execution Time":
+                if policies[i] in time_info.get('policy_times', {}):
+                    label_text = f"{time_info['policy_times'][policies[i]]['minutes']:.1f}min"
+                else:
+                    # Handle special case for policies without time data (like R-S)
+                    label_text = "No Time"
+                rotation = 90  # Tilt execution time labels 90 degrees
             else:
-                # Show normalized score for other tasks
-                label_text = f'{mean:.3f}'
+                label_text = f"{mean:.2f}"  # Two digits after decimal
+                rotation = 0  # Keep other labels horizontal
             
-            # Style the label
-            ax.text(bar.get_x() + bar.get_width()/2., label_y,
-                   label_text, ha='center', va='bottom', 
-                   fontsize=11, fontweight='bold', color='#2c3e50')
+            # Enhanced label styling with professional bbox and colors
+            ax.text(bar.get_x() + bar.get_width()/2., label_y, label_text, 
+                   ha='center', va='bottom', fontsize=18, fontweight='bold', 
+                   color='#2c3e50', rotation=rotation,
+                   bbox=dict(boxstyle='round,pad=0.3', facecolor='white', 
+                            edgecolor=bar_colors[i], alpha=0.92, linewidth=1.4))
         
         # Add horizontal reference lines for common thresholds
         for threshold, color, style in [(0.5, '#e74c3c', '--'), (0.8, '#27ae60', ':')]:
-            ax.axhline(y=threshold, color=color, linestyle=style, alpha=0.6, linewidth=1.5)
+            ax.axhline(y=threshold, color=color, linestyle=style, alpha=0.55, linewidth=1.7)
         
-        # Add subtle border to subplot
-        for spine in ax.spines.values():
-            spine.set_edgecolor('#bdc3c7')
-            spine.set_linewidth(1.5)
+        # Add visual separation between subplots in the same row
+        if col_idx == 0:  # Left subplot - add right border
+            ax.spines['right'].set_edgecolor('#2c3e50')
+            ax.spines['right'].set_linewidth(3)
+        else:  # Right subplot - add left border  
+            ax.spines['left'].set_edgecolor('#2c3e50')
+            ax.spines['left'].set_linewidth(3)
+            
+        # Style other borders
+        for spine_name in ['top', 'bottom']:
+            ax.spines[spine_name].set_edgecolor('#bdc3c7')
+            ax.spines[spine_name].set_linewidth(1.6)
+        if col_idx == 0:
+            ax.spines['left'].set_edgecolor('#bdc3c7')
+            ax.spines['left'].set_linewidth(1.6)
+        else:
+            ax.spines['right'].set_edgecolor('#bdc3c7')
+            ax.spines['right'].set_linewidth(1.6)
     
-    # Professional main title with subtitle
+    # Professional main title with subtitle - A4 optimized
     fig.suptitle('ACT Policy Performance Analysis: Can Sorting Task (Lighting Test)', 
-                fontsize=22, fontweight='bold', y=0.96, color='#2c3e50')
+                fontsize=28, fontweight='bold', y=0.985, color='#2c3e50')
     
     # Add subtitle
-    fig.text(0.5, 0.92, 'Mean Success Rate ± Standard Deviation by Subtask', 
-             ha='center', va='top', fontsize=14, style='italic', color='#7f8c8d')
+    fig.text(0.5, 0.965, 'Mean Success Rate ± Standard Deviation by Subtask', 
+             ha='center', va='top', fontsize=20, style='italic', color='#7f8c8d')
     
-    # Add legend for reference lines
+    # Create combined legend with policies and reference lines
     from matplotlib.lines import Line2D
-    legend_elements = [
+    from matplotlib.patches import Rectangle
+    
+    # Policy legend elements with consistent colors
+    policy_legend_elements = []
+    for i, policy in enumerate(policies):
+        policy_legend_elements.append(
+            Rectangle((0, 0), 1, 1, facecolor=POLICY_COLOR_MAP.get(policy, POLICY_COLORS[i % len(POLICY_COLORS)]), 
+                     alpha=0.85, edgecolor='white', linewidth=1,
+                     label=format_policy_name(policy))
+        )
+    
+    # Reference lines legend elements  
+    reference_legend_elements = [
         Line2D([0], [0], color='#27ae60', linestyle='-', alpha=0.7, linewidth=2.5, label='100% Success'),
-        Line2D([0], [0], color='#e74c3c', linestyle='--', alpha=0.6, label='50% Success'),
-        Line2D([0], [0], color='#27ae60', linestyle=':', alpha=0.6, label='80% Success')
+        Line2D([0], [0], color='#e74c3c', linestyle='--', alpha=0.6, linewidth=1.7, label='50% Success'),
+        Line2D([0], [0], color='#27ae60', linestyle=':', alpha=0.6, linewidth=1.7, label='80% Success')
     ]
     
-    # Position legend in the bottom right
-    fig.legend(handles=legend_elements, loc='lower right', bbox_to_anchor=(0.98, 0.02),
-              frameon=True, fancybox=True, shadow=True, fontsize=11)
+    # Combine all legend elements
+    all_legend_elements = policy_legend_elements + reference_legend_elements
     
-    # Professional layout with proper spacing
-    plt.tight_layout(rect=[0, 0.03, 1, 0.91])
+    # Position legend across the bottom in multiple rows - closer to plots with bigger text
+    legend = fig.legend(handles=all_legend_elements, loc='lower center', bbox_to_anchor=(0.5, 0.04),
+                       frameon=True, fancybox=True, shadow=True, fontsize=20, 
+                       ncol=(len(all_legend_elements) + 2) // 3, columnspacing=1.5, handletextpad=0.8)
+    legend.get_frame().set_facecolor('#f8f9fa')
+    legend.get_frame().set_edgecolor('#dee2e6')
+    legend.get_frame().set_linewidth(1.4)
+    
+    # Professional layout with proper spacing optimized for A4 - reduced bottom margin for closer legend
+    plt.tight_layout(rect=[0, 0.11, 1, 0.96])
     
     # Save in multiple formats for thesis use
     #plt.savefig(output_dir / 'grouped_bar_plot_with_errors.png', 
@@ -579,97 +629,227 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         if data.empty:
             print(f'No data for {task_label}')
             return
+            
+        # DEBUG: Check what policies are available in the data
+        print(f"\nDEBUG: {task_label} - Available policies: {sorted(data['Policy'].unique())}")
+        print(f"DEBUG: Data shape for {task_label}: {data.shape}")
+        
+        # Professional A4-optimized layout with enhanced styling
         plt.style.use('default')
-        fig,(ax1,ax2)=plt.subplots(1,2,figsize=(16,7),dpi=150)
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 10), dpi=150)
+        fig.patch.set_facecolor('white')
+        
         overall = data[data['Color']=='all'].copy()
         if overall.empty:
             print(f'No overall rows for {task_label}')
+        else:
+            print(f"DEBUG: Overall data policies for {task_label}: {sorted(overall['Policy'].unique())}")
+            print(f"DEBUG: Overall data shape: {overall.shape}")
+        
         # Reconstruct component std (exact): recompute components used for that total
         # We need manipulation tasks + (Time [+ReturnHome])
         policies = sorted(overall['Policy'].unique())
         task_is_with = task_label == 'Total Score'
         comp_map = {}
+        print(f"DEBUG: Processing {len(policies)} policies for component mapping:")
         for policy in policies:
+            print(f"  - Checking policy: {policy}")
             manip_vals = []
             for t in ['Hand Move to Can','Hand Grasp Can','Hand Move to Correct Box','Can in Correct Box']:
                 rr=df[(df['Policy']==policy)&(df['Task']==t)&(df['Color']=='all')]
-                if rr.empty: manip_vals=[]; break
+                if rr.empty: 
+                    print(f"    Missing task '{t}' for policy {policy}")
+                    manip_vals=[]; break
                 manip_vals.append(rr['Score'].iloc[0])
+                print(f"    Found task '{t}' with score: {rr['Score'].iloc[0]:.3f}")
             if not manip_vals:
+                print(f"    SKIP: {policy} - missing manipulation tasks")
                 continue
             time_row = df[(df['Policy']==policy)&(df['Task']=='Execution Time')&(df['Color']=='all')]
             if time_row.empty:
+                print(f"    SKIP: {policy} - missing Execution Time")
                 continue
             time_sc = time_row['Score'].iloc[0]
+            print(f"    Found Execution Time with score: {time_sc:.3f}")
             comps = manip_vals + [time_sc]
             if task_is_with:
                 rh_row = df[(df['Policy']==policy)&(df['Task']=='Return to Home Position')&(df['Color']=='all')]
                 if rh_row.empty:
+                    print(f"    SKIP: {policy} - missing Return to Home Position")
                     continue
                 rh_sc = rh_row['Score'].iloc[0]
+                print(f"    Found Return to Home Position with score: {rh_sc:.3f}")
                 comps = manip_vals + [rh_sc, time_sc]
             comp_map[policy] = comps
+            print(f"    SUCCESS: {policy} added to component map with {len(comps)} components")
+        
         stats_rows=[]
+        print(f"DEBUG: Creating stats rows from {len(policies)} policies:")
         for policy in policies:
             row = overall[overall['Policy']==policy]
             if row.empty or policy not in comp_map:
+                if row.empty:
+                    print(f"  SKIP: {policy} - no overall row found")
+                else:
+                    print(f"  SKIP: {policy} - not in component map")
                 continue
             mean_val = row['Score'].iloc[0]
             std_val = float(np.std(comp_map[policy], ddof=1)) if len(comp_map[policy])>1 else 0.0
             stats_rows.append({'Policy':policy,'Score':mean_val,'Std':std_val})
+            print(f"  SUCCESS: {policy} - Score: {mean_val:.3f}, Std: {std_val:.3f}")
+        
+        print(f"DEBUG: Total stats rows created: {len(stats_rows)}")
+        if stats_rows:
+            print(f"DEBUG: Final policy list: {[row['Policy'] for row in stats_rows]}")
+        
         if not stats_rows:
             print(f'No stats rows for {task_label}')
             return
+        
         overall_stats = pd.DataFrame(stats_rows).set_index('Policy')
-        colors_palette=['#3498db','#e74c3c','#2ecc71','#f39c12','#9b59b6','#1abc9c','#34495e','#e67e22','#ff69b4']
+        
+        # Enhanced subplot styling for overall performance
+        ax1.set_facecolor('#fafafa')
+        ax1.grid(axis='y', linestyle='--', alpha=0.4, linewidth=1, color='#bdc3c7')
+        ax1.set_axisbelow(True)
+        
         x = np.arange(len(overall_stats.index))
-        bars=ax1.bar(x, overall_stats['Score'], yerr=overall_stats['Std'], capsize=8,
-                     color=[POLICY_COLOR_MAP.get(p, POLICY_COLORS[i % len(POLICY_COLORS)]) for i,p in enumerate(overall_stats.index)],
-                     edgecolor='white',linewidth=2,alpha=0.9)
+        bars = ax1.bar(x, overall_stats['Score'], yerr=overall_stats['Std'], capsize=10,
+                       color=[POLICY_COLOR_MAP.get(p, POLICY_COLORS[i % len(POLICY_COLORS)]) for i,p in enumerate(overall_stats.index)],
+                       edgecolor='white', linewidth=2.5, alpha=0.85,
+                       error_kw={'elinewidth': 3, 'capthick': 3, 'ecolor': '#34495e', 'alpha': 0.8})
+        
+        # Professional reference lines
+        ax1.axhline(y=0.5, color='#e74c3c', linestyle='--', alpha=0.6, linewidth=2, zorder=0)
+        ax1.axhline(y=0.8, color='#f39c12', linestyle=':', alpha=0.7, linewidth=2, zorder=0)  
+        ax1.axhline(y=1.0, color='#27ae60', linestyle='-', alpha=0.8, linewidth=2.5, zorder=0)
+        
         ax1.set_xticks(x)
-        ax1.set_xticklabels([format_policy_name(p) for p in overall_stats.index], rotation=45, ha='right', fontsize=11)
-        ax1.set_ylabel('Total Score', fontsize=13, fontweight='bold')
-        # Title adjustments
+        ax1.set_xticklabels([format_policy_name(p) for p in overall_stats.index], 
+                           rotation=45, ha='right', fontsize=12, fontweight='medium', color='#34495e')
+        ax1.set_ylabel('Total Score', fontsize=14, fontweight='bold', color='#2c3e50')
+        
+        # Title adjustments with enhanced styling
         if task_label == 'Total Score Sort Cans(Lighting Test)':
-            ax1.set_title('Overall Total Score', fontsize=15, fontweight='bold')
+            ax1.set_title('Overall Total Score', fontsize=16, fontweight='bold', color='#2c3e50', pad=20)
         elif task_label == 'Total Score (No RH)':
-            ax1.set_title('Overall Total Score Without RH Subtask (Lighting Test)', fontsize=15, fontweight='bold')
+            ax1.set_title('Overall Total Score Without RH Subtask (Lighting Test)', fontsize=16, fontweight='bold', color='#2c3e50', pad=20)
         else:
-            ax1.set_title(f'Overall {task_label}', fontsize=15, fontweight='bold')
-        ax1.set_ylim(0,1.05)
-        ax1.grid(axis='y', alpha=0.3)
-        # Move labels just above bar (not error bar) and remove box
-        for bar, val, std in zip(bars, overall_stats['Score'], overall_stats['Std']):
-            ax1.text(bar.get_x()+bar.get_width()/2., val + 0.015, f'{val:.3f}±{std:.3f}',
-                     ha='center', va='bottom', fontsize=8, fontweight='bold', color='#2c3e50')
-        # Color breakdown
+            ax1.set_title(f'Overall {task_label}', fontsize=16, fontweight='bold', color='#2c3e50', pad=20)
+        
+        ax1.set_ylim(0, 1.2)
+        ax1.set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1.0])
+        ax1.tick_params(axis='y', labelsize=11, colors='#34495e')
+        
+        # Enhanced styling for subplot borders  
+        for spine in ax1.spines.values():
+            spine.set_edgecolor('#bdc3c7')
+            spine.set_linewidth(1.5)
+        
+        # Separate mean and standard deviation labels with enhanced styling
+        for i, (bar, val, std, policy) in enumerate(zip(bars, overall_stats['Score'], overall_stats['Std'], overall_stats.index)):
+            # Mean value label on bar top with policy color
+            policy_color = POLICY_COLOR_MAP.get(policy, POLICY_COLORS[i % len(POLICY_COLORS)])
+            ax1.text(bar.get_x() + bar.get_width()/2., val + 0.02, f'{val:.3f}',
+                    ha='center', va='bottom', fontsize=11, fontweight='bold',
+                    bbox=dict(boxstyle='round,pad=0.3', facecolor='white', 
+                             edgecolor=policy_color, alpha=0.95, linewidth=1.5))
+            
+            # Standard deviation label on error bar top with neutral styling
+            # Skip R-S policy to prevent overlap
+            if not (policy.startswith('R-S') and std > 0):
+                ax1.text(bar.get_x() + bar.get_width()/2., val + std + 0.06, f'±{std:.3f}',
+                        ha='center', va='bottom', fontsize=9, fontweight='medium',
+                        bbox=dict(boxstyle='round,pad=0.25', facecolor='#f8f9fa', 
+                                 edgecolor='#6c757d', alpha=0.9, linewidth=1))
+        
+        # Enhanced color breakdown subplot
         color_subset = data[data['Color'].isin(['red','green'])]
         if not color_subset.empty:
+            ax2.set_facecolor('#fafafa')
+            ax2.grid(axis='y', linestyle='--', alpha=0.4, linewidth=1, color='#bdc3c7')
+            ax2.set_axisbelow(True)
+            
             pivot = color_subset.pivot_table(index='Policy', columns='Color', values='Score', aggfunc='mean')
             pivot.loc['Average'] = pivot.mean(axis=0)
             x2 = np.arange(len(pivot.index))
-            width=0.35
+            width = 0.35
+            
             red_vals = pivot['red'] if 'red' in pivot.columns else np.zeros(len(pivot))
             green_vals = pivot['green'] if 'green' in pivot.columns else np.zeros(len(pivot))
-            # UPDATED LEGEND LABELS
-            bars1=ax2.bar(x2-width/2, red_vals,width,label='Red Cans',color='#e74c3c',alpha=0.85,edgecolor='white',linewidth=1.5)
-            bars2=ax2.bar(x2+width/2, green_vals,width,label='Green Cans',color='#2ecc71',alpha=0.85,edgecolor='white',linewidth=1.5)
-            for b,v in zip(bars1, red_vals):
-                ax2.text(b.get_x()+b.get_width()/2., v+0.015, f'{v:.2f}', ha='center', va='bottom', fontsize=9, fontweight='bold')
-            for b,v in zip(bars2, green_vals):
-                ax2.text(b.get_x()+b.get_width()/2., v+0.015, f'{v:.2f}', ha='center', va='bottom', fontsize=9, fontweight='bold')
+            
+            # Professional reference lines for second subplot
+            ax2.axhline(y=0.5, color='#e74c3c', linestyle='--', alpha=0.6, linewidth=2, zorder=0)
+            ax2.axhline(y=0.8, color='#f39c12', linestyle=':', alpha=0.7, linewidth=2, zorder=0)
+            ax2.axhline(y=1.0, color='#27ae60', linestyle='-', alpha=0.8, linewidth=2.5, zorder=0)
+            
+            bars1 = ax2.bar(x2-width/2, red_vals, width, label='Red Cans', color='#e74c3c', 
+                           alpha=0.85, edgecolor='white', linewidth=2)
+            bars2 = ax2.bar(x2+width/2, green_vals, width, label='Green Cans', color='#2ecc71',
+                           alpha=0.85, edgecolor='white', linewidth=2)
+            
+            # Removed value labels from color breakdown for cleaner presentation
+            
             ax2.set_xticks(x2)
-            ax2.set_xticklabels([format_policy_name(p) if p!='Average' else 'Average' for p in pivot.index], rotation=45, ha='right', fontsize=11)
-            ax2.set_ylabel('Total Score', fontsize=13, fontweight='bold')
-            ax2.set_title(f'{task_label} by Can Color', fontsize=15, fontweight='bold')
-            ax2.set_ylim(0,1.05)
-            ax2.grid(axis='y', alpha=0.3)
-            ax2.legend()
-            ax2.axvline(len(pivot.index)-1.5, color='black', linestyle='--', alpha=0.35)
+            ax2.set_xticklabels([format_policy_name(p) if p!='Average' else 'Average' for p in pivot.index], 
+                               rotation=45, ha='right', fontsize=12, fontweight='medium', color='#34495e')
+            ax2.set_ylabel('Total Score', fontsize=14, fontweight='bold', color='#2c3e50')
+            ax2.set_title(f'{task_label} by Can Color', fontsize=16, fontweight='bold', color='#2c3e50', pad=20)
+            ax2.set_ylim(0, 1.2)
+            ax2.set_yticks([0, 0.2, 0.4, 0.6, 0.8, 1.0])
+            ax2.tick_params(axis='y', labelsize=11, colors='#34495e')
+            
+            # Enhanced legend with professional styling
+            legend = ax2.legend(loc='upper right', fontsize=11, frameon=True, fancybox=True, 
+                              shadow=True, framealpha=0.95)
+            legend.get_frame().set_facecolor('#f8f9fa')
+            legend.get_frame().set_edgecolor('#dee2e6')
+            legend.get_frame().set_linewidth(1.5)
+            
+            # Professional visual separator
+            ax2.axvline(len(pivot.index)-1.5, color='#34495e', linestyle='--', alpha=0.6, linewidth=2)
+            
+            # Enhanced styling for second subplot borders
+            for spine in ax2.spines.values():
+                spine.set_edgecolor('#bdc3c7')
+                spine.set_linewidth(1.5)
         else:
             ax2.set_visible(False)
-        plt.tight_layout()
-        plt.savefig(output_dir/filename, bbox_inches='tight')
+        
+        # Enhanced main titles and reference line legends
+        main_title = 'ACT Policy Performance Analysis: Can Sorting Task'
+        if task_label == 'Total Score':
+            subtitle = 'Total Score Analysis (With Return Home)'
+        elif task_label == 'Total Score (No RH)':
+            subtitle = 'Total Score Analysis (Without Return Home)'
+        else:
+            subtitle = f'{task_label} Analysis'
+        
+        fig.suptitle(main_title, fontsize=18, fontweight='bold', y=0.95, color='#2c3e50')
+        fig.text(0.5, 0.91, subtitle, ha='center', va='top', fontsize=14, 
+                style='italic', color='#7f8c8d')
+        
+        # Professional multi-row legend with reference lines
+        from matplotlib.lines import Line2D
+        legend_elements = [
+            Line2D([0], [0], color='#27ae60', linestyle='-', linewidth=2.5, 
+                   label='100% Success', alpha=0.8),
+            Line2D([0], [0], color='#f39c12', linestyle=':', linewidth=2, 
+                   label='80% Success', alpha=0.7),
+            Line2D([0], [0], color='#e74c3c', linestyle='--', linewidth=2, 
+                   label='50% Success', alpha=0.6)
+        ]
+        
+        # Position legend at bottom with 4 columns
+        fig.legend(handles=legend_elements, loc='lower center', 
+                  bbox_to_anchor=(0.5, 0.02), ncol=3, frameon=True, 
+                  fancybox=True, shadow=True, fontsize=11,
+                  title='Success Rate Thresholds', title_fontsize=12)
+        
+        # Professional layout with proper spacing
+        plt.tight_layout(rect=[0, 0.08, 1, 0.88])
+        
+        plt.savefig(output_dir/filename, bbox_inches='tight', facecolor='white', edgecolor='none')
         plt.close()
     _compute_overall_and_colors('Total Score','total_score_with_return.pdf')
     _compute_overall_and_colors('Total Score (No RH)','total_score_without_return.pdf')
