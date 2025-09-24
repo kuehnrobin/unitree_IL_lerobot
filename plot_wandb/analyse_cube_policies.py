@@ -662,10 +662,9 @@ def create_hand_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         print("No hand data found")
         return
     
-    # Professional styling
+    # Professional styling optimized for A4 format - narrower but taller
     plt.style.use('default')
-    # Increased figure size slightly
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(21, 15), dpi=150)
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 20), dpi=150)
     
     # 1. Overall performance by hand
     hand_stats = hand_data.groupby('Hand')['Score'].agg(['mean', 'std', 'count'])
@@ -673,17 +672,24 @@ def create_hand_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     colors = ['#3498db', '#e74c3c']
     x = np.arange(len(hand_stats.index))
     
-    bars = ax1.bar(x, hand_stats['mean'], yerr=hand_stats['std'], capsize=9, color=colors[:len(hand_stats)], alpha=0.85, edgecolor='white', linewidth=2)
+    bars = ax1.bar(x, hand_stats['mean'], yerr=hand_stats['std'], capsize=12, color=colors[:len(hand_stats)], 
+                   alpha=0.85, edgecolor='white', linewidth=2)
     
     ax1.set_xticks(x)
-    ax1.set_xticklabels(['Left Hand', 'Right Hand'], fontsize=17)
-    ax1.set_ylabel('Overall Success Rate', fontsize=19, fontweight='bold')
-    ax1.set_title('Overall Performance by Hand', fontsize=23, fontweight='bold')
-    ax1.set_ylim(0, 1.22); ax1.grid(axis='y', alpha=0.3)
+    ax1.set_xticklabels(['Left Hand', 'Right Hand'], fontsize=22)
+    # Only show y-axis label for left subplot
+    ax1.set_ylabel('Success Rate', fontsize=26, fontweight='bold', color='#2c3e50')
+    ax1.set_title('Overall Performance by Hand', fontsize=28, fontweight='bold', pad=25, color='#2c3e50')
+    ax1.set_ylim(0, 1.22)
+    ax1.grid(axis='y', alpha=0.4)
+    ax1.tick_params(axis='y', labelsize=20, colors='#34495e', width=2, length=6)
+    ax1.tick_params(axis='x', labelsize=22)
     
-    # Add value labels
+    # Add value labels with bigger text
     for bar, mean, std in zip(bars, hand_stats['mean'], hand_stats['std']):
-        height = bar.get_height(); ax1.text(bar.get_x() + bar.get_width()/2., height + 0.035, f'{mean:.2f}±{std:.2f}', ha='center', va='bottom', fontweight='bold', fontsize=16)
+        height = bar.get_height()
+        ax1.text(bar.get_x() + bar.get_width()/2., height + 0.035, f'{mean:.2f}±{std:.2f}', 
+                ha='center', va='bottom', fontweight='bold', fontsize=20)
     
     # 2. Performance by hand and task
     task_hand_stats = hand_data.groupby(['Task', 'Hand'])['Score'].mean().unstack(fill_value=0)
@@ -692,17 +698,27 @@ def create_hand_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     main_tasks = ["Hand Move to Cube","Hand Grasp Cube","Hand Move to Box","Cube in Box","Hand Back to Start Position","Execution Time"]
     task_hand_stats = task_hand_stats.loc[task_hand_stats.index.isin(main_tasks)]
     
-    x2 = np.arange(len(task_hand_stats.index)); width = 0.38
+    x2 = np.arange(len(task_hand_stats.index))
+    width = 0.38
     
     if 'left' in task_hand_stats.columns and 'right' in task_hand_stats.columns:
-        bars1 = ax2.bar(x2 - width/2, task_hand_stats['left'], width, label='Left Hand', color='#3498db', alpha=0.82)
-        bars2 = ax2.bar(x2 + width/2, task_hand_stats['right'], width, label='Right Hand', color='#e74c3c', alpha=0.82)
+        bars1 = ax2.bar(x2 - width/2, task_hand_stats['left'], width, color='#3498db', 
+                       alpha=0.82, edgecolor='white', linewidth=1)
+        bars2 = ax2.bar(x2 + width/2, task_hand_stats['right'], width, color='#e74c3c', 
+                       alpha=0.82, edgecolor='white', linewidth=1)
         
         ax2.set_xticks(x2)
-        ax2.set_xticklabels([task.replace(' ', '\n') for task in task_hand_stats.index], fontsize=15)
-        ax2.set_ylabel('Success Rate', fontsize=19, fontweight='bold')
-        ax2.set_title('Performance by Task and Hand', fontsize=23, fontweight='bold')
-        ax2.legend(fontsize=16); ax2.set_ylim(0, 1.27); ax2.grid(axis='y', alpha=0.3)
+        ax2.set_xticklabels([task.replace(' ', '\n') for task in task_hand_stats.index], fontsize=20)
+        # Hide y-axis label for right subplot but keep ticks
+        ax2.tick_params(axis='y', labelsize=0, width=2, length=6)
+        ax2.set_title('Performance by Task and Hand', fontsize=28, fontweight='bold', pad=25, color='#2c3e50')
+        ax2.set_ylim(0, 1.27)
+        ax2.grid(axis='y', alpha=0.4)
+        ax2.tick_params(axis='x', labelsize=20)
+        
+        # Add visual separation - right border for top row combination
+        ax2.spines['left'].set_edgecolor('#2c3e50')
+        ax2.spines['left'].set_linewidth(3)
     
     # 3. Performance by hand and color
     if len(hand_data['Color'].unique()) > 1:
@@ -711,37 +727,89 @@ def create_hand_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         x3 = np.arange(len(color_hand_stats.index))
         
         if 'left' in color_hand_stats.columns and 'right' in color_hand_stats.columns:
-            bars3 = ax3.bar(x3 - width/2, color_hand_stats['left'], width, label='Left Hand', color='#3498db', alpha=0.82)
-            bars4 = ax3.bar(x3 + width/2, color_hand_stats['right'], width, label='Right Hand', color='#e74c3c', alpha=0.82)
+            bars3 = ax3.bar(x3 - width/2, color_hand_stats['left'], width, color='#3498db', 
+                           alpha=0.82, edgecolor='white', linewidth=1)
+            bars4 = ax3.bar(x3 + width/2, color_hand_stats['right'], width, color='#e74c3c', 
+                           alpha=0.82, edgecolor='white', linewidth=1)
             
             for bar, value in zip(bars3, color_hand_stats['left']):
-                height = bar.get_height(); ax3.text(bar.get_x() + bar.get_width()/2., height + 0.03, f'{value:.2f}', ha='center', va='bottom', fontsize=14, fontweight='bold')
+                height = bar.get_height()
+                ax3.text(bar.get_x() + bar.get_width()/2., height + 0.03, f'{value:.2f}', 
+                        ha='center', va='bottom', fontsize=18, fontweight='bold')
             
             for bar, value in zip(bars4, color_hand_stats['right']):
-                height = bar.get_height(); ax3.text(bar.get_x() + bar.get_width()/2., height + 0.03, f'{value:.2f}', ha='center', va='bottom', fontsize=14, fontweight='bold')
+                height = bar.get_height()
+                ax3.text(bar.get_x() + bar.get_width()/2., height + 0.03, f'{value:.2f}', 
+                        ha='center', va='bottom', fontsize=18, fontweight='bold')
             
             ax3.set_xticks(x3)
-            ax3.set_xticklabels([color.title() for color in color_hand_stats.index], fontsize=16)
-            ax3.set_ylabel('Success Rate', fontsize=19, fontweight='bold')
-            ax3.set_title('Performance by Hand and Color', fontsize=23, fontweight='bold')
-            ax3.legend(fontsize=16); ax3.set_ylim(0, 1.22); ax3.grid(axis='y', alpha=0.3)
+            ax3.set_xticklabels([color.title() for color in color_hand_stats.index], fontsize=22)
+            ax3.set_ylabel('Success Rate', fontsize=26, fontweight='bold', color='#2c3e50')
+            ax3.set_title('Performance by Hand and Color', fontsize=28, fontweight='bold', pad=25, color='#2c3e50')
+            ax3.set_ylim(0, 1.22)
+            ax3.grid(axis='y', alpha=0.4)
+            ax3.tick_params(axis='y', labelsize=20, colors='#34495e', width=2, length=6)
+            ax3.tick_params(axis='x', labelsize=22)
     
     # 4. Hand usage distribution
     hand_counts = hand_data['Hand'].value_counts()
     colors_pie = ['#3498db', '#e74c3c']
     
-    wedges, texts, autotexts = ax4.pie(hand_counts.values, labels=['Left Hand', 'Right Hand'], 
-                                      autopct='%1.1f%%', colors=colors_pie, startangle=90, textprops={'fontsize': 16})
-    ax4.set_title('Hand Usage Distribution', fontsize=23, fontweight='bold')
+    wedges, texts, autotexts = ax4.pie(hand_counts.values, labels=None,  # Remove individual labels 
+                                      autopct='%1.1f%%', colors=colors_pie, startangle=90, textprops={'fontsize': 20})
+    ax4.set_title('Hand Usage Distribution', fontsize=28, fontweight='bold', pad=25, color='#2c3e50')
     
-    # Enhance pie chart text
+    # Enhance pie chart text with bigger fonts
     for autotext in autotexts:
         autotext.set_color('white')
         autotext.set_fontweight('bold')
-        autotext.set_fontsize(16)
+        autotext.set_fontsize(20)
     
-    plt.tight_layout()
-    plt.savefig(output_dir / 'hand_analysis.pdf', bbox_inches='tight'); plt.close()
+    # Add beautiful separations between plots
+    ax1.spines['right'].set_edgecolor('#2c3e50')
+    ax1.spines['right'].set_linewidth(3)
+    ax3.spines['right'].set_edgecolor('#2c3e50')
+    ax3.spines['right'].set_linewidth(3)
+    ax4.spines['left'].set_edgecolor('#2c3e50')
+    ax4.spines['left'].set_linewidth(3)
+    
+    # Style other borders for all subplots
+    for ax in [ax1, ax2, ax3, ax4]:
+        for spine_name in ['top', 'bottom']:
+            ax.spines[spine_name].set_edgecolor('#bdc3c7')
+            ax.spines[spine_name].set_linewidth(1.6)
+        # Left and right borders for outer edges
+        if ax in [ax1, ax3]:  # Left column
+            ax.spines['left'].set_edgecolor('#bdc3c7')
+            ax.spines['left'].set_linewidth(1.6)
+        if ax in [ax2, ax4]:  # Right column
+            ax.spines['right'].set_edgecolor('#bdc3c7')
+            ax.spines['right'].set_linewidth(1.6)
+    
+    # Create hand legend at bottom right under hand distribution
+    from matplotlib.patches import Rectangle
+    legend_elements = []
+    for i, hand in enumerate(['left', 'right']):
+        if hand in hand_data['Hand'].values:
+            legend_elements.append(
+                Rectangle((0, 0), 1, 1, facecolor=colors_pie[i], alpha=0.82, 
+                         edgecolor='white', linewidth=1, label=f'{hand.title()} Hand')
+            )
+    
+    # Position legend under the pie chart with bigger text
+    if legend_elements:
+        legend = fig.legend(handles=legend_elements, loc='lower right', bbox_to_anchor=(0.98, 0.12),
+                           frameon=True, fancybox=True, shadow=True, fontsize=22,
+                           title='Hand Usage', title_fontsize=24, ncol=1)
+        legend.get_frame().set_facecolor('#f8f9fa')
+        legend.get_frame().set_edgecolor('#dee2e6')
+        legend.get_frame().set_linewidth(1.4)
+        legend.get_title().set_fontweight('bold')
+        legend.get_title().set_color('#2c3e50')
+    
+    plt.tight_layout(rect=[0, 0.02, 1, 0.98])
+    plt.savefig(output_dir / 'hand_analysis.pdf', bbox_inches='tight', facecolor='white', edgecolor='none')
+    plt.close()
 
 
 def create_color_analysis(df: pd.DataFrame, output_dir: Path) -> None:
@@ -754,10 +822,9 @@ def create_color_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         print("No color data found")
         return
     
-    # Professional styling
+    # Professional styling optimized for A4 format - narrower but taller
     plt.style.use('default')
-    # Increased figure size
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(21, 15), dpi=150)
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 16), dpi=150)
     
     # 1. Overall performance by color
     color_stats = color_data.groupby('Color')['Score'].agg(['mean', 'std', 'count'])
@@ -768,16 +835,23 @@ def create_color_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     
     x = np.arange(len(color_stats.index))
     
-    bars = ax1.bar(x, color_stats['mean'], yerr=color_stats['std'], capsize=9, color=bar_colors, alpha=0.85, edgecolor='white', linewidth=2)
+    bars = ax1.bar(x, color_stats['mean'], yerr=color_stats['std'], capsize=12, color=bar_colors, alpha=0.85, edgecolor='white', linewidth=2)
     
-    ax1.set_xticks(x); ax1.set_xticklabels([color.title() + ' Cubes' for color in color_stats.index], fontsize=17)
-    ax1.set_ylabel('Overall Success Rate', fontsize=19, fontweight='bold')
-    ax1.set_title('Overall Performance by Cube Color', fontsize=23, fontweight='bold')
-    ax1.set_ylim(0, 1.22); ax1.grid(axis='y', alpha=0.3)
+    ax1.set_xticks(x)
+    ax1.set_xticklabels([color.title() + ' Cubes' for color in color_stats.index], fontsize=22)
+    # Only show y-axis label for left subplot
+    ax1.set_ylabel('Success Rate', fontsize=26, fontweight='bold', color='#2c3e50')
+    ax1.set_title('Overall Performance by Cube Color', fontsize=28, fontweight='bold', pad=25, color='#2c3e50')
+    ax1.set_ylim(0, 1.22)
+    ax1.grid(axis='y', alpha=0.4)
+    ax1.tick_params(axis='y', labelsize=20, colors='#34495e', width=2, length=6)
+    ax1.tick_params(axis='x', labelsize=22)
     
-    # Add value labels
+    # Add value labels with bigger text
     for bar, mean, std in zip(bars, color_stats['mean'], color_stats['std']):
-        height = bar.get_height(); ax1.text(bar.get_x() + bar.get_width()/2., height + 0.035, f'{mean:.2f}±{std:.2f}', ha='center', va='bottom', fontweight='bold', fontsize=15)
+        height = bar.get_height()
+        ax1.text(bar.get_x() + bar.get_width()/2., height + 0.035, f'{mean:.2f}±{std:.2f}', 
+                ha='center', va='bottom', fontweight='bold', fontsize=20)
     
     # 2. Performance by color and task
     task_color_stats = color_data.groupby(['Task', 'Color'])['Score'].mean().unstack(fill_value=0)
@@ -786,19 +860,27 @@ def create_color_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     main_tasks = ["Hand Move to Cube","Hand Grasp Cube","Hand Move to Box","Cube in Box","Hand Back to Start Position"]
     task_color_stats = task_color_stats.loc[task_color_stats.index.isin(main_tasks)]
     
-    x2 = np.arange(len(task_color_stats.index)); width = 0.25
+    x2 = np.arange(len(task_color_stats.index))
+    width = 0.25
     
     available_colors = [col for col in ['red', 'green', 'black'] if col in task_color_stats.columns]
     
     for i, color in enumerate(available_colors):
         offset = (i - len(available_colors)/2 + 0.5) * width
-        ax2.bar(x2 + offset, task_color_stats[color], width, label=f'{color.title()} Cubes', color=color_map[color], alpha=0.80)
+        ax2.bar(x2 + offset, task_color_stats[color], width, color=color_map[color], alpha=0.80, edgecolor='white', linewidth=1)
     
     ax2.set_xticks(x2)
-    ax2.set_xticklabels([task.replace(' ', '\n') for task in task_color_stats.index], fontsize=15)
-    ax2.set_ylabel('Success Rate', fontsize=19, fontweight='bold')
-    ax2.set_title('Performance by Task and Cube Color', fontsize=23, fontweight='bold')
-    ax2.legend(fontsize=16); ax2.set_ylim(0, 1.27); ax2.grid(axis='y', alpha=0.3)
+    ax2.set_xticklabels([task.replace(' ', '\n') for task in task_color_stats.index], fontsize=20)
+    # Hide y-axis label for right subplot but keep ticks
+    ax2.tick_params(axis='y', labelsize=0, width=2, length=6)
+    ax2.set_title('Performance by Task and Cube Color', fontsize=28, fontweight='bold', pad=25, color='#2c3e50')
+    ax2.set_ylim(0, 1.27)
+    ax2.grid(axis='y', alpha=0.4)
+    ax2.tick_params(axis='x', labelsize=20)
+    
+    # Add visual separation - right border for top row combination
+    ax2.spines['left'].set_edgecolor('#2c3e50')
+    ax2.spines['left'].set_linewidth(3)
     
     # 3. Performance by color and policy
     policy_color_stats = color_data.groupby(['Policy', 'Color'])['Score'].mean().unstack(fill_value=0)
@@ -808,31 +890,77 @@ def create_color_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     for i, color in enumerate(available_colors):
         offset = (i - len(available_colors)/2 + 0.5) * width
         if color in policy_color_stats.columns:
-            ax3.bar(x3 + offset, policy_color_stats[color], width, label=f'{color.title()} Cubes', color=color_map[color], alpha=0.80)
+            ax3.bar(x3 + offset, policy_color_stats[color], width, color=color_map[color], alpha=0.80, edgecolor='white', linewidth=1)
     
     ax3.set_xticks(x3)
-    ax3.set_xticklabels([format_policy_name(policy) for policy in policy_color_stats.index], rotation=40, ha='right', fontsize=15)
-    ax3.set_ylabel('Success Rate', fontsize=19, fontweight='bold')
-    ax3.set_title('Performance by Policy and Cube Color', fontsize=23, fontweight='bold')
-    ax3.legend(fontsize=16); ax3.set_ylim(0, 1.27); ax3.grid(axis='y', alpha=0.3)
+    ax3.set_xticklabels([format_policy_name(policy) for policy in policy_color_stats.index], rotation=45, ha='right', fontsize=20)
+    ax3.set_ylabel('Success Rate', fontsize=26, fontweight='bold', color='#2c3e50')
+    ax3.set_title('Performance by Policy and Cube Color', fontsize=28, fontweight='bold', pad=25, color='#2c3e50')
+    ax3.set_ylim(0, 1.27)
+    ax3.grid(axis='y', alpha=0.4)
+    ax3.tick_params(axis='y', labelsize=20, colors='#34495e', width=2, length=6)
+    ax3.tick_params(axis='x', labelsize=20)
     
     # 4. Color distribution
     color_counts = color_data['Color'].value_counts()
     pie_colors = [color_map.get(color, '#95a5a6') for color in color_counts.index]
     
     wedges, texts, autotexts = ax4.pie(color_counts.values, 
-                                      labels=[f'{color.title()} Cubes' for color in color_counts.index], 
-                                      autopct='%1.1f%%', colors=pie_colors, startangle=90, textprops={'fontsize': 16})
-    ax4.set_title('Cube Color Distribution', fontsize=23, fontweight='bold')
+                                      labels=None,  # Remove individual labels from pie
+                                      autopct='%1.1f%%', colors=pie_colors, startangle=90, textprops={'fontsize': 20})
+    ax4.set_title('Cube Color Distribution', fontsize=28, fontweight='bold', pad=25, color='#2c3e50')
     
-    # Enhance pie chart text
+    # Enhance pie chart text with bigger fonts
     for autotext in autotexts:
         autotext.set_color('white')
         autotext.set_fontweight('bold')
-        autotext.set_fontsize(16)
+        autotext.set_fontsize(20)
     
-    plt.tight_layout()
-    plt.savefig(output_dir / 'color_analysis.pdf', bbox_inches='tight'); plt.close()
+    # Add beautiful separations between plots
+    ax1.spines['right'].set_edgecolor('#2c3e50')
+    ax1.spines['right'].set_linewidth(3)
+    ax3.spines['right'].set_edgecolor('#2c3e50')
+    ax3.spines['right'].set_linewidth(3)
+    ax4.spines['left'].set_edgecolor('#2c3e50')
+    ax4.spines['left'].set_linewidth(3)
+    
+    # Style other borders for all subplots
+    for ax in [ax1, ax2, ax3, ax4]:
+        for spine_name in ['top', 'bottom']:
+            ax.spines[spine_name].set_edgecolor('#bdc3c7')
+            ax.spines[spine_name].set_linewidth(1.6)
+        # Left and right borders for outer edges
+        if ax in [ax1, ax3]:  # Left column
+            ax.spines['left'].set_edgecolor('#bdc3c7')
+            ax.spines['left'].set_linewidth(1.6)
+        if ax in [ax2, ax4]:  # Right column
+            ax.spines['right'].set_edgecolor('#bdc3c7')
+            ax.spines['right'].set_linewidth(1.6)
+    
+    # Create cube color legend at bottom right under color distribution
+    from matplotlib.patches import Rectangle
+    legend_elements = []
+    for color in ['red', 'green', 'black']:
+        if color in available_colors:
+            legend_elements.append(
+                Rectangle((0, 0), 1, 1, facecolor=color_map[color], alpha=0.80, 
+                         edgecolor='white', linewidth=1, label=f'{color.title()} Cubes')
+            )
+    
+    # Position legend under the pie chart with bigger text
+    if legend_elements:
+        legend = fig.legend(handles=legend_elements, loc='lower right', bbox_to_anchor=(0.98, 0.12),
+                           frameon=True, fancybox=True, shadow=True, fontsize=22,
+                           title='Cube Colors', title_fontsize=24, ncol=1)
+        legend.get_frame().set_facecolor('#f8f9fa')
+        legend.get_frame().set_edgecolor('#dee2e6')
+        legend.get_frame().set_linewidth(1.4)
+        legend.get_title().set_fontweight('bold')
+        legend.get_title().set_color('#2c3e50')
+    
+    plt.tight_layout(rect=[0, 0.02, 1, 0.98])
+    plt.savefig(output_dir / 'color_analysis.pdf', bbox_inches='tight', facecolor='white', edgecolor='none')
+    plt.close()
 
 
 def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
