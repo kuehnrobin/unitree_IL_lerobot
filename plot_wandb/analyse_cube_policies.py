@@ -898,6 +898,12 @@ def create_color_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     
     ax3.set_xticks(x3)
     ax3.set_xticklabels([format_policy_name(policy) for policy in policy_color_stats.index], rotation=45, ha='right', fontsize=20)
+    # Color the tick labels to match policy colors
+    thesis_colors = ['#3498db','#e377c2','#e74c3c','#2ecc71','#f39c12','#9b59b6','#1abc9c','#34495e','#e67e22']
+    for i, tick in enumerate(ax3.get_xticklabels()):
+        tick.set_color(thesis_colors[i % len(thesis_colors)])
+        tick.set_fontweight('bold')
+    
     ax3.set_ylabel('Success Rate', fontsize=26, fontweight='bold', color='#2c3e50')
     ax3.set_title('Performance by Policy and Cube Color', fontsize=28, fontweight='bold', pad=22, color='#2c3e50')
     ax3.set_ylim(0, 1.27)
@@ -995,7 +1001,7 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
                    error_kw={'elinewidth': 2, 'capthick': 2, 'ecolor': '#2c3e50', 'alpha': 0.8})
     
     ax1.set_xticks(x)
-    ax1.set_xticklabels([format_policy_name(policy) for policy in policy_stats.index], rotation=38, ha='right', fontsize=20)
+    ax1.set_xticklabels([])  # Remove policy names from x-axis
     ax1.set_ylabel('Total Score', fontsize=26, fontweight='bold', color='#2c3e50')
     ax1.set_title('Total Policy Performance Score', fontsize=28, fontweight='bold', pad=25, color='#2c3e50')
     ax1.set_ylim(0, 1.22)
@@ -1003,6 +1009,10 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     ax1.set_facecolor('#fafafa')
     ax1.tick_params(axis='y', labelsize=20, colors='#34495e', width=2, length=6)
     ax1.tick_params(axis='x', labelsize=20)
+    
+    # Add horizontal reference lines for common thresholds
+    for threshold, color, style in [(0.5, '#e74c3c', '--'), (0.8, '#27ae60', ':'), (1.0, '#27ae60', '-')]:
+        ax1.axhline(y=threshold, color=color, linestyle=style, alpha=0.7, linewidth=2.5)
     
     # Add value labels with bbox styling
     for i, (bar, mean, std) in enumerate(zip(bars, policy_stats['mean'], policy_stats['std'])):
@@ -1044,7 +1054,19 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
                               alpha=0.85, edgecolor='white', linewidth=2)
             
             ax2.set_xticks(x2)
+            # Use colored ticks for policies, black for average
+            tick_colors = []
+            for i, policy in enumerate(extended_policies):
+                if policy == 'Average':
+                    tick_colors.append('#2c3e50')  # Dark color for average
+                else:
+                    tick_colors.append(colors[i % len(colors)])
+            
             ax2.set_xticklabels(extended_policies, rotation=38, ha='right', fontsize=20)
+            # Color the tick labels
+            for i, (tick, color) in enumerate(zip(ax2.get_xticklabels(), tick_colors)):
+                tick.set_color(color)
+                tick.set_fontweight('bold')
             
             # Add a visual separator before the average column
             ax2.axvline(x=len(policies_list) - 0.5, color='#2c3e50', linestyle='--', alpha=0.7, linewidth=2)
@@ -1052,14 +1074,24 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         # Hide y-axis label for right subplot but keep ticks
         ax2.tick_params(axis='y', labelsize=0, width=2, length=6)
         ax2.set_title('Total Score by Cube Color', fontsize=28, fontweight='bold', pad=25, color='#2c3e50')
-        ax2.legend(fontsize=22, loc='upper right', frameon=True, fancybox=True, shadow=True)
-        ax2.legend().get_frame().set_facecolor('#f8f9fa')
-        ax2.legend().get_frame().set_edgecolor('#dee2e6')
-        ax2.legend().get_frame().set_linewidth(1.4)
+        
+        # Make legend bigger
+        legend_obj = ax2.legend(fontsize=26, loc='upper right', frameon=True, fancybox=True, shadow=True, 
+                               title='Cube Colors', title_fontsize=28)
+        legend_obj.get_frame().set_facecolor('#f8f9fa')
+        legend_obj.get_frame().set_edgecolor('#dee2e6')
+        legend_obj.get_frame().set_linewidth(1.4)
+        legend_obj.get_title().set_fontweight('bold')
+        legend_obj.get_title().set_color('#2c3e50')
+        
         ax2.set_ylim(0, 1.22)
         ax2.grid(axis='y', linestyle='--', alpha=0.45, linewidth=1, color='#bdc3c7')
         ax2.set_facecolor('#fafafa')
         ax2.tick_params(axis='x', labelsize=20)
+        
+        # Add horizontal reference lines for common thresholds
+        for threshold, color, style in [(0.5, '#e74c3c', '--'), (0.8, '#27ae60', ':'), (1.0, '#27ae60', '-')]:
+            ax2.axhline(y=threshold, color=color, linestyle=style, alpha=0.7, linewidth=2.5)
     
     # Add beautiful separations between plots
     ax1.spines['right'].set_edgecolor('#2c3e50')
@@ -1078,11 +1110,39 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     ax2.spines['right'].set_edgecolor('#bdc3c7')
     ax2.spines['right'].set_linewidth(1.6)
     
-    # Professional main title with subtitle
-    fig.suptitle('ACT Policy Total Score Analysis: Grasp Cube and Place in Box Task', 
-                fontsize=28, fontweight='bold', y=0.95, color='#2c3e50')
+    # Create policy legend at bottom left
+    from matplotlib.patches import Rectangle
+    policy_legend_elements = []
+    for i, policy in enumerate(policy_stats.index):
+        policy_legend_elements.append(
+            Rectangle((0, 0), 1, 1, facecolor=colors[i % len(colors)], 
+                     alpha=0.85, edgecolor='white', linewidth=1,
+                     label=format_policy_name(policy))
+        )
     
-    plt.tight_layout(rect=[0, 0.02, 1, 0.92])
+    # Add reference lines to legend
+    from matplotlib.lines import Line2D
+    reference_legend_elements = [
+        Line2D([0], [0], color='#27ae60', linestyle='-', alpha=0.7, linewidth=2.5, label='100% Success'),
+        Line2D([0], [0], color='#e74c3c', linestyle='--', alpha=0.7, linewidth=2.5, label='50% Success'),
+        Line2D([0], [0], color='#27ae60', linestyle=':', alpha=0.7, linewidth=2.5, label='80% Success')
+    ]
+    
+    # Combine all legend elements
+    all_legend_elements = policy_legend_elements + reference_legend_elements
+    
+    # Position legend at bottom left in three rows
+    legend = fig.legend(handles=all_legend_elements, loc='lower left', bbox_to_anchor=(0.05, 0.02),
+                       frameon=True, fancybox=True, shadow=True, fontsize=18, 
+                       ncol=(len(all_legend_elements) + 2) // 3, columnspacing=1.5, handletextpad=0.8,
+                       title='ACT Policies & Reference Lines', title_fontsize=20)
+    legend.get_frame().set_facecolor('#f8f9fa')
+    legend.get_frame().set_edgecolor('#dee2e6')
+    legend.get_frame().set_linewidth(1.4)
+    legend.get_title().set_fontweight('bold')
+    legend.get_title().set_color('#2c3e50')
+    
+    plt.tight_layout(rect=[0, 0.15, 1, 0.98])  # More space for legend
     plt.savefig(output_dir / 'total_score_analysis.pdf', bbox_inches='tight', facecolor='white', edgecolor='none')
     plt.close()
 
