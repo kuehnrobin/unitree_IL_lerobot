@@ -404,7 +404,7 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
                 outside_min_top = 1.12
                 outside_min_lr  = 1.12
                 outside_min_bot = 1.10
-                outside_max = 1.35  # keep below tick label at left that we move to ~1.24
+                outside_max = 1.2  # keep below tick label at left that we move to ~1.24
 
                 if angle_deg <= 45 or angle_deg >= 315:
                     label_r = min(max(value + base_tb + abs(signed_radial), outside_min_top), outside_max); ha, va = 'center', 'bottom'
@@ -456,7 +456,7 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
         ax.plot([0, 2*pi], [tick, tick], color='gray', alpha=0.22, linewidth=0.8)
     
     # Legend moved slightly left
-    legend = ax.legend(loc='lower right', bbox_to_anchor=(1.08, -0.17), borderaxespad=0.0, frameon=True, fancybox=True, shadow=True,
+    legend = ax.legend(loc='lower right', bbox_to_anchor=(1.05, -0.15), borderaxespad=0.0, frameon=True, fancybox=True, shadow=True,
                        fontsize=13, title='ACT Policies', title_fontsize=13)
     legend.get_frame().set_facecolor('#f8f9fa')
     legend.get_frame().set_edgecolor('#dee2e6')
@@ -468,7 +468,7 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
     fig.text(0.28, 0.985, 'Success Rate by Subtask (0.0 = Failure, 1.0 = Success)', 
              ha='left', va='top', fontsize=14, style='italic', color='#6c757d')
 
-    plt.tight_layout(rect=[0.00, 0.00, 1.00, 0.9])
+    plt.tight_layout(rect=[0.00, 0.00, 1.00, 0.95])
     plt.savefig(output_dir / 'radar_chart_policy_comparison.pdf', bbox_inches='tight', facecolor='white', edgecolor='none')
 
 
