@@ -1017,19 +1017,22 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     # Add separate mean and std deviation labels
     for i, (bar, mean, std) in enumerate(zip(bars, policy_stats['mean'], policy_stats['std'])):
         bar_height = bar.get_height()
+        policy_name = policy_stats.index[i]
         
-        # Mean label on top of actual bar (horizontal)
-        ax1.text(bar.get_x() + bar.get_width()/2., bar_height + 0.015, f'{mean:.2f}', 
+        # Mean label on top of actual bar (horizontal) - moved up to see bar end
+        ax1.text(bar.get_x() + bar.get_width()/2., bar_height + 0.025, f'{mean:.2f}', 
                 ha='center', va='bottom', fontweight='bold', fontsize=16, rotation=0,
                 bbox=dict(boxstyle='round,pad=0.25', facecolor='white', edgecolor=colors[i % len(colors)], 
                          alpha=0.92, linewidth=1.4))
         
-        # Standard deviation label on top of error bar
-        error_bar_top = bar_height + std
-        ax1.text(bar.get_x() + bar.get_width()/2., error_bar_top + 0.025, f'±{std:.2f}', 
-                ha='center', va='bottom', fontweight='normal', fontsize=14, rotation=0,
-                bbox=dict(boxstyle='round,pad=0.2', facecolor='#f0f0f0', edgecolor='#666666', 
-                         alpha=0.85, linewidth=1.0))
+        # Standard deviation label on top of error bar - skip for R-S policy and make more beautiful
+        if policy_name != 'R-S':  # Skip std label for R-S policy to avoid overlap
+            error_bar_top = bar_height + std
+            ax1.text(bar.get_x() + bar.get_width()/2., error_bar_top + 0.035, f'±{std:.2f}', 
+                    ha='center', va='bottom', fontweight='normal', fontsize=13, rotation=0,
+                    bbox=dict(boxstyle='round,pad=0.3', facecolor='#f8f9fa', edgecolor='#95a5a6', 
+                             alpha=0.90, linewidth=1.2),
+                    color='#666666')
     
     # 2. Color-based performance for total score
     if len(total_score_data['Color'].unique()) > 1:
@@ -1085,8 +1088,8 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         ax2.tick_params(axis='y', labelsize=0, width=2, length=6)
         ax2.set_title('Total Score by Cube Color', fontsize=25, fontweight='bold', pad=25, color='#2c3e50')
         
-        # Make legend smaller and move it right and up
-        legend_obj = ax2.legend(fontsize=18, loc='upper right', bbox_to_anchor=(0.85, 0.96), frameon=True, fancybox=True, shadow=True, 
+        # Make legend smaller and move it a bit more to the left
+        legend_obj = ax2.legend(fontsize=18, loc='upper right', bbox_to_anchor=(0.80, 0.96), frameon=True, fancybox=True, shadow=True, 
                                title='Cube Colors', title_fontsize=20)
         legend_obj.get_frame().set_facecolor('#f8f9fa')
         legend_obj.get_frame().set_edgecolor('#dee2e6')
