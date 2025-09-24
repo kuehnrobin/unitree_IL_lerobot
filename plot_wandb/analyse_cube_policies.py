@@ -977,29 +977,40 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         print("No Total Score data found")
         return
     
-    # Professional styling
+    # Professional styling optimized for A4 format
     plt.style.use('default')
-    # Increased figure size slightly
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(21, 9.5), dpi=150)
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 10), dpi=150)
+    
+    # Global styling
+    fig.patch.set_facecolor('white')
     
     # 1. Bar plot of total scores
     policy_stats = total_score_data.groupby('Policy')['Score'].agg(['mean', 'std', 'count'])
     
-    #colors = ['#3498db','#e74c3c','#2ecc71','#f39c12','#9b59b6','#1abc9c','#34495e','#e67e22']
     colors = ['#3498db','#e377c2','#e74c3c','#2ecc71','#f39c12','#9b59b6','#1abc9c','#34495e','#e67e22']
     x = np.arange(len(policy_stats.index))
     
-    bars = ax1.bar(x, policy_stats['mean'], yerr=policy_stats['std'], capsize=9, color=colors[:len(policy_stats)], alpha=0.85, edgecolor='white', linewidth=2)
+    bars = ax1.bar(x, policy_stats['mean'], yerr=policy_stats['std'], capsize=12, color=colors[:len(policy_stats)], 
+                   alpha=0.85, edgecolor='white', linewidth=2,
+                   error_kw={'elinewidth': 2, 'capthick': 2, 'ecolor': '#2c3e50', 'alpha': 0.8})
     
     ax1.set_xticks(x)
-    ax1.set_xticklabels([format_policy_name(policy) for policy in policy_stats.index], rotation=38, ha='right', fontsize=16)
-    ax1.set_ylabel('Total Score', fontsize=19, fontweight='bold')
-    ax1.set_title('Total Policy Performance Score', fontsize=23, fontweight='bold')
-    ax1.set_ylim(0, 1.22); ax1.grid(axis='y', alpha=0.3)
+    ax1.set_xticklabels([format_policy_name(policy) for policy in policy_stats.index], rotation=38, ha='right', fontsize=20)
+    ax1.set_ylabel('Total Score', fontsize=26, fontweight='bold', color='#2c3e50')
+    ax1.set_title('Total Policy Performance Score', fontsize=28, fontweight='bold', pad=25, color='#2c3e50')
+    ax1.set_ylim(0, 1.22)
+    ax1.grid(axis='y', linestyle='--', alpha=0.45, linewidth=1, color='#bdc3c7')
+    ax1.set_facecolor('#fafafa')
+    ax1.tick_params(axis='y', labelsize=20, colors='#34495e', width=2, length=6)
+    ax1.tick_params(axis='x', labelsize=20)
     
-    # Add value labels
-    for bar, mean, std in zip(bars, policy_stats['mean'], policy_stats['std']):
-        height = bar.get_height(); ax1.text(bar.get_x() + bar.get_width()/2., height + 0.035, f'{mean:.2f}±{std:.2f}', ha='center', va='bottom', fontweight='bold', fontsize=15)
+    # Add value labels with bbox styling
+    for i, (bar, mean, std) in enumerate(zip(bars, policy_stats['mean'], policy_stats['std'])):
+        height = bar.get_height()
+        ax1.text(bar.get_x() + bar.get_width()/2., height + 0.035, f'{mean:.2f}±{std:.2f}', 
+                ha='center', va='bottom', fontweight='bold', fontsize=18,
+                bbox=dict(boxstyle='round,pad=0.3', facecolor='white', edgecolor=colors[i % len(colors)], 
+                         alpha=0.92, linewidth=1.4))
     
     # 2. Color-based performance for total score
     if len(total_score_data['Color'].unique()) > 1:
@@ -1025,26 +1036,55 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
             # Color mapping
             color_map = {'red': '#e74c3c', 'green': '#2ecc71', 'black': '#34495e'}
             
-            # Plot bars for each color
+            # Plot bars for each color - no value labels
             for i, color in enumerate(available_colors):
                 offset = (i - len(available_colors)/2 + 0.5) * width
                 bars = ax2.bar(x2 + offset, color_values[color], width, 
-                              label=f'{color.title()} Cubes', color=color_map.get(color, '#95a5a6'), alpha=0.80)
-                
-                # Add value labels on bars
-                for j, (bar, value) in enumerate(zip(bars, color_values[color])):
-                    height = bar.get_height(); ax2.text(bar.get_x() + bar.get_width()/2., height + 0.01, f'{value:.2f}'.lstrip('0'), ha='center', va='bottom', fontsize=8, fontweight='bold')
+                              label=f'{color.title()} Cubes', color=color_map.get(color, '#95a5a6'), 
+                              alpha=0.85, edgecolor='white', linewidth=2)
             
             ax2.set_xticks(x2)
-            ax2.set_xticklabels(extended_policies, rotation=38, ha='right', fontsize=16)
+            ax2.set_xticklabels(extended_policies, rotation=38, ha='right', fontsize=20)
             
             # Add a visual separator before the average column
-            ax2.axvline(x=len(policies_list) - 0.5, color='black', linestyle='--', alpha=0.5, linewidth=1)
+            ax2.axvline(x=len(policies_list) - 0.5, color='#2c3e50', linestyle='--', alpha=0.7, linewidth=2)
         
-        ax2.set_ylabel('Total Score', fontsize=19, fontweight='bold')
-        ax2.set_title('Total Score by Cube Color', fontsize=23, fontweight='bold'); ax2.legend(fontsize=16); ax2.set_ylim(0, 1.22); ax2.grid(axis='y', alpha=0.3)
+        # Hide y-axis label for right subplot but keep ticks
+        ax2.tick_params(axis='y', labelsize=0, width=2, length=6)
+        ax2.set_title('Total Score by Cube Color', fontsize=28, fontweight='bold', pad=25, color='#2c3e50')
+        ax2.legend(fontsize=22, loc='upper right', frameon=True, fancybox=True, shadow=True)
+        ax2.legend().get_frame().set_facecolor('#f8f9fa')
+        ax2.legend().get_frame().set_edgecolor('#dee2e6')
+        ax2.legend().get_frame().set_linewidth(1.4)
+        ax2.set_ylim(0, 1.22)
+        ax2.grid(axis='y', linestyle='--', alpha=0.45, linewidth=1, color='#bdc3c7')
+        ax2.set_facecolor('#fafafa')
+        ax2.tick_params(axis='x', labelsize=20)
     
-    plt.tight_layout(); plt.savefig(output_dir / 'total_score_analysis.pdf', bbox_inches='tight'); plt.close()
+    # Add beautiful separations between plots
+    ax1.spines['right'].set_edgecolor('#2c3e50')
+    ax1.spines['right'].set_linewidth(3)
+    ax2.spines['left'].set_edgecolor('#2c3e50')
+    ax2.spines['left'].set_linewidth(3)
+    
+    # Style other borders
+    for ax in [ax1, ax2]:
+        for spine_name in ['top', 'bottom']:
+            ax.spines[spine_name].set_edgecolor('#bdc3c7')
+            ax.spines[spine_name].set_linewidth(1.6)
+    # Left and right borders for outer edges
+    ax1.spines['left'].set_edgecolor('#bdc3c7')
+    ax1.spines['left'].set_linewidth(1.6)
+    ax2.spines['right'].set_edgecolor('#bdc3c7')
+    ax2.spines['right'].set_linewidth(1.6)
+    
+    # Professional main title with subtitle
+    fig.suptitle('ACT Policy Total Score Analysis: Grasp Cube and Place in Box Task', 
+                fontsize=28, fontweight='bold', y=0.95, color='#2c3e50')
+    
+    plt.tight_layout(rect=[0, 0.02, 1, 0.92])
+    plt.savefig(output_dir / 'total_score_analysis.pdf', bbox_inches='tight', facecolor='white', edgecolor='none')
+    plt.close()
 
 
 def main():
