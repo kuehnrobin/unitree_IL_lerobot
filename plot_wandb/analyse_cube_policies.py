@@ -494,7 +494,7 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
     thesis_colors = ['#3498db','#e377c2','#e74c3c','#2ecc71','#f39c12','#9b59b6','#1abc9c','#34495e','#e67e22']
     
     # Optimized for A4 format - taller and narrower with better aspect ratio
-    fig, axes = plt.subplots(3, 2, figsize=(16, 30), dpi=150)
+    fig, axes = plt.subplots(3, 2, figsize=(16, 20), dpi=150)
     
     # Global styling
     fig.patch.set_facecolor('white')
