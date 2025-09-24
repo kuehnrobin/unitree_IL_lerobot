@@ -1032,7 +1032,7 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
                     ha='center', va='bottom', fontweight='normal', fontsize=13, rotation=0,
                     bbox=dict(boxstyle='round,pad=0.3', facecolor='#f8f9fa', edgecolor='#95a5a6', 
                              alpha=0.90, linewidth=1.2),
-                    color='#666666')
+                    color="#000000")
     
     # 2. Color-based performance for total score
     if len(total_score_data['Color'].unique()) > 1:
@@ -1089,7 +1089,7 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         ax2.set_title('Total Score by Cube Color', fontsize=25, fontweight='bold', pad=25, color='#2c3e50')
         
         # Make legend smaller and move it a bit more to the left
-        legend_obj = ax2.legend(fontsize=18, loc='upper right', bbox_to_anchor=(0.80, 0.96), frameon=True, fancybox=True, shadow=True, 
+        legend_obj = ax2.legend(fontsize=18, loc='upper right', bbox_to_anchor=(0.50, 0.99), frameon=True, fancybox=True, shadow=True, 
                                title='Cube Colors', title_fontsize=20)
         legend_obj.get_frame().set_facecolor('#f8f9fa')
         legend_obj.get_frame().set_edgecolor('#dee2e6')
