@@ -1004,7 +1004,7 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     ax1.set_xticklabels([])  # Remove policy names from x-axis
     ax1.set_ylabel('Total Score', fontsize=26, fontweight='bold', color='#2c3e50')
     ax1.set_title('Total Policy Performance Score', fontsize=28, fontweight='bold', pad=25, color='#2c3e50')
-    ax1.set_ylim(0, 1.22)
+    ax1.set_ylim(0, 1.30)
     ax1.grid(axis='y', linestyle='--', alpha=0.45, linewidth=1, color='#bdc3c7')
     ax1.set_facecolor('#fafafa')
     ax1.tick_params(axis='y', labelsize=20, colors='#34495e', width=2, length=6)
@@ -1014,11 +1014,11 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     for threshold, color, style in [(0.5, '#e74c3c', '--'), (0.8, '#27ae60', ':'), (1.0, '#27ae60', '-')]:
         ax1.axhline(y=threshold, color=color, linestyle=style, alpha=0.7, linewidth=2.5)
     
-    # Add value labels with bbox styling
+    # Add value labels with bbox styling - tilted 90 degrees
     for i, (bar, mean, std) in enumerate(zip(bars, policy_stats['mean'], policy_stats['std'])):
         height = bar.get_height()
         ax1.text(bar.get_x() + bar.get_width()/2., height + 0.035, f'{mean:.2f}±{std:.2f}', 
-                ha='center', va='bottom', fontweight='bold', fontsize=18,
+                ha='center', va='bottom', fontweight='bold', fontsize=18, rotation=90,
                 bbox=dict(boxstyle='round,pad=0.3', facecolor='white', edgecolor=colors[i % len(colors)], 
                          alpha=0.92, linewidth=1.4))
     
@@ -1075,16 +1075,16 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         ax2.tick_params(axis='y', labelsize=0, width=2, length=6)
         ax2.set_title('Total Score by Cube Color', fontsize=28, fontweight='bold', pad=25, color='#2c3e50')
         
-        # Make legend bigger
-        legend_obj = ax2.legend(fontsize=26, loc='upper right', frameon=True, fancybox=True, shadow=True, 
-                               title='Cube Colors', title_fontsize=28)
+        # Make legend smaller and move it to the left
+        legend_obj = ax2.legend(fontsize=22, loc='upper left', frameon=True, fancybox=True, shadow=True, 
+                               title='Cube Colors', title_fontsize=24)
         legend_obj.get_frame().set_facecolor('#f8f9fa')
         legend_obj.get_frame().set_edgecolor('#dee2e6')
         legend_obj.get_frame().set_linewidth(1.4)
         legend_obj.get_title().set_fontweight('bold')
         legend_obj.get_title().set_color('#2c3e50')
         
-        ax2.set_ylim(0, 1.22)
+        ax2.set_ylim(0, 1.30)
         ax2.grid(axis='y', linestyle='--', alpha=0.45, linewidth=1, color='#bdc3c7')
         ax2.set_facecolor('#fafafa')
         ax2.tick_params(axis='x', labelsize=20)
@@ -1131,10 +1131,10 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     # Combine all legend elements
     all_legend_elements = policy_legend_elements + reference_legend_elements
     
-    # Position legend at bottom left in three rows
-    legend = fig.legend(handles=all_legend_elements, loc='lower left', bbox_to_anchor=(0.05, 0.02),
+    # Position legend at bottom left in four rows - moved up and to the left
+    legend = fig.legend(handles=all_legend_elements, loc='lower left', bbox_to_anchor=(0.02, 0.08),
                        frameon=True, fancybox=True, shadow=True, fontsize=18, 
-                       ncol=(len(all_legend_elements) + 2) // 3, columnspacing=1.5, handletextpad=0.8,
+                       ncol=(len(all_legend_elements) + 3) // 4, columnspacing=1.5, handletextpad=0.8,
                        title='ACT Policies & Reference Lines', title_fontsize=20)
     legend.get_frame().set_facecolor('#f8f9fa')
     legend.get_frame().set_edgecolor('#dee2e6')
