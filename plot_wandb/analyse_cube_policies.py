@@ -547,7 +547,7 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
         else:  # Right column - hide y-axis labels but keep ticks
             ax.tick_params(axis='y', labelsize=0, width=2, length=6)
         
-        # Remove x-axis labels and "Policy" label to save space
+        # Remove x-axis labels to save space - policy info is in the legend
         ax.set_xticks(x)
         ax.set_xticklabels([])  # No individual policy labels
         ax.tick_params(axis='x', length=0)  # Hide x-axis tick marks
@@ -568,7 +568,7 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
             else:
                 label_text = f"{mean:.3f}"
             ax.text(bar.get_x() + bar.get_width()/2., label_y, label_text, ha='center', va='bottom', 
-                    fontsize=16, fontweight='bold', color='#2c3e50',
+                    fontsize=16, fontweight='bold', color='#2c3e50', rotation=45,
                     bbox=dict(boxstyle='round,pad=0.3', facecolor='white', edgecolor=thesis_colors[i % len(thesis_colors)], 
                              alpha=0.92, linewidth=1.4)
                     )
@@ -627,16 +627,16 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
     # Combine all legend elements
     all_legend_elements = policy_legend_elements + reference_legend_elements
     
-    # Position legend across the bottom in two rows
-    legend = fig.legend(handles=all_legend_elements, loc='lower center', bbox_to_anchor=(0.5, 0.01),
-                       frameon=True, fancybox=True, shadow=True, fontsize=18, 
-                       ncol=(len(all_legend_elements) + 1) // 2, columnspacing=1.5, handletextpad=0.8)
+    # Position legend across the bottom in three rows - closer to plots with bigger text
+    legend = fig.legend(handles=all_legend_elements, loc='lower center', bbox_to_anchor=(0.5, 0.04),
+                       frameon=True, fancybox=True, shadow=True, fontsize=20, 
+                       ncol=(len(all_legend_elements) + 2) // 3, columnspacing=1.5, handletextpad=0.8)
     legend.get_frame().set_facecolor('#f8f9fa')
     legend.get_frame().set_edgecolor('#dee2e6')
     legend.get_frame().set_linewidth(1.4)
     
-    # Professional layout with proper spacing optimized for A4 - space for two-row legend
-    plt.tight_layout(rect=[0, 0.14, 1, 0.96])
+    # Professional layout with proper spacing optimized for A4 - reduced bottom margin for closer legend
+    plt.tight_layout(rect=[0, 0.11, 1, 0.96])
     
     plt.savefig(output_dir / 'grouped_bar_plot_with_errors.pdf', bbox_inches='tight', facecolor='white', edgecolor='none')
 
