@@ -377,12 +377,11 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
         values += values[:1]  # Complete the circle
         color = thesis_colors[idx % len(thesis_colors)]
 
-        # Reduced marker size and line width per request
-        ax.plot(angles, values, 'o-', linewidth=2.5, label=format_policy_name(policy), color=color,
-                markersize=8, markerfacecolor=color, markeredgecolor='white',
-               markeredgewidth=2, alpha=0.9)
+        # Thinner lines & smaller markers
+        ax.plot(angles, values, 'o-', linewidth=1.8, label=format_policy_name(policy), color=color,
+                markersize=6, markerfacecolor=color, markeredgecolor='white', markeredgewidth=1.4, alpha=0.9)
 
-        ax.fill(angles, values, alpha=0.08, color=color)
+        ax.fill(angles, values, alpha=0.07, color=color)
 
         # Enhanced dynamic label positioning
         for j, (angle, value) in enumerate(zip(angles[:-1], values[:-1])):
@@ -393,19 +392,19 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
 
                 # Stronger angle jitter at top/bottom to spread horizontally more
                 if angle_deg <= 45 or (135 < angle_deg <= 225) or angle_deg >= 315:
-                    angle_jitter = 0.36
+                    angle_jitter = 0.40
                 else:
-                    angle_jitter = 0.26
+                    angle_jitter = 0.30
                 angle_shifted = angle + norm_idx * angle_jitter
 
                 # Push labels further outward
-                base_tb = 0.14 if value < 0.3 else 0.12
-                base_lr = 0.12
-                signed_radial = 0.035 * norm_idx
-                outside_min_top = 1.12
-                outside_min_lr  = 1.15
-                outside_min_bot = 1.15
-                outside_max = 1.32  # keep below tick label at left that we move to ~1.24
+                base_tb = 0.18 if value < 0.3 else 0.16
+                base_lr = 0.16
+                signed_radial = 0.04 * norm_idx
+                outside_min_top = 1.18
+                outside_min_lr  = 1.20
+                outside_min_bot = 1.20
+                outside_max = 1.40  # keep below tick label at left that we move to ~1.24
 
                 if angle_deg <= 45 or angle_deg >= 315:
                     label_r = min(max(value + base_tb + abs(signed_radial), outside_min_top), outside_max); ha, va = 'center', 'bottom'
@@ -421,22 +420,20 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
                 if task_name == "Execution Time" and policy in time_info.get('policy_times', {}):
                     # Show actual time in minutes for execution time
                     actual_minutes = time_info['policy_times'][policy]['minutes']
-                    label_text = f'{actual_minutes:.1f}min'
+                    label_text = f"{actual_minutes:.1f}min"
                 else:
                     # Show normalized score for other tasks
-                    label_text = f'{value:.2f}'
+                    label_text = f"{value:.2f}"
 
-                ax.text(angle_shifted, label_r, label_text,
-                        ha=ha, va=va, fontsize=11, fontweight='bold',
-                        bbox=dict(boxstyle='round,pad=0.30', facecolor='white',
-                                  edgecolor=color, alpha=0.9, linewidth=1.4),
+                ax.text(angle_shifted, label_r, label_text, ha=ha, va=va, fontsize=11, fontweight='bold',
+                        bbox=dict(boxstyle='round,pad=0.26', facecolor='white', edgecolor=color, alpha=0.9, linewidth=1.2),
                         zorder=10, clip_on=False)
 
     # Enhanced axis customization
     ax.set_xticks(angles[:-1])
     task_labels = [
         "Move to\nCube",
-        "Grasp\nCube", 
+        "Grasp\nCube",
         "Move to\nBox",
         "Place Cube in\nBox",
         "Hand Back to\nStart Position",
@@ -447,23 +444,23 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
         task_labels.append("Total\nScore")
         
     ax.set_xticklabels(task_labels, fontsize=14, fontweight='bold', ha='center')
-    ax.tick_params(axis='x', pad=42)  # push all task labels outward
+    ax.tick_params(axis='x', pad=45)  # push all task labels outward
 
     # Increase radial limit to make room for outside labels
-    ax.set_ylim(0, 1.35)
+    ax.set_ylim(0, 1.42)
     ax.set_yticks([0.2,0.4,0.6,0.8,1.0])
     ax.set_yticklabels(['0.2','0.4','0.6','0.8','1.0'], fontsize=13, alpha=0.85, fontweight='medium')
 
     # Add radial grid lines at specific values
     for tick in [0.2,0.4,0.6,0.8,1.0]:
-        ax.plot([0, 2*pi], [tick, tick], color='gray', alpha=0.25, linewidth=0.9)
+        ax.plot([0, 2*pi], [tick, tick], color='gray', alpha=0.22, linewidth=0.8)
     
-    # Legend moved further down and right
-    legend = ax.legend(loc='lower right', bbox_to_anchor=(1.28, -0.18), borderaxespad=0.0, frameon=True, fancybox=True, shadow=True,
+    # Legend moved slightly left
+    legend = ax.legend(loc='lower right', bbox_to_anchor=(1.18, -0.17), borderaxespad=0.0, frameon=True, fancybox=True, shadow=True,
                        fontsize=12, title='ACT Policies', title_fontsize=13)
     legend.get_frame().set_facecolor('#f8f9fa')
     legend.get_frame().set_edgecolor('#dee2e6')
-    legend.get_frame().set_linewidth(1.6)
+    legend.get_frame().set_linewidth(1.4)
     legend.get_title().set_fontweight('bold')
 
     # Titles
@@ -539,36 +536,34 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
         
         # Customize subplot titles with better formatting
         task_title = task.replace(' to ', ' to\n') if len(task) > 20 else task
-        ax.set_title(f'{task_title}', fontsize=18, fontweight='bold', pad=18, color='#2c3e50')
+        ax.set_title(f'{task_title}', fontsize=21, fontweight='bold', pad=20, color='#2c3e50')
         
         # Enhanced axis labels
-        ax.set_ylabel('Success Rate', fontsize=16, fontweight='medium', color='#2c3e50')
-        ax.set_xlabel('Policy', fontsize=16, fontweight='medium', color='#2c3e50')
+        ax.set_ylabel('Success Rate', fontsize=19, fontweight='medium', color='#2c3e50')
+        ax.set_xlabel('Policy', fontsize=19, fontweight='medium', color='#2c3e50')
         
         # Better x-axis labels
         ax.set_xticks(x)
         policy_labels = [format_policy_name(policy).replace(' ', '\n') if len(policy) > 12 else format_policy_name(policy) for policy in policies]
-        ax.set_xticklabels(policy_labels, fontsize=14, fontweight='medium', color='#34495e', rotation=38, ha='right')
+        ax.set_xticklabels(policy_labels, fontsize=17, fontweight='medium', color='#34495e', rotation=38, ha='right')
         
         # Set consistent y-axis limits with padding to accommodate error bars and labels
-        ax.set_ylim(0, 1.40)
+        ax.set_ylim(0, 1.42)
         ax.set_yticks([0,0.2,0.4,0.6,0.8,1.0,1.2])
-        ax.tick_params(axis='y', labelsize=13, colors='#34495e')
+        ax.tick_params(axis='y', labelsize=16, colors='#34495e')
         
         # Add a horizontal line indicating 100% success rate
         ax.axhline(y=1.0, color='#27ae60', linestyle='-', alpha=0.7, linewidth=2.5, label='100% Success')
         
         # Add value labels on bars with enhanced styling
         for i, (bar, mean, std) in enumerate(zip(bars, means, stds)):
-            height = bar.get_height(); label_y = height + std + 0.045
-            policy = policies[i]
-            if task == "Execution Time" and policy in time_info.get('policy_times', {}):
-                actual_minutes = time_info['policy_times'][policy]['minutes']
-                label_text = f'{actual_minutes:.1f}min'
+            height = bar.get_height(); label_y = height + std + 0.05
+            if task == "Execution Time" and policies[i] in time_info.get('policy_times', {}):
+                label_text = f"{time_info['policy_times'][policies[i]]['minutes']:.1f}min"
             else:
-                label_text = f'{mean:.3f}'
-            ax.text(bar.get_x() + bar.get_width()/2., label_y, label_text, ha='center', va='bottom', fontsize=12, fontweight='bold', color='#2c3e50',
-                    bbox=dict(boxstyle='round,pad=0.32', facecolor='white', edgecolor=thesis_colors[i % len(thesis_colors)], alpha=0.92, linewidth=1.6))
+                label_text = f"{mean:.3f}"
+            ax.text(bar.get_x() + bar.get_width()/2., label_y, label_text, ha='center', va='bottom', fontsize=15, fontweight='bold', color='#2c3e50',
+                    bbox=dict(boxstyle='round,pad=0.34', facecolor='white', edgecolor=thesis_colors[i % len(thesis_colors)], alpha=0.92, linewidth=1.6))
         
         # Add horizontal reference lines for common thresholds
         for threshold, color, style in [(0.5, '#e74c3c', '--'), (0.8, '#27ae60', ':')]:
@@ -579,11 +574,11 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
             spine.set_edgecolor('#bdc3c7'); spine.set_linewidth(1.6)
     
     # Professional main title with subtitle
-    fig.suptitle('ACT Policy Performance Analysis: Grasp Cube and Place in Box Task', fontsize=24, fontweight='bold', y=0.97, color='#2c3e50')
+    fig.suptitle('ACT Policy Performance Analysis: Grasp Cube and Place in Box Task', fontsize=27, fontweight='bold', y=0.97, color='#2c3e50')
     
     # Add subtitle
     fig.text(0.5, 0.93, 'Mean Success Rate ± Standard Deviation by Subtask', 
-             ha='center', va='top', fontsize=16, style='italic', color='#7f8c8d')
+             ha='center', va='top', fontsize=19, style='italic', color='#7f8c8d')
     
     # Add legend for reference lines
     from matplotlib.lines import Line2D
@@ -595,7 +590,7 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
     
     # Position legend in the bottom right
     fig.legend(handles=legend_elements, loc='lower right', bbox_to_anchor=(0.985, 0.02),
-              frameon=True, fancybox=True, shadow=True, fontsize=13)
+              frameon=True, fancybox=True, shadow=True, fontsize=16)
     
     # Professional layout with proper spacing
     plt.tight_layout(rect=[0, 0.035, 1, 0.915])
@@ -627,14 +622,14 @@ def create_hand_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     bars = ax1.bar(x, hand_stats['mean'], yerr=hand_stats['std'], capsize=9, color=colors[:len(hand_stats)], alpha=0.85, edgecolor='white', linewidth=2)
     
     ax1.set_xticks(x)
-    ax1.set_xticklabels(['Left Hand', 'Right Hand'], fontsize=14)
-    ax1.set_ylabel('Overall Success Rate', fontsize=16, fontweight='bold')
-    ax1.set_title('Overall Performance by Hand', fontsize=20, fontweight='bold')
-    ax1.set_ylim(0, 1.20); ax1.grid(axis='y', alpha=0.3)
+    ax1.set_xticklabels(['Left Hand', 'Right Hand'], fontsize=17)
+    ax1.set_ylabel('Overall Success Rate', fontsize=19, fontweight='bold')
+    ax1.set_title('Overall Performance by Hand', fontsize=23, fontweight='bold')
+    ax1.set_ylim(0, 1.22); ax1.grid(axis='y', alpha=0.3)
     
     # Add value labels
     for bar, mean, std in zip(bars, hand_stats['mean'], hand_stats['std']):
-        height = bar.get_height(); ax1.text(bar.get_x() + bar.get_width()/2., height + 0.03, f'{mean:.2f}±{std:.2f}', ha='center', va='bottom', fontweight='bold', fontsize=13)
+        height = bar.get_height(); ax1.text(bar.get_x() + bar.get_width()/2., height + 0.035, f'{mean:.2f}±{std:.2f}', ha='center', va='bottom', fontweight='bold', fontsize=16)
     
     # 2. Performance by hand and task
     task_hand_stats = hand_data.groupby(['Task', 'Hand'])['Score'].mean().unstack(fill_value=0)
@@ -650,12 +645,10 @@ def create_hand_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         bars2 = ax2.bar(x2 + width/2, task_hand_stats['right'], width, label='Right Hand', color='#e74c3c', alpha=0.82)
         
         ax2.set_xticks(x2)
-        ax2.set_xticklabels([task.replace(' ', '\n') for task in task_hand_stats.index], fontsize=12)
-        ax2.set_ylabel('Success Rate', fontsize=16, fontweight='bold')
-        ax2.set_title('Performance by Task and Hand', fontsize=20, fontweight='bold')
-        ax2.legend(fontsize=13)
-        ax2.set_ylim(0, 1.25)  # increased to avoid overlap when enlarging fonts
-        ax2.grid(axis='y', alpha=0.3)
+        ax2.set_xticklabels([task.replace(' ', '\n') for task in task_hand_stats.index], fontsize=15)
+        ax2.set_ylabel('Success Rate', fontsize=19, fontweight='bold')
+        ax2.set_title('Performance by Task and Hand', fontsize=23, fontweight='bold')
+        ax2.legend(fontsize=16); ax2.set_ylim(0, 1.27); ax2.grid(axis='y', alpha=0.3)
     
     # 3. Performance by hand and color
     if len(hand_data['Color'].unique()) > 1:
@@ -668,31 +661,30 @@ def create_hand_analysis(df: pd.DataFrame, output_dir: Path) -> None:
             bars4 = ax3.bar(x3 + width/2, color_hand_stats['right'], width, label='Right Hand', color='#e74c3c', alpha=0.82)
             
             for bar, value in zip(bars3, color_hand_stats['left']):
-                height = bar.get_height(); ax3.text(bar.get_x() + bar.get_width()/2., height + 0.025, f'{value:.2f}', ha='center', va='bottom', fontsize=11, fontweight='bold')
+                height = bar.get_height(); ax3.text(bar.get_x() + bar.get_width()/2., height + 0.03, f'{value:.2f}', ha='center', va='bottom', fontsize=14, fontweight='bold')
             
             for bar, value in zip(bars4, color_hand_stats['right']):
-                height = bar.get_height(); ax3.text(bar.get_x() + bar.get_width()/2., height + 0.025, f'{value:.2f}', ha='center', va='bottom', fontsize=11, fontweight='bold')
+                height = bar.get_height(); ax3.text(bar.get_x() + bar.get_width()/2., height + 0.03, f'{value:.2f}', ha='center', va='bottom', fontsize=14, fontweight='bold')
             
             ax3.set_xticks(x3)
-            ax3.set_xticklabels([color.title() for color in color_hand_stats.index], fontsize=13)
-            ax3.set_ylabel('Success Rate', fontsize=16, fontweight='bold')
-            ax3.set_title('Performance by Hand and Color', fontsize=20, fontweight='bold')
-            ax3.legend(fontsize=13)
-            ax3.set_ylim(0, 1.20); ax3.grid(axis='y', alpha=0.3)
+            ax3.set_xticklabels([color.title() for color in color_hand_stats.index], fontsize=16)
+            ax3.set_ylabel('Success Rate', fontsize=19, fontweight='bold')
+            ax3.set_title('Performance by Hand and Color', fontsize=23, fontweight='bold')
+            ax3.legend(fontsize=16); ax3.set_ylim(0, 1.22); ax3.grid(axis='y', alpha=0.3)
     
     # 4. Hand usage distribution
     hand_counts = hand_data['Hand'].value_counts()
     colors_pie = ['#3498db', '#e74c3c']
     
     wedges, texts, autotexts = ax4.pie(hand_counts.values, labels=['Left Hand', 'Right Hand'], 
-                                      autopct='%1.1f%%', colors=colors_pie, startangle=90, textprops={'fontsize': 13})
-    ax4.set_title('Hand Usage Distribution', fontsize=20, fontweight='bold')
+                                      autopct='%1.1f%%', colors=colors_pie, startangle=90, textprops={'fontsize': 16})
+    ax4.set_title('Hand Usage Distribution', fontsize=23, fontweight='bold')
     
     # Enhance pie chart text
     for autotext in autotexts:
         autotext.set_color('white')
         autotext.set_fontweight('bold')
-        autotext.set_fontsize(13)
+        autotext.set_fontsize(16)
     
     plt.tight_layout()
     plt.savefig(output_dir / 'hand_analysis.pdf', bbox_inches='tight'); plt.close()
@@ -724,14 +716,14 @@ def create_color_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     
     bars = ax1.bar(x, color_stats['mean'], yerr=color_stats['std'], capsize=9, color=bar_colors, alpha=0.85, edgecolor='white', linewidth=2)
     
-    ax1.set_xticks(x); ax1.set_xticklabels([color.title() + ' Cubes' for color in color_stats.index], fontsize=14)
-    ax1.set_ylabel('Overall Success Rate', fontsize=16, fontweight='bold')
-    ax1.set_title('Overall Performance by Cube Color', fontsize=20, fontweight='bold')
-    ax1.set_ylim(0, 1.20); ax1.grid(axis='y', alpha=0.3)
+    ax1.set_xticks(x); ax1.set_xticklabels([color.title() + ' Cubes' for color in color_stats.index], fontsize=17)
+    ax1.set_ylabel('Overall Success Rate', fontsize=19, fontweight='bold')
+    ax1.set_title('Overall Performance by Cube Color', fontsize=23, fontweight='bold')
+    ax1.set_ylim(0, 1.22); ax1.grid(axis='y', alpha=0.3)
     
     # Add value labels
     for bar, mean, std in zip(bars, color_stats['mean'], color_stats['std']):
-        height = bar.get_height(); ax1.text(bar.get_x() + bar.get_width()/2., height + 0.03, f'{mean:.2f}±{std:.2f}', ha='center', va='bottom', fontweight='bold', fontsize=12)
+        height = bar.get_height(); ax1.text(bar.get_x() + bar.get_width()/2., height + 0.035, f'{mean:.2f}±{std:.2f}', ha='center', va='bottom', fontweight='bold', fontsize=15)
     
     # 2. Performance by color and task
     task_color_stats = color_data.groupby(['Task', 'Color'])['Score'].mean().unstack(fill_value=0)
@@ -749,11 +741,10 @@ def create_color_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         ax2.bar(x2 + offset, task_color_stats[color], width, label=f'{color.title()} Cubes', color=color_map[color], alpha=0.80)
     
     ax2.set_xticks(x2)
-    ax2.set_xticklabels([task.replace(' ', '\n') for task in task_color_stats.index], fontsize=12)
-    ax2.set_ylabel('Success Rate', fontsize=16, fontweight='bold')
-    ax2.set_title('Performance by Task and Cube Color', fontsize=20, fontweight='bold')
-    ax2.legend(fontsize=13)
-    ax2.set_ylim(0, 1.25); ax2.grid(axis='y', alpha=0.3)
+    ax2.set_xticklabels([task.replace(' ', '\n') for task in task_color_stats.index], fontsize=15)
+    ax2.set_ylabel('Success Rate', fontsize=19, fontweight='bold')
+    ax2.set_title('Performance by Task and Cube Color', fontsize=23, fontweight='bold')
+    ax2.legend(fontsize=16); ax2.set_ylim(0, 1.27); ax2.grid(axis='y', alpha=0.3)
     
     # 3. Performance by color and policy
     policy_color_stats = color_data.groupby(['Policy', 'Color'])['Score'].mean().unstack(fill_value=0)
@@ -766,11 +757,10 @@ def create_color_analysis(df: pd.DataFrame, output_dir: Path) -> None:
             ax3.bar(x3 + offset, policy_color_stats[color], width, label=f'{color.title()} Cubes', color=color_map[color], alpha=0.80)
     
     ax3.set_xticks(x3)
-    ax3.set_xticklabels([format_policy_name(policy) for policy in policy_color_stats.index], rotation=40, ha='right', fontsize=12)
-    ax3.set_ylabel('Success Rate', fontsize=16, fontweight='bold')
-    ax3.set_title('Performance by Policy and Cube Color', fontsize=20, fontweight='bold')
-    ax3.legend(fontsize=13)
-    ax3.set_ylim(0, 1.25); ax3.grid(axis='y', alpha=0.3)
+    ax3.set_xticklabels([format_policy_name(policy) for policy in policy_color_stats.index], rotation=40, ha='right', fontsize=15)
+    ax3.set_ylabel('Success Rate', fontsize=19, fontweight='bold')
+    ax3.set_title('Performance by Policy and Cube Color', fontsize=23, fontweight='bold')
+    ax3.legend(fontsize=16); ax3.set_ylim(0, 1.27); ax3.grid(axis='y', alpha=0.3)
     
     # 4. Color distribution
     color_counts = color_data['Color'].value_counts()
@@ -778,14 +768,14 @@ def create_color_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     
     wedges, texts, autotexts = ax4.pie(color_counts.values, 
                                       labels=[f'{color.title()} Cubes' for color in color_counts.index], 
-                                      autopct='%1.1f%%', colors=pie_colors, startangle=90, textprops={'fontsize': 13})
-    ax4.set_title('Cube Color Distribution', fontsize=20, fontweight='bold')
+                                      autopct='%1.1f%%', colors=pie_colors, startangle=90, textprops={'fontsize': 16})
+    ax4.set_title('Cube Color Distribution', fontsize=23, fontweight='bold')
     
     # Enhance pie chart text
     for autotext in autotexts:
         autotext.set_color('white')
         autotext.set_fontweight('bold')
-        autotext.set_fontsize(13)
+        autotext.set_fontsize(16)
     
     plt.tight_layout()
     plt.savefig(output_dir / 'color_analysis.pdf', bbox_inches='tight'); plt.close()
@@ -815,14 +805,14 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     bars = ax1.bar(x, policy_stats['mean'], yerr=policy_stats['std'], capsize=9, color=colors[:len(policy_stats)], alpha=0.85, edgecolor='white', linewidth=2)
     
     ax1.set_xticks(x)
-    ax1.set_xticklabels([format_policy_name(policy) for policy in policy_stats.index], rotation=38, ha='right', fontsize=13)
-    ax1.set_ylabel('Total Score', fontsize=16, fontweight='bold')
-    ax1.set_title('Total Policy Performance Score', fontsize=20, fontweight='bold')
-    ax1.set_ylim(0, 1.20); ax1.grid(axis='y', alpha=0.3)
+    ax1.set_xticklabels([format_policy_name(policy) for policy in policy_stats.index], rotation=38, ha='right', fontsize=16)
+    ax1.set_ylabel('Total Score', fontsize=19, fontweight='bold')
+    ax1.set_title('Total Policy Performance Score', fontsize=23, fontweight='bold')
+    ax1.set_ylim(0, 1.22); ax1.grid(axis='y', alpha=0.3)
     
     # Add value labels
     for bar, mean, std in zip(bars, policy_stats['mean'], policy_stats['std']):
-        height = bar.get_height(); ax1.text(bar.get_x() + bar.get_width()/2., height + 0.03, f'{mean:.2f}±{std:.2f}', ha='center', va='bottom', fontweight='bold', fontsize=12)
+        height = bar.get_height(); ax1.text(bar.get_x() + bar.get_width()/2., height + 0.035, f'{mean:.2f}±{std:.2f}', ha='center', va='bottom', fontweight='bold', fontsize=15)
     
     # 2. Color-based performance for total score
     if len(total_score_data['Color'].unique()) > 1:
@@ -859,15 +849,13 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
                     height = bar.get_height(); ax2.text(bar.get_x() + bar.get_width()/2., height + 0.01, f'{value:.2f}'.lstrip('0'), ha='center', va='bottom', fontsize=8, fontweight='bold')
             
             ax2.set_xticks(x2)
-            ax2.set_xticklabels(extended_policies, rotation=38, ha='right', fontsize=13)
+            ax2.set_xticklabels(extended_policies, rotation=38, ha='right', fontsize=16)
             
             # Add a visual separator before the average column
             ax2.axvline(x=len(policies_list) - 0.5, color='black', linestyle='--', alpha=0.5, linewidth=1)
         
-        ax2.set_ylabel('Total Score', fontsize=16, fontweight='bold')
-        ax2.set_title('Total Score by Cube Color', fontsize=20, fontweight='bold')
-        ax2.legend(fontsize=13)
-        ax2.set_ylim(0, 1.20); ax2.grid(axis='y', alpha=0.3)
+        ax2.set_ylabel('Total Score', fontsize=19, fontweight='bold')
+        ax2.set_title('Total Score by Cube Color', fontsize=23, fontweight='bold'); ax2.legend(fontsize=16); ax2.set_ylim(0, 1.22); ax2.grid(axis='y', alpha=0.3)
     
     plt.tight_layout(); plt.savefig(output_dir / 'total_score_analysis.pdf', bbox_inches='tight'); plt.close()
 
