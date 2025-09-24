@@ -358,7 +358,7 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
 
                 # Enhanced angle jitter for better label distribution
                 if angle_deg <= 45 or (135 < angle_deg <= 225) or angle_deg >= 315:
-                    angle_jitter = 0.52  # Stronger jitter for top/bottom to spread horizontally more
+                    angle_jitter = 0.55  # Stronger jitter for top/bottom to spread horizontally more
                 else:
                     angle_jitter = 0.35  # Moderate jitter for left/right
                 angle_shifted = angle + norm_idx * angle_jitter

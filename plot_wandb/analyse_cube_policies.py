@@ -309,32 +309,73 @@ def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
                 policy_trial_data = df[(df['Policy'] == policy) & (df['Trial'] == trial)]
                 
                 if len(policy_trial_data) > 0:
-                    # Calculate weighted average score
-                    total_score = 0
-                    total_weight = 0
                     trial_color = policy_trial_data['Color'].iloc[0]
                     trial_hand = policy_trial_data['Hand'].iloc[0]
                     
-                    for task in task_weights.keys():
-                        task_data = policy_trial_data[policy_trial_data['Task'] == task]
-                        if len(task_data) > 0:
-                            task_score = task_data['Score'].iloc[0]
-                            weight = task_weights[task]
-                            total_score += task_score * weight
-                            total_weight += weight
-                    
-                    if total_weight > 0:
-                        weighted_average = total_score / total_weight
+                    # Special handling for R-S policy
+                    if policy == 'R-S':
+                        # Add specific scores for R-S policy
+                        rs_tasks = [
+                            ('Hand Move to Cube', 0.1),
+                            ('Hand Grasp Cube', 0.0),
+                            ('Hand Move to Box', 0.0),
+                            ('Cube in Box', 0.0),
+                            ('Hand Back to Start Position', 0.0)
+                        ]
                         
-                        # Add total score as a new task
+                        for task_name, score in rs_tasks:
+                            # Check if this task already exists for this trial
+                            existing_task = df[(df['Policy'] == policy) & (df['Trial'] == trial) & (df['Task'] == task_name)]
+                            if existing_task.empty:
+                                # Add missing task data for R-S policy
+                                df = pd.concat([df, pd.DataFrame([{
+                                    'Policy': policy,
+                                    'Trial': trial,
+                                    'Color': trial_color,
+                                    'Hand': trial_hand,
+                                    'Task': task_name,
+                                    'Score': score
+                                }])], ignore_index=True)
+                        
+                        # Calculate R-S total score: (0.1 + 0.0 + 0.0 + 0.0 + 0.0) / 5 = 0.02, but user wants 0.05
+                        # User specified: use 0.1 for move to cube and 0.0 for grasp cube => total = 0.05
+                        rs_total_score = 0.05
+                        
+                        # Add total score for R-S
                         df = pd.concat([df, pd.DataFrame([{
                             'Policy': policy,
                             'Trial': trial,
                             'Color': trial_color,
                             'Hand': trial_hand,
                             'Task': 'Total Score',
-                            'Score': weighted_average
+                            'Score': rs_total_score
                         }])], ignore_index=True)
+                        
+                    else:
+                        # Standard calculation for other policies
+                        total_score = 0
+                        total_weight = 0
+                        
+                        for task in task_weights.keys():
+                            task_data = policy_trial_data[policy_trial_data['Task'] == task]
+                            if len(task_data) > 0:
+                                task_score = task_data['Score'].iloc[0]
+                                weight = task_weights[task]
+                                total_score += task_score * weight
+                                total_weight += weight
+                        
+                        if total_weight > 0:
+                            weighted_average = total_score / total_weight
+                            
+                            # Add total score as a new task
+                            df = pd.concat([df, pd.DataFrame([{
+                                'Policy': policy,
+                                'Trial': trial,
+                                'Color': trial_color,
+                                'Hand': trial_hand,
+                                'Task': 'Total Score',
+                                'Score': weighted_average
+                            }])], ignore_index=True)
     
     return df, time_info
 
@@ -396,11 +437,16 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
 
         # Enhanced dynamic label positioning with consistent radius
         for j, (angle, value) in enumerate(zip(angles[:-1], values[:-1])):
-            # Hard-coded fix: show "0.0" labels for R-S policy where value is 0, except for "Move to Cube"
+            task_name = subtasks[j] if j < len(subtasks) else "Unknown"
+            
+            # Enhanced logic for showing labels
             should_show_label = value > 0.05
-            if policy == "R-S" and value <= 0.05:
-                task_name = subtasks[j] if j < len(subtasks) else "Unknown"
-                if task_name != "Hand Move to Cube":  # Skip "Move to Cube" task
+            
+            # Special handling for R-S policy
+            if policy == "R-S":
+                if task_name in ["Hand Back to Start Position", "Cube in Box", "Hand Move to Box"]:
+                    should_show_label = True  # Always show labels for these specific tasks
+                elif value <= 0.05 and task_name not in ["Hand Move to Cube", "Hand Grasp Cube"]:
                     should_show_label = True
             
             if should_show_label:
@@ -410,7 +456,7 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
 
                 # Stronger angle jitter at top/bottom to spread horizontally more
                 if angle_deg <= 45 or (135 < angle_deg <= 225) or angle_deg >= 315:
-                    angle_jitter = 0.45
+                    angle_jitter = 0.51
                 else:
                     angle_jitter = 0.30
                 angle_shifted = angle + norm_idx * angle_jitter
@@ -428,8 +474,7 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
                 else:
                     ha, va = 'right', 'center'
 
-                # Determine label text based on task type
-                task_name = subtasks[j] if j < len(subtasks) else "Unknown"
+                # Determine label text based on task type and policy
                 if task_name == "Execution Time":
                     if policy in time_info.get('policy_times', {}):
                         # Show actual time in minutes for policies with time data
@@ -438,8 +483,11 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
                     else:
                         # Show "No Time" for policies without time data (like R-S)
                         label_text = "No Time"
+                elif policy == "R-S" and task_name in ["Hand Back to Start Position", "Cube in Box", "Hand Move to Box"]:
+                    # Show "No Score" for specific R-S tasks
+                    label_text = "No Score"
                 else:
-                    # Show normalized score for other tasks (including hard-coded 0.0 for R-S)
+                    # Show normalized score for other tasks
                     label_text = f"{value:.2f}"
 
                 ax.text(angle_shifted, label_r, label_text, ha=ha, va=va, fontsize=12, fontweight='bold',
@@ -585,6 +633,10 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
                     # Handle special case for policies without time data (like R-S)
                     label_text = "No Time"
                 rotation = 90  # Tilt execution time labels 90 degrees
+            elif policies[i] == "R-S" and task in ["Hand Back to Start Position", "Cube in Box", "Hand Move to Box"]:
+                # Show "No Score" for specific R-S tasks
+                label_text = "No Score"
+                rotation = 90
             else:
                 label_text = f"{mean:.2f}"  # Two digits after decimal
                 rotation = 0  # Keep other labels horizontal
