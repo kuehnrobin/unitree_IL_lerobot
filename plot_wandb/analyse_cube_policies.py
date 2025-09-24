@@ -575,11 +575,11 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
                     label_text = "No Time"
                 rotation = 90  # Tilt execution time labels 90 degrees
             else:
-                label_text = f"{mean:.3f}"  # Keep three digits after decimal
+                label_text = f"{mean:.2f}"  # Two digits after decimal
                 rotation = 0  # Keep other labels horizontal
             
             ax.text(bar.get_x() + bar.get_width()/2., label_y, label_text, ha='center', va='bottom', 
-                    fontsize=16, fontweight='bold', color='#2c3e50', rotation=rotation,
+                    fontsize=18, fontweight='bold', color='#2c3e50', rotation=rotation,
                     bbox=dict(boxstyle='round,pad=0.3', facecolor='white', edgecolor=thesis_colors[i % len(thesis_colors)], 
                              alpha=0.92, linewidth=1.4)
                     )
