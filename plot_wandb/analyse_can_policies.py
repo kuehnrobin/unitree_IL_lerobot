@@ -292,6 +292,16 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
         if task not in policy_stats.columns:
             policy_stats[task] = 0
     
+    # Ensure all policies have entries for all tasks, especially Return to Home Position
+    all_policies = policy_stats.index.tolist()
+    for policy in all_policies:
+        # Set Return to Home Position to 0.00 if missing data
+        if pd.isna(policy_stats.loc[policy, "Return to Home Position"]) or policy_stats.loc[policy, "Return to Home Position"] == 0:
+            # Check if this policy actually has Return to Home data in the original DataFrame
+            rh_data = df[(df['Policy'] == policy) & (df['Task'] == 'Return to Home Position') & (df['Color'] == 'all')]
+            if rh_data.empty:
+                policy_stats.loc[policy, "Return to Home Position"] = 0.00
+    
     policy_stats = policy_stats[subtasks]  # Reorder columns
     
     # Set up radar chart with better proportions
@@ -324,11 +334,21 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
 
         # Enhanced dynamic label positioning with consistent radius
         for j, (angle, value) in enumerate(zip(angles[:-1], values[:-1])):
+            task_name = subtasks[j] if j < len(subtasks) else "Unknown"
+            
             # Enhanced condition for showing labels with better logic for zero values
             should_show_label = value > 0.05
-            if policy.startswith('R-S') and value <= 0.05:
-                task_name = subtasks[j] if j < len(subtasks) else "Unknown"
-                if task_name != "Hand Move to Can":  # Skip first task for R-S policy
+            
+            # Special handling for policies with zero/missing values
+            if value <= 0.05:
+                # For Return to Home Position, always show 0.00 if no data
+                if task_name == "Return to Home Position":
+                    should_show_label = True
+                # For Execution Time, show "No Time" if policy has no time data
+                elif task_name == "Execution Time":
+                    should_show_label = True
+                # For R-S policy, show labels except for first task
+                elif policy.startswith('R-S') and task_name != "Hand Move to Can":
                     should_show_label = True
             
             if should_show_label:
@@ -338,9 +358,9 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
 
                 # Enhanced angle jitter for better label distribution
                 if angle_deg <= 45 or (135 < angle_deg <= 225) or angle_deg >= 315:
-                    angle_jitter = 0.07  # Stronger jitter for top/bottom
+                    angle_jitter = 0.52  # Stronger jitter for top/bottom to spread horizontally more
                 else:
-                    angle_jitter = 0.05  # Moderate jitter for left/right
+                    angle_jitter = 0.35  # Moderate jitter for left/right
                 angle_shifted = angle + norm_idx * angle_jitter
 
                 # Use consistent radius for all labels - professional positioning
@@ -357,21 +377,23 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
                     ha, va = 'right', 'center'
 
                 # Determine label text based on task type with enhanced formatting
-                task_name = subtasks[j] if j < len(subtasks) else "Unknown"
                 if task_name == "Execution Time":
-                    if policy in time_info.get('policy_times', {}):
+                    if policy in time_info.get('policy_times', {}) and value > 0.05:
                         # Show actual time in minutes for policies with time data
                         actual_minutes = time_info['policy_times'][policy]['minutes']
                         label_text = f"{actual_minutes:.1f}min"
                     else:
-                        # Show "No Time" for policies without time data (like R-S)
+                        # Show "No Time" for policies without time data or with zero scores
                         label_text = "No Time"
+                elif task_name == "Return to Home Position" and value <= 0.05:
+                    # Always show 0.00 for Return to Home Position when no data
+                    label_text = "0.00"
                 else:
                     # Show normalized score for other tasks
                     label_text = f"{value:.2f}"
 
                 # Enhanced label styling with professional bbox
-                ax.text(angle_shifted, label_r, label_text, ha=ha, va=va, fontsize=12, fontweight='bold',
+                ax.text(angle_shifted, label_r, label_text, ha=ha, va=va, fontsize=14, fontweight='bold',
                         bbox=dict(boxstyle='round,pad=0.26', facecolor='white', edgecolor=color, alpha=0.9, linewidth=1.2),
                         zorder=10, clip_on=False)
 
@@ -405,14 +427,14 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
     # Professional legend with enhanced positioning and styling
     legend = ax.legend(loc='lower right', bbox_to_anchor=(1.05, -0.15),
                       borderaxespad=0.0, frameon=True, fancybox=True, shadow=True,
-                      fontsize=13, title='ACT Policies', title_fontsize=13)
+                      fontsize=14, title='ACT Policies', title_fontsize=16)
     legend.get_frame().set_facecolor('#f8f9fa')
     legend.get_frame().set_edgecolor('#dee2e6')
     legend.get_frame().set_linewidth(1.4)
     legend.get_title().set_fontweight('bold')
 
     # Enhanced titles with professional positioning
-    fig.suptitle('Policy Performance Comparison on Can Sorting Task (Lighting Test)',
+    fig.suptitle('Policy Performance Comparison on Can Sorting Task)',
                  x=0.23, y=1.0, size=18, fontweight='bold', color='#2c3e50', ha='left')
     fig.text(0.33, 0.975, 'Success Rate by Subtask (0.0 = Failure, 1.0 = Success)', 
              ha='left', va='top', fontsize=14, style='italic', color='#6c757d')
@@ -565,7 +587,7 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
             ax.spines['right'].set_linewidth(1.6)
     
     # Professional main title with subtitle - A4 optimized
-    fig.suptitle('ACT Policy Performance Analysis: Can Sorting Task (Lighting Test)', 
+    fig.suptitle('ACT Policy Performance Analysis: Can Sorting Task', 
                 fontsize=28, fontweight='bold', y=0.985, color='#2c3e50')
     
     # Add subtitle
@@ -729,7 +751,7 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         ax1.set_ylabel('Total Score', fontsize=26, fontweight='bold', color='#2c3e50')
         
         # Title adjustments with enhanced styling
-        if task_label == 'Total Score Sort Cans(Lighting Test)':
+        if task_label == 'Total Score Sort Cans':
             ax1.set_title('Total Policy Performance Score', fontsize=25, fontweight='bold', color='#2c3e50', pad=25)
         elif task_label == 'Total Score (No RH)':
             ax1.set_title('Total Score Without RH Subtask', fontsize=25, fontweight='bold', color='#2c3e50', pad=25)
@@ -757,7 +779,9 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
             # Standard deviation label on error bar top with neutral styling
             # Skip R-S policy to prevent overlap
             if not (policy.startswith('R-S') and std > 0):
-                ax1.text(bar.get_x() + bar.get_width()/2., val + std + 0.035, f'±{std:.2f}',
+                # Extra spacing for R-A-AUG to prevent overlap with mean label
+                extra_spacing = 0.025 if policy == 'R-A-AUG' else 0.0
+                ax1.text(bar.get_x() + bar.get_width()/2., val + std + 0.035 + extra_spacing, f'±{std:.2f}',
                         ha='center', va='bottom', fontsize=16, fontweight='medium',
                         bbox=dict(boxstyle='round,pad=0.3', facecolor='#f8f9fa', 
                                  edgecolor='#95a5a6', alpha=0.90, linewidth=1.2),
@@ -846,8 +870,8 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         ax2.spines['right'].set_edgecolor('#bdc3c7')
         ax2.spines['right'].set_linewidth(1.6)
         
-        # Enhanced main titles and reference line legends
-        main_title = 'ACT Policy Performance Analysis: Can Sorting Task'
+        #Enhanced main titles removed - subplot titles are sufficient
+        main_title = 'ACT Performance Evaluation: Can Sorting Task'
         if task_label == 'Total Score':
             subtitle = 'Total Score Analysis (With Return Home)'
         elif task_label == 'Total Score (No RH)':
@@ -856,7 +880,7 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
             subtitle = f'{task_label} Analysis'
         
         fig.suptitle(main_title, fontsize=28, fontweight='bold', y=0.985, color='#2c3e50')
-        fig.text(0.5, 0.965, subtitle, ha='center', va='top', fontsize=20, 
+        fig.text(0.5, 0.94, subtitle, ha='center', va='top', fontsize=20, 
                 style='italic', color='#7f8c8d')
         
         # Create policy legend at bottom left
@@ -880,8 +904,8 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         # Combine all legend elements
         all_legend_elements = policy_legend_elements + reference_legend_elements
         
-        # Position legend at bottom left in multiple rows
-        legend = fig.legend(handles=all_legend_elements, loc='lower left', bbox_to_anchor=(-0.01, 0.16),
+        # Position legend at bottom left in multiple rows - moved down further
+        legend = fig.legend(handles=all_legend_elements, loc='lower left', bbox_to_anchor=(0.06, 0.04),
                            frameon=True, fancybox=True, shadow=True, fontsize=18, 
                            ncol=(len(all_legend_elements) + 3) // 4, columnspacing=1.5, handletextpad=0.8,
                            title='ACT Policies & Reference Lines', title_fontsize=20)
@@ -891,8 +915,8 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         legend.get_title().set_fontweight('bold')
         legend.get_title().set_color('#2c3e50')
         
-        # Professional layout with proper spacing
-        plt.tight_layout(rect=[0, 0.15, 1, 0.96])
+        # Professional layout with proper spacing - adjusted for lower legend position
+        plt.tight_layout(rect=[0, 0.10, 1, 0.94])
         
         plt.savefig(output_dir/filename, bbox_inches='tight', facecolor='white', edgecolor='none')
         plt.close()
