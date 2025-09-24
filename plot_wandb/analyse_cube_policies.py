@@ -568,9 +568,10 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
             else:
                 label_text = f"{mean:.3f}"
             ax.text(bar.get_x() + bar.get_width()/2., label_y, label_text, ha='center', va='bottom', 
-                    fontsize=13, fontweight='bold', color='#2c3e50',
+                    fontsize=16, fontweight='bold', color='#2c3e50',
                     bbox=dict(boxstyle='round,pad=0.3', facecolor='white', edgecolor=thesis_colors[i % len(thesis_colors)], 
-                             alpha=0.92, linewidth=1.4))
+                             alpha=0.92, linewidth=1.4)
+                    )
         
         # Add horizontal reference lines for common thresholds
         for threshold, color, style in [(0.5, '#e74c3c', '--'), (0.8, '#27ae60', ':')]:
@@ -626,16 +627,16 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
     # Combine all legend elements
     all_legend_elements = policy_legend_elements + reference_legend_elements
     
-    # Position legend at bottom right with better formatting
-    legend = fig.legend(handles=all_legend_elements, loc='lower right', bbox_to_anchor=(0.98, 0.01),
-                       frameon=True, fancybox=True, shadow=True, fontsize=14, ncol=2,
-                       columnspacing=1.5, handletextpad=0.8)
+    # Position legend across the bottom in two rows
+    legend = fig.legend(handles=all_legend_elements, loc='lower center', bbox_to_anchor=(0.5, 0.01),
+                       frameon=True, fancybox=True, shadow=True, fontsize=18, 
+                       ncol=(len(all_legend_elements) + 1) // 2, columnspacing=1.5, handletextpad=0.8)
     legend.get_frame().set_facecolor('#f8f9fa')
     legend.get_frame().set_edgecolor('#dee2e6')
     legend.get_frame().set_linewidth(1.4)
     
-    # Professional layout with proper spacing optimized for A4
-    plt.tight_layout(rect=[0, 0.08, 1, 0.96])
+    # Professional layout with proper spacing optimized for A4 - space for two-row legend
+    plt.tight_layout(rect=[0, 0.14, 1, 0.96])
     
     plt.savefig(output_dir / 'grouped_bar_plot_with_errors.pdf', bbox_inches='tight', facecolor='white', edgecolor='none')
 
