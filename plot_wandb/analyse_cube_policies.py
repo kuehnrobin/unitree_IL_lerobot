@@ -354,8 +354,8 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
     policy_stats = policy_stats[subtasks]  # Reorder columns
     
     # Professional color scheme
-    thesis_colors = ['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd','#8c564b','#e377c2','#7f7f7f']
-    
+    #thesis_colors = ['#1f77b4','#ff7f0e','#2ca02c','#d62728','#9467bd','#8c564b','#e377c2','#7f7f7f']
+    thesis_colors = ['#3498db','#e377c2','#e74c3c','#2ecc71','#f39c12','#9b59b6','#1abc9c','#34495e','#e67e22']
     # Set up radar chart with better proportions
     N = len(subtasks)
     angles = [n / float(N) * 2 * pi for n in range(N)]
@@ -392,19 +392,19 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
 
                 # Stronger angle jitter at top/bottom to spread horizontally more
                 if angle_deg <= 45 or (135 < angle_deg <= 225) or angle_deg >= 315:
-                    angle_jitter = 0.40
+                    angle_jitter = 0.50
                 else:
-                    angle_jitter = 0.30
+                    angle_jitter = 0.33
                 angle_shifted = angle + norm_idx * angle_jitter
 
                 # Push labels further outward
                 base_tb = 0.18 if value < 0.3 else 0.16
                 base_lr = 0.16
                 signed_radial = 0.04 * norm_idx
-                outside_min_top = 1.18
-                outside_min_lr  = 1.20
-                outside_min_bot = 1.20
-                outside_max = 1.40  # keep below tick label at left that we move to ~1.24
+                outside_min_top = 1.12
+                outside_min_lr  = 1.12
+                outside_min_bot = 1.10
+                outside_max = 1.35  # keep below tick label at left that we move to ~1.24
 
                 if angle_deg <= 45 or angle_deg >= 315:
                     label_r = min(max(value + base_tb + abs(signed_radial), outside_min_top), outside_max); ha, va = 'center', 'bottom'
@@ -447,28 +447,28 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
     ax.tick_params(axis='x', pad=45)  # push all task labels outward
 
     # Increase radial limit to make room for outside labels
-    ax.set_ylim(0, 1.42)
+    ax.set_ylim(0, 1.34)
     ax.set_yticks([0.2,0.4,0.6,0.8,1.0])
-    ax.set_yticklabels(['0.2','0.4','0.6','0.8','1.0'], fontsize=13, alpha=0.85, fontweight='medium')
+    ax.set_yticklabels(['0.2','0.4','0.6','0.8','1.0'], fontsize=13, alpha=0.9, fontweight='medium')
 
     # Add radial grid lines at specific values
     for tick in [0.2,0.4,0.6,0.8,1.0]:
         ax.plot([0, 2*pi], [tick, tick], color='gray', alpha=0.22, linewidth=0.8)
     
     # Legend moved slightly left
-    legend = ax.legend(loc='lower right', bbox_to_anchor=(1.18, -0.17), borderaxespad=0.0, frameon=True, fancybox=True, shadow=True,
-                       fontsize=12, title='ACT Policies', title_fontsize=13)
+    legend = ax.legend(loc='lower right', bbox_to_anchor=(1.08, -0.17), borderaxespad=0.0, frameon=True, fancybox=True, shadow=True,
+                       fontsize=13, title='ACT Policies', title_fontsize=13)
     legend.get_frame().set_facecolor('#f8f9fa')
     legend.get_frame().set_edgecolor('#dee2e6')
     legend.get_frame().set_linewidth(1.4)
     legend.get_title().set_fontweight('bold')
 
     # Titles
-    fig.suptitle('Policy Performance Comparison on Grasp Cube and Place in Box Task', x=0.26, y=1.0, size=22, fontweight='bold', color='#2c3e50', ha='left')
-    fig.text(0.33, 0.985, 'Success Rate by Subtask (0.0 = Failure, 1.0 = Success)', 
+    fig.suptitle('Policy Performance Comparison on Place Cube in Box Task', x=0.20, y=1.0, size=18, fontweight='bold', color='#2c3e50', ha='left')
+    fig.text(0.28, 0.985, 'Success Rate by Subtask (0.0 = Failure, 1.0 = Success)', 
              ha='left', va='top', fontsize=14, style='italic', color='#6c757d')
 
-    plt.tight_layout(rect=[0.00, 0.00, 1.00, 0.82])
+    plt.tight_layout(rect=[0.00, 0.00, 1.00, 0.9])
     plt.savefig(output_dir / 'radar_chart_policy_comparison.pdf', bbox_inches='tight', facecolor='white', edgecolor='none')
 
 
@@ -489,8 +489,7 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
     policies = stats['Policy'].unique()
     
     # Professional color scheme for thesis
-    thesis_colors = ['#3498db','#e74c3c','#2ecc71','#f39c12','#9b59b6','#1abc9c','#34495e','#e67e22']
-    
+    thesis_colors = ['#3498db','#e377c2','#e74c3c','#2ecc71','#f39c12','#9b59b6','#1abc9c','#34495e','#e67e22']
     # Set up the plot with better spacing and professional styling - now 3x2 grid
     fig, axes = plt.subplots(3, 2, figsize=(23, 25), dpi=150)
     axes = axes.flatten()
