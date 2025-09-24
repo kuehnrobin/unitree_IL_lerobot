@@ -385,7 +385,14 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
 
         # Enhanced dynamic label positioning with consistent radius
         for j, (angle, value) in enumerate(zip(angles[:-1], values[:-1])):
-            if value > 0.05:
+            # Hard-coded fix: show "0.0" labels for R-S policy where value is 0, except for "Move to Cube"
+            should_show_label = value > 0.05
+            if policy == "R-S" and value <= 0.05:
+                task_name = subtasks[j] if j < len(subtasks) else "Unknown"
+                if task_name != "Hand Move to Cube":  # Skip "Move to Cube" task
+                    should_show_label = True
+            
+            if should_show_label:
                 angle_deg = (angle * 180 / pi) % 360
                 # Normalized policy offset in [-1, 1]
                 norm_idx = (idx - (n_policies - 1) / 2) / ((n_policies - 1) / 2) if n_policies > 1 else 0.0
@@ -417,7 +424,7 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
                     actual_minutes = time_info['policy_times'][policy]['minutes']
                     label_text = f"{actual_minutes:.1f}min"
                 else:
-                    # Show normalized score for other tasks
+                    # Show normalized score for other tasks (including hard-coded 0.0 for R-S)
                     label_text = f"{value:.2f}"
 
                 ax.text(angle_shifted, label_r, label_text, ha=ha, va=va, fontsize=11, fontweight='bold',
