@@ -565,10 +565,13 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
             label_y = height + std + 0.05
             if task == "Execution Time" and policies[i] in time_info.get('policy_times', {}):
                 label_text = f"{time_info['policy_times'][policies[i]]['minutes']:.1f}min"
+                rotation = 45  # Tilt execution time labels
             else:
-                label_text = f"{mean:.3f}"
+                label_text = f"{mean:.3f}"  # Keep three digits after decimal
+                rotation = 0  # Keep other labels horizontal
+            
             ax.text(bar.get_x() + bar.get_width()/2., label_y, label_text, ha='center', va='bottom', 
-                    fontsize=16, fontweight='bold', color='#2c3e50', rotation=45,
+                    fontsize=16, fontweight='bold', color='#2c3e50', rotation=rotation,
                     bbox=dict(boxstyle='round,pad=0.3', facecolor='white', edgecolor=thesis_colors[i % len(thesis_colors)], 
                              alpha=0.92, linewidth=1.4)
                     )
