@@ -399,13 +399,13 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
 
                 # Stronger angle jitter at top/bottom to spread horizontally more
                 if angle_deg <= 45 or (135 < angle_deg <= 225) or angle_deg >= 315:
-                    angle_jitter = 0.40
+                    angle_jitter = 0.45
                 else:
                     angle_jitter = 0.30
                 angle_shifted = angle + norm_idx * angle_jitter
 
                 # Use consistent radius for all labels
-                label_r = 1.15  # Fixed radius for all labels
+                label_r = 1.1  # Fixed radius for all labels
 
                 # Determine text alignment based on angle
                 if angle_deg <= 45 or angle_deg >= 315:
@@ -427,7 +427,7 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
                     # Show normalized score for other tasks (including hard-coded 0.0 for R-S)
                     label_text = f"{value:.2f}"
 
-                ax.text(angle_shifted, label_r, label_text, ha=ha, va=va, fontsize=11, fontweight='bold',
+                ax.text(angle_shifted, label_r, label_text, ha=ha, va=va, fontsize=12, fontweight='bold',
                         bbox=dict(boxstyle='round,pad=0.26', facecolor='white', edgecolor=color, alpha=0.9, linewidth=1.2),
                         zorder=10, clip_on=False)
 
@@ -449,9 +449,9 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
     ax.tick_params(axis='x', pad=45)  # push all task labels outward
 
     # Increase radial limit to make room for outside labels
-    ax.set_ylim(0, 1.34)
+    ax.set_ylim(0, 1.3)
     ax.set_yticks([0.2,0.4,0.6,0.8,1.0])
-    ax.set_yticklabels(['0.2','0.4','0.6','0.8','1.0'], fontsize=13, alpha=0.9, fontweight='medium')
+    ax.set_yticklabels(['0.2','0.4','0.6','0.8','1.0'], fontsize=14, alpha=0.95, fontweight='medium')
 
     # Add radial grid lines at specific values
     for tick in [0.2,0.4,0.6,0.8,1.0]:
@@ -466,11 +466,11 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
     legend.get_title().set_fontweight('bold')
 
     # Titles
-    fig.suptitle('Policy Performance Comparison on Place Cube in Box Task', x=0.20, y=1.0, size=18, fontweight='bold', color='#2c3e50', ha='left')
-    fig.text(0.28, 0.985, 'Success Rate by Subtask (0.0 = Failure, 1.0 = Success)', 
+    fig.suptitle('Policy Performance Comparison on Place Cube in Box Task', x=0.23, y=1.0, size=18, fontweight='bold', color='#2c3e50', ha='left')
+    fig.text(0.33, 0.975, 'Success Rate by Subtask (0.0 = Failure, 1.0 = Success)', 
              ha='left', va='top', fontsize=14, style='italic', color='#6c757d')
 
-    plt.tight_layout(rect=[0.00, 0.00, 1.00, 0.95])
+    plt.tight_layout(rect=[0.00, 0.00, 1.00, 0.97])
     plt.savefig(output_dir / 'radar_chart_policy_comparison.pdf', bbox_inches='tight', facecolor='white', edgecolor='none')
 
 
