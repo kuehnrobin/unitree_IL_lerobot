@@ -1014,13 +1014,22 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     for threshold, color, style in [(0.5, '#e74c3c', '--'), (0.8, '#27ae60', ':'), (1.0, '#27ae60', '-')]:
         ax1.axhline(y=threshold, color=color, linestyle=style, alpha=0.7, linewidth=2.5)
     
-    # Add value labels with bbox styling - tilted 90 degrees
+    # Add separate mean and std deviation labels
     for i, (bar, mean, std) in enumerate(zip(bars, policy_stats['mean'], policy_stats['std'])):
-        height = bar.get_height()
-        ax1.text(bar.get_x() + bar.get_width()/2., height + 0.035, f'{mean:.2f}±{std:.2f}', 
-                ha='center', va='bottom', fontweight='bold', fontsize=18, rotation=45,
-                bbox=dict(boxstyle='round,pad=0.3', facecolor='white', edgecolor=colors[i % len(colors)], 
+        bar_height = bar.get_height()
+        
+        # Mean label on top of actual bar (horizontal)
+        ax1.text(bar.get_x() + bar.get_width()/2., bar_height + 0.015, f'{mean:.2f}', 
+                ha='center', va='bottom', fontweight='bold', fontsize=16, rotation=0,
+                bbox=dict(boxstyle='round,pad=0.25', facecolor='white', edgecolor=colors[i % len(colors)], 
                          alpha=0.92, linewidth=1.4))
+        
+        # Standard deviation label on top of error bar
+        error_bar_top = bar_height + std
+        ax1.text(bar.get_x() + bar.get_width()/2., error_bar_top + 0.025, f'±{std:.2f}', 
+                ha='center', va='bottom', fontweight='normal', fontsize=14, rotation=0,
+                bbox=dict(boxstyle='round,pad=0.2', facecolor='#f0f0f0', edgecolor='#666666', 
+                         alpha=0.85, linewidth=1.0))
     
     # 2. Color-based performance for total score
     if len(total_score_data['Color'].unique()) > 1:
@@ -1132,8 +1141,8 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     # Combine all legend elements
     all_legend_elements = policy_legend_elements + reference_legend_elements
     
-    # Position legend at bottom left in four rows - moved further left and up
-    legend = fig.legend(handles=all_legend_elements, loc='lower left', bbox_to_anchor=(-0.01, 0.12),
+    # Position legend at bottom left in four rows - moved further left and higher up
+    legend = fig.legend(handles=all_legend_elements, loc='lower left', bbox_to_anchor=(-0.01, 0.16),
                        frameon=True, fancybox=True, shadow=True, fontsize=18, 
                        ncol=(len(all_legend_elements) + 3) // 4, columnspacing=1.5, handletextpad=0.8,
                        title='ACT Policies & Reference Lines', title_fontsize=20)
