@@ -664,7 +664,7 @@ def create_hand_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     
     # Professional styling optimized for A4 format - narrower but taller
     plt.style.use('default')
-    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 20), dpi=150)
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 16), dpi=150)
     
     # 1. Overall performance by hand
     hand_stats = hand_data.groupby('Hand')['Score'].agg(['mean', 'std', 'count'])
@@ -841,7 +841,7 @@ def create_color_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     ax1.set_xticklabels([color.title() + ' Cubes' for color in color_stats.index], fontsize=22)
     # Only show y-axis label for left subplot
     ax1.set_ylabel('Success Rate', fontsize=26, fontweight='bold', color='#2c3e50')
-    ax1.set_title('Overall Performance by Cube Color', fontsize=28, fontweight='bold', pad=25, color='#2c3e50')
+    ax1.set_title('Performance by Cube Color', fontsize=28, fontweight='bold', pad=25, color='#2c3e50')
     ax1.set_ylim(0, 1.22)
     ax1.grid(axis='y', alpha=0.4)
     ax1.tick_params(axis='y', labelsize=20, colors='#34495e', width=2, length=6)
