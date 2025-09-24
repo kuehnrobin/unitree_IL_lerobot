@@ -419,10 +419,14 @@ def create_radar_chart(df: pd.DataFrame, time_info: dict, output_dir: Path, incl
 
                 # Determine label text based on task type
                 task_name = subtasks[j] if j < len(subtasks) else "Unknown"
-                if task_name == "Execution Time" and policy in time_info.get('policy_times', {}):
-                    # Show actual time in minutes for execution time
-                    actual_minutes = time_info['policy_times'][policy]['minutes']
-                    label_text = f"{actual_minutes:.1f}min"
+                if task_name == "Execution Time":
+                    if policy in time_info.get('policy_times', {}):
+                        # Show actual time in minutes for policies with time data
+                        actual_minutes = time_info['policy_times'][policy]['minutes']
+                        label_text = f"{actual_minutes:.1f}min"
+                    else:
+                        # Show "No Time" for policies without time data (like R-S)
+                        label_text = "No Time"
                 else:
                     # Show normalized score for other tasks (including hard-coded 0.0 for R-S)
                     label_text = f"{value:.2f}"
