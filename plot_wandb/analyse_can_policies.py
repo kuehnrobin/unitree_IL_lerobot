@@ -223,18 +223,33 @@ def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
                     manip = []
                     break
                 manip.append(r['Score'].iloc[0])
-            if len(manip)!=4 or time_score is None:
+            if len(manip)!=4:
                 continue
-            # total without RH
-            components_no = manip + [time_score]  # (sum manip + time)/5
-            total_no = float(np.mean(components_no))
-            std_no = float(np.std(components_no, ddof=1)) if len(components_no)>1 else 0.0
-            total_rows.append({'Policy':policy,'Trial':1,'Color':color_tag,'Task':'Total Score (No RH)','Score':total_no,'Std':std_no})
-            if home_score is not None:
-                components_with = manip + [home_score, time_score]  # (sum manip + home + time)/6
-                total_with = float(np.mean(components_with))
-                std_with = float(np.std(components_with, ddof=1)) if len(components_with)>1 else 0.0
-                total_rows.append({'Policy':policy,'Trial':1,'Color':color_tag,'Task':'Total Score','Score':total_with,'Std':std_with})
+            
+            # Handle policies with and without execution time data
+            if time_score is not None:
+                # Standard calculation with execution time
+                # total without RH
+                components_no = manip + [time_score]  # (sum manip + time)/5
+                total_no = float(np.mean(components_no))
+                std_no = float(np.std(components_no, ddof=1)) if len(components_no)>1 else 0.0
+                total_rows.append({'Policy':policy,'Trial':1,'Color':color_tag,'Task':'Total Score (No RH)','Score':total_no,'Std':std_no})
+                if home_score is not None:
+                    components_with = manip + [home_score, time_score]  # (sum manip + home + time)/6
+                    total_with = float(np.mean(components_with))
+                    std_with = float(np.std(components_with, ddof=1)) if len(components_with)>1 else 0.0
+                    total_rows.append({'Policy':policy,'Trial':1,'Color':color_tag,'Task':'Total Score','Score':total_with,'Std':std_with})
+            else:
+                # For policies without execution time (like R-A-P), use only manipulation tasks
+                # total without RH (only manipulation tasks)
+                total_no = float(np.mean(manip))  # just average of 4 manipulation tasks
+                std_no = float(np.std(manip, ddof=1)) if len(manip)>1 else 0.0
+                total_rows.append({'Policy':policy,'Trial':1,'Color':color_tag,'Task':'Total Score (No RH)','Score':total_no,'Std':std_no})
+                if home_score is not None:
+                    components_with = manip + [home_score]  # (sum manip + home)/5
+                    total_with = float(np.mean(components_with))
+                    std_with = float(np.std(components_with, ddof=1)) if len(components_with)>1 else 0.0
+                    total_rows.append({'Policy':policy,'Trial':1,'Color':color_tag,'Task':'Total Score','Score':total_with,'Std':std_with})
     if total_rows:
         totals_df = pd.DataFrame(total_rows)
         df = pd.concat([df, totals_df[['Policy','Trial','Color','Task','Score']]], ignore_index=True)
@@ -688,12 +703,14 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
                 print(f"    SKIP: {policy} - missing manipulation tasks")
                 continue
             time_row = df[(df['Policy']==policy)&(df['Task']=='Execution Time')&(df['Color']=='all')]
-            if time_row.empty:
-                print(f"    SKIP: {policy} - missing Execution Time")
-                continue
-            time_sc = time_row['Score'].iloc[0]
-            print(f"    Found Execution Time with score: {time_sc:.3f}")
-            comps = manip_vals + [time_sc]
+            time_sc = None
+            if not time_row.empty:
+                time_sc = time_row['Score'].iloc[0]
+                print(f"    Found Execution Time with score: {time_sc:.3f}")
+                comps = manip_vals + [time_sc]
+            else:
+                print(f"    No Execution Time found for {policy} - using manipulation tasks only")
+                comps = manip_vals
             if task_is_with:
                 rh_row = df[(df['Policy']==policy)&(df['Task']=='Return to Home Position')&(df['Color']=='all')]
                 if rh_row.empty:
@@ -701,7 +718,10 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
                     continue
                 rh_sc = rh_row['Score'].iloc[0]
                 print(f"    Found Return to Home Position with score: {rh_sc:.3f}")
-                comps = manip_vals + [rh_sc, time_sc]
+                if time_sc is not None:
+                    comps = manip_vals + [rh_sc, time_sc]
+                else:
+                    comps = manip_vals + [rh_sc]
             comp_map[policy] = comps
             print(f"    SUCCESS: {policy} added to component map with {len(comps)} components")
         
@@ -777,8 +797,8 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
                              edgecolor=policy_color, alpha=0.92, linewidth=1.4))
             
             # Standard deviation label on error bar top with neutral styling
-            # Skip R-S policy to prevent overlap
-            if not (policy.startswith('R-S') and std > 0):
+            # Skip only exact 'R-S' policy to prevent overlap, but include R-SW and R-S_LWA
+            if not (policy == 'R-S' and std > 0):
                 # Extra spacing for R-A-AUG to prevent overlap with mean label
                 extra_spacing = 0.025 if policy == 'R-A-AUG' else 0.0
                 ax1.text(bar.get_x() + bar.get_width()/2., val + std + 0.035 + extra_spacing, f'±{std:.2f}',
