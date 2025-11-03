@@ -271,15 +271,15 @@ def parse_csv_data(csv_path: str) -> Tuple[pd.DataFrame, dict]:
 #     '#00bcd4',  # Cyan R-W_RA
 # ]
 POLICY_COLORS = [
-    '#3498db',  # Blue R-A    # Passt
-    '#4b0082',  # Indigo R-A-AUG # Bright yellow-gold, distinct from all other colors
-    '#228b22',  # Forest Green R-A-P # Professional green tone
-    '#dc143c',  # Crimson R-SW # Deep red, distinct from other reds
-    '#ffd700',  # Gold  R-S_LWA # Deep purple-blue, distinct from purple
-    '#9b59b6',  # Purple R-WA # Passt
-    '#1abc9c',  # Teal R-WA-P # Passt
-    '#34495e',  # Slate Gray R-WA-PV_AT_A # Passt
-    '#ff6347',  # Tomato R-W_RA # Orange-red, easily distinguishable
+    '#3498db',  # Blue R-A    
+    '#4b0082',  # Indigo R-A-AUG 
+    '#228b22',  # Forest Green R-A-P
+    '#dc143c',  # Crimson R-SW 
+    '#ffd700',  # Gold  R-S_LWA
+    '#9b59b6',  # Purple R-WA
+    '#1abc9c',  # Teal R-WA-P
+    '#34495e',  # Slate Gray R-WA-PV_AT_A
+    '#ff6347',  # Tomato R-W_RA
 ]
 
 POLICY_COLOR_MAP = {}
