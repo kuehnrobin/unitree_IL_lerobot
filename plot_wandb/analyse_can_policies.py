@@ -512,9 +512,17 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
                 means.append(0)
                 stds.append(0)
         
+        # Clip error bars so they don't exceed 1.0 (100%)
+        clipped_stds = []
+        for mean, std in zip(means, stds):
+            # Ensure error bar top doesn't exceed 1.0
+            max_allowed_std = max(0, 1.0 - mean)
+            clipped_std = min(std, max_allowed_std)
+            clipped_stds.append(clipped_std)
+        
         # Create beautiful bars with enhanced styling using consistent colors
         bar_colors = [POLICY_COLOR_MAP.get(p, POLICY_COLORS[i % len(POLICY_COLORS)]) for i,p in enumerate(policies)]
-        bars = ax.bar(x, means, yerr=stds, capsize=8,
+        bars = ax.bar(x, means, yerr=clipped_stds, capsize=8,
                       color=bar_colors,
                       alpha=0.85, edgecolor='white', linewidth=2,
                       error_kw={'elinewidth': 2, 'capthick': 2, 'ecolor': '#2c3e50', 'alpha': 0.8})
@@ -756,7 +764,16 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
         ax1.set_axisbelow(True)
         
         x = np.arange(len(overall_stats.index))
-        bars = ax1.bar(x, overall_stats['Score'], yerr=overall_stats['Std'], capsize=12,
+        
+        # Clip error bars so they don't exceed 1.0 (100%)
+        clipped_yerr = []
+        for score, std in zip(overall_stats['Score'], overall_stats['Std']):
+            # Ensure error bar top doesn't exceed 1.0
+            max_allowed_std = max(0, 1.0 - score)
+            clipped_std = min(std, max_allowed_std)
+            clipped_yerr.append(clipped_std)
+        
+        bars = ax1.bar(x, overall_stats['Score'], yerr=clipped_yerr, capsize=12,
                        color=[POLICY_COLOR_MAP.get(p, POLICY_COLORS[i % len(POLICY_COLORS)]) for i,p in enumerate(overall_stats.index)],
                        edgecolor='white', linewidth=2, alpha=0.85,
                        error_kw={'elinewidth': 2, 'capthick': 2, 'ecolor': '#2c3e50', 'alpha': 0.8})
