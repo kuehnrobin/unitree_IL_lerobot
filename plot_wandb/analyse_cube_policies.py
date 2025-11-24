@@ -582,8 +582,15 @@ def create_grouped_bar_plot(df: pd.DataFrame, time_info: dict, output_dir: Path)
             else:
                 means.append(0); stds.append(0)
         
+        # Clip error bars to prevent exceeding 1.0 (100%)
+        clipped_stds = []
+        for mean, std in zip(means, stds):
+            max_allowed_std = max(0, 1.0 - mean)
+            clipped_std = min(std, max_allowed_std)
+            clipped_stds.append(clipped_std)
+        
         # Create beautiful bars with enhanced styling
-        bars = ax.bar(x, means, yerr=stds, capsize=8,
+        bars = ax.bar(x, means, yerr=clipped_stds, capsize=8,
                      color=[thesis_colors[i % len(thesis_colors)] for i in range(len(policies))],
                      alpha=0.85, edgecolor='white', linewidth=2,
                      error_kw={'elinewidth': 2, 'capthick': 2, 'ecolor': '#2c3e50', 'alpha': 0.8})
@@ -732,10 +739,17 @@ def create_hand_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     # 1. Overall performance by hand
     hand_stats = hand_data.groupby('Hand')['Score'].agg(['mean', 'std', 'count'])
     
+    # Clip error bars to prevent exceeding 1.0 (100%)
+    clipped_yerr = []
+    for mean, std in zip(hand_stats['mean'], hand_stats['std']):
+        max_allowed_std = max(0, 1.0 - mean)
+        clipped_std = min(std, max_allowed_std)
+        clipped_yerr.append(clipped_std)
+    
     colors = ['#3498db', '#e74c3c']
     x = np.arange(len(hand_stats.index))
     
-    bars = ax1.bar(x, hand_stats['mean'], yerr=hand_stats['std'], capsize=12, color=colors[:len(hand_stats)], 
+    bars = ax1.bar(x, hand_stats['mean'], yerr=clipped_yerr, capsize=12, color=colors[:len(hand_stats)], 
                    alpha=0.85, edgecolor='white', linewidth=2)
     
     ax1.set_xticks(x)
@@ -894,13 +908,20 @@ def create_color_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     # 1. Overall performance by color
     color_stats = color_data.groupby('Color')['Score'].agg(['mean', 'std', 'count'])
     
+    # Clip error bars to prevent exceeding 1.0 (100%)
+    clipped_yerr = []
+    for mean, std in zip(color_stats['mean'], color_stats['std']):
+        max_allowed_std = max(0, 1.0 - mean)
+        clipped_std = min(std, max_allowed_std)
+        clipped_yerr.append(clipped_std)
+    
     # Use color-appropriate colors for visualization
     color_map = {'red': '#e74c3c', 'green': '#2ecc71', 'black': '#34495e'}
     bar_colors = [color_map.get(color, '#95a5a6') for color in color_stats.index]
     
     x = np.arange(len(color_stats.index))
     
-    bars = ax1.bar(x, color_stats['mean'], yerr=color_stats['std'], capsize=12, color=bar_colors, alpha=0.85, edgecolor='white', linewidth=2)
+    bars = ax1.bar(x, color_stats['mean'], yerr=clipped_yerr, capsize=12, color=bar_colors, alpha=0.85, edgecolor='white', linewidth=2)
     
     ax1.set_xticks(x)
     ax1.set_xticklabels([color.title() + ' Cubes' for color in color_stats.index], fontsize=22)
@@ -1056,10 +1077,17 @@ def create_total_score_analysis(df: pd.DataFrame, output_dir: Path) -> None:
     # 1. Bar plot of total scores
     policy_stats = total_score_data.groupby('Policy')['Score'].agg(['mean', 'std', 'count'])
     
+    # Clip error bars to prevent exceeding 1.0 (100%)
+    clipped_yerr = []
+    for mean, std in zip(policy_stats['mean'], policy_stats['std']):
+        max_allowed_std = max(0, 1.0 - mean)
+        clipped_std = min(std, max_allowed_std)
+        clipped_yerr.append(clipped_std)
+    
     colors = ['#3498db','#e377c2','#e74c3c','#2ecc71','#f39c12','#9b59b6','#1abc9c','#34495e','#e67e22']
     x = np.arange(len(policy_stats.index))
     
-    bars = ax1.bar(x, policy_stats['mean'], yerr=policy_stats['std'], capsize=12, color=colors[:len(policy_stats)], 
+    bars = ax1.bar(x, policy_stats['mean'], yerr=clipped_yerr, capsize=12, color=colors[:len(policy_stats)], 
                    alpha=0.85, edgecolor='white', linewidth=2,
                    error_kw={'elinewidth': 2, 'capthick': 2, 'ecolor': '#2c3e50', 'alpha': 0.8})
     
