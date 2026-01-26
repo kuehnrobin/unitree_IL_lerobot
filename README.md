@@ -1,447 +1,329 @@
-**Read this in other languages: [中文](./docs/README_zh.md).**
+# More Is Not Always Better: Active Stereo Camera Setup Outperforms Multi-Sensor Setup in ACT Imitation Learning
 
-|Unitree Robotics  repositories        | link |
-|---------------------|------|
-| Unitree Datasets   | [unitree datasets](https://huggingface.co/unitreerobotics) |
-| AVP Teleoperate    | [avp_teleoperate](https://github.com/unitreerobotics/avp_teleoperate) |
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Paper](https://img.shields.io/badge/Paper-RAL%202026-blue)]()
+[![arXiv](https://img.shields.io/badge/arXiv-XXXX.XXXXX-b31b1b.svg)]()
 
+**Robin Kühn¹, Dennis Bank¹, Moritz Schappler¹, Thomas Seel¹**
 
-# 0. 📖 Introduction
+¹Institute of Mechatronic Systems, Leibniz University Hannover, Germany
 
-This repository is used for `lerobot training validation`(Supports LeRobot datasets version 2.0 and above.) and `unitree data conversion`.
+> **TL;DR**: We demonstrate that a minimal active stereo camera setup outperforms complex multi-sensor arrays for humanoid manipulation with Action Chunking Transformers (ACT), achieving 87.5% success in spatial generalization tasks. Our **Unified Ablation Framework** enables rigorous sensor comparison by training all policies on identical demonstration sequences.
 
-`❗Tips： If you have any questions, ideas or suggestions that you want to realize, please feel free to raise them at any time. We will do our best to solve and implement them.`
+---
 
-| Directory          | Description                                                                                                                |
-| ------------- | ------------------------------------------------------------------------------------------------------------------- |
-| lerobot       | The code in the `lerobot repository` for training;  its corresponding commit version number is `725b446a`.|
-| utils         | `unitree data processing tool `   |
-| eval_robot    | `unitree real machine inference verification of the model`     |
+## 📰 News
 
+- **[Jan 2026]** Repository released with reproduction code
+- **[Jan 2026]** Paper submitted to IEEE RA-L
 
-# 1. 📦 Environment Setup
+## 🎬 Demo Videos
 
-## 1.1 🦾 LeRobot Environment Setup
+<table>
+<tr>
+<td width="50%" align="center">
+<h3>Grasp Cubes (Spatial Generalization)</h3>
+<img src="media/demos/cubes_demo.gif" alt="Cubes Demo" width="100%"/>
+<br/>
+<a href="https://seafile.projekt.uni-hannover.de/f/d40a7d127f5a4941a352/">📹 Full Video (HD)</a>
+<br/>
+<em>R-A policy achieving 87.5% success on randomized cube positions</em>
+</td>
+<td width="50%" align="center">
+<h3>Sort Cans (Structured Task)</h3>
+<img src="media/demos/cans_demo.gif" alt="Cans Demo" width="100%"/>
+<br/>
+<a href="https://seafile.projekt.uni-hannover.de/f/fc056a5182c34eaa8c84/">📹 Full Video (HD)</a>
+<br/>
+<em>R-A policy achieving 94.4% success in can sorting</em>
+</td>
+</tr>
+</table>
 
-The purpose of this project is to use the [LeRobot](https://github.com/huggingface/lerobot) open-source framework to train and test data collected from Unitree robots. Therefore, it is necessary to install the LeRobot-related dependencies first. The installation steps are as follows, and you can also refer to the official [LeRobot](https://github.com/huggingface/lerobot) installation guide:
+## 🔬 Abstract
+
+While Action Chunking with Transformers (ACT) enables rapid task acquisition for humanoid robots, there is no consensus on optimal sensor configuration. We benchmark **15 sensor combinations** on the Unitree G1, evaluating visual, proprioceptive, and tactile modalities across two manipulation tasks.
+
+**Key Finding**: Strategic sensor selection outperforms complex configurations for small datasets. A minimal active stereo camera ($R-A$) achieved 87.5% success in spatial generalization, while adding pressure sensors to this setup reduced performance from 94% to 67% due to introduced noise.
+
+## 🏆 Main Contributions
+
+1. **Unified Ablation Framework**: Open-source toolchain using runtime sensor masking on a master dataset, eliminating human demonstration variance
+2. **Tactile Integration Study**: First systematic evaluation of finger-tip pressure sensors with ACT-based policies
+3. **Design Guidelines**: Empirical evidence that active vision often suffices, enabling cost-effective system design
+
+## 📊 Key Results
+
+<p align="center">
+<img src="media/results/pareto_can_sorting.png" alt="Can Sorting Results" width="48%"/>
+<img src="media/results/pareto_cube_in_box.png" alt="Cube Grasping Results" width="48%"/>
+</p>
+<p align="center"><em>Execution time vs. success rate for different sensor configurations. Active vision (R-A) achieves near-optimal performance with minimal hardware complexity.</em></p>
+
+### Task 1: Sort Cans (Structured Environment)
+
+| Configuration | Success Rate | Execution Time | Hardware Complexity |
+|--------------|--------------|----------------|---------------------|
+| **R-A** (Ours) | 94.4% | 3.57 min | ⭐ Minimal |
+| R-WA-P | **97.6%** | **3.17 min** | ⚠️ High |
+| R-A-P | 67.3% ❌ | - | Medium |
+
+*Adding pressure sensors without visual support (R-A-P) caused 27% performance drop*
+
+### Task 2: Grasp Cubes (Spatial Generalization)
+
+| Configuration | Success Rate | Execution Time | Generalization |
+|--------------|--------------|----------------|----------------|
+| **R-A** (Ours) | **87.5%** | **0.38 min** | ✅ Excellent |
+| R-WA-P | 68.1% | 0.34 min | ⚠️ Moderate |
+| R-S | 10.0% ❌ | - | ❌ Failed |
+
+*Static cameras exhibited "hovering behavior" due to feature interference*
+
+**Legend**: R=ResNet18, A=Active Camera, S=Static Camera, W=Wrist Cameras, P=Pressure Sensors
+
+## 🚀 Quick Start
+
+### Installation
 
 ```bash
-# Clone the source code
-git clone --recurse-submodules https://github.com/unitreerobotics/unitree_IL_lerobot.git
+# Clone with submodules
+git clone --recurse-submodules https://github.com/kuehnrobin/UAF_unitree_g1.git
+cd UAF_unitree_g1
 
-# If already downloaded:
-git submodule update --init --recursive
+# Create environment
+conda create -y -n uaf_lerobot python=3.10
+conda activate uaf_lerobot
 
-# Create a conda environment
-conda create -y -n unitree_lerobot python=3.10
-conda activate unitree_lerobot
-
-# Install LeRobot
-cd unitree_lerobot/lerobot && pip install -e .
-
-# Install unitree_lerobot
-cd ../../ && pip install -e .
+# Install dependencies
+cd unitree_lerobot/UAF_lerobot && pip install -e .
+cd ../.. && pip install -e .
 ```
 
-## 1.2 🕹️ unitree_sdk2_python
-
-For `DDS communication` on Unitree robots, some dependencies need to be installed. Follow the installation steps below:
+### Train a Policy
 
 ```bash
-git clone https://github.com/unitreerobotics/unitree_sdk2_python.git
-cd unitree_sdk2_python  && pip install -e .
-```
-
-# 2. ⚙️ Data Collection and Conversion
-
-## 2.1 🖼️ Load Datasets
-If you want to directly load the dataset we have already recorded,
-Load the [`unitreerobotics/G1_ToastedBread_Dataset`](https://huggingface.co/datasets/unitreerobotics/G1_ToastedBread_Dataset) dataset from Hugging Face. The default download location is `~/.cache/huggingface/lerobot/unitreerobotics`. If you want to load data from a local source, please change the `root` parameter.
-
-```python
-from lerobot.common.datasets.lerobot_dataset import LeRobotDataset
-import tqdm
-
-episode_index = 1
-dataset = LeRobotDataset(repo_id="unitreerobotics/G1_ToastedBread_Dataset")
-
-from_idx = dataset.episode_data_index["from"][episode_index].item()
-to_idx = dataset.episode_data_index["to"][episode_index].item()
-
-for step_idx in tqdm.tqdm(range(from_idx, to_idx)):
-    step = dataset[step_idx]
-```
-
-`visualization`
-
-```bash
-cd unitree_lerobot/lerobot
-
-python lerobot/scripts/visualize_dataset.py \
-    --repo-id unitreerobotics/G1_ToastedBread_Dataset \
-    --episode-index 0
-```
-
-## 2.2 🔨 Data Collection
-
-If you want to record your own dataset. The open-source teleoperation project [avp_teleoperate](https://github.com/unitreerobotics/avp_teleoperate/tree/g1) can be used to collect data using the Unitree G1 humanoid robot. For more details, please refer to the [avp_teleoperate](https://github.com/unitreerobotics/avp_teleoperate/tree/g1) project.
-
-## 2.3 🛠️ Data Conversion
-
-The data collected using [avp_teleoperate](https://github.com/unitreerobotics/avp_teleoperate/tree/g1) is stored in JSON format. Assuming the collected data is stored in the `$HOME/datasets/g1_grabcube_double_hand`, the format is as follows
-
-    g1_grabcube_double_hand/        # Task name
-    │
-    ├── episode_0001                # First trajectory
-    │    ├──audios/                 # Audio information
-    │    ├──colors/                 # Image information
-    │    ├──depths/                 # Depth image information
-    │    └──data.json               # State and action information
-    ├── episode_0002
-    ├── episode_...
-    ├── episode_xxx
-
-### 2.3.1 🔀 Sort and Rename
-
-When generating datasets for LeRobot, it is recommended to ensure that the data naming convention, starting from `episode_0`, is sequential and continuous. You can use the following script to `sort and rename` the data accordingly.
-
-
-```bash
-python unitree_lerobot/utils/sort_and_rename_folders.py \
-        --data_dir $HOME/datasets/g1_grabcube_double_hand
-```
-
-#### 2.3.2 🔄 Conversion
-
-Convert `Unitree JSON` Dataset to `LeRobot` Format. You can define your own `robot_type` based on [ROBOT_CONFIGS](https://github.com/unitreerobotics/unitree_IL_lerobot/blob/main/unitree_lerobot/utils/convert_unitree_json_to_lerobot.py#L154).
-```bash
-# --raw-dir     Corresponds to the directory of your JSON dataset
-# --repo-id     Your unique repo ID on Hugging Face Hub
-# --push_to_hub Whether or not to upload the dataset to Hugging Face Hub (true or false)
-# --robot_type  The type of the robot used in the dataset (e.g., Unitree_G1_Dex3, Unitree_Z1_Dual, Unitree_G1_Dex3)
-
-python unitree_lerobot/utils/convert_unitree_json_to_lerobot.py \
-    --raw-dir $HOME/datasets/g1_grabcube_double_hand \
-    --repo-id your_name/g1_grabcube_double_hand \
-    --robot_type Unitree_G1_Dex3 \ 
-    --push_to_hub
-```
-
-
-# 3. 🚀 Training
-
-[For training, please refer to the official LeRobot training example and parameters for further guidance.](https://github.com/huggingface/lerobot/blob/main/examples/4_train_policy_with_script.md)
-
-
-- `Train Act Policy`
-
-```bash
-cd unitree_lerobot/lerobot
-
-python lerobot/scripts/train.py \
-  --dataset.repo_id kuehnrobin/g1_pour_can_left_hand \
-  --policy.type=act
-  --policy.path outputs/train/pouring_unitree_2025-05-09/10-08-45_act/checkpoints/last/pretrained_model/ \
-  --optimizer.lr 1e-5 \
-  --steps 50000 \
-  --wandb.enable True \
-  --wandb.project pour_can
-
-
-Fine Tune:
-
-python lerobot/scripts/train.py \
-  --dataset.repo_id kuehnrobin/g1_pour_can_left_hand \
-  --policy.path=outputs/train/pouring_unitree_2025-05-09/10-08-45_act/checkpoints/last/pretrained_model/ \
-  --wandb.enable True \
-  --wandb.project pour_can
-
-    
-First try of fine tuning Unitree Pouring with my custom Dataset g1_can_pour_left_hand on 26.05.2025
-
-
-
-Given your specific scenario (right hand + water bottle → left hand + can), here are my(Claude Sonnet 4) suggested parameters:
-
-```bash
-cd unitree_lerobot/lerobot
-
-python lerobot/scripts/train.py \
-  --dataset.repo_id kuehnrobin/g1_pour_can_left_hand \
-  --policy.path=outputs/train/pouring_unitree_2025-05-09/10-08-45_act/checkpoints/last/pretrained_model/ \
-  --optimizer.lr 5e-6 \
-  --optimizer.weight_decay 1e-4 \
-  --steps 15000 \
-  --eval_freq 1000 \
-  --save_freq 1000 \
-  --log_freq 100 \
-  --batch_size 16 \
-  --wandb.enable true \
-  --wandb.project pour_can \
-  --job_name left_hand_can_adaptation
-
-# Feature Selection Examples
-
-# Disable joint velocities and torques
-python lerobot/scripts/train.py \
-  --dataset.repo_id kuehnrobin/g1_cubes_box_no_hover \
+# Minimal Active Vision (R-A) - Recommended baseline
+python unitree_lerobot/UAF_lerobot/src/lerobot/scripts/train.py \
+  --dataset.repo_id=your_username/master_dataset \
   --policy.type=act \
-  --feature_selection.use_joint_velocities=false \
-  --feature_selection.use_joint_torques=false \
-  --steps 50000 \
-  --eval_freq 10000 \
-  --save_freq 10000 \
-  --log_freq 1000 \
-  --batch_size 12 \
-  --wandb.enable true \
-  --wandb.project cubes_box_no_hover \
-  --feature_selection.exclude_cameras='["cam_left_head"]'
+  --feature_selection.cameras='["cam_head_active"]' \
+  --steps=50000
 
-
-# Use only specific cameras
-python lerobot/scripts/train.py \
-  --dataset.repo_id kuehnrobin/g1_cubes_box_no_hover \
-  --policy.type=act \
-  --feature_selection.cameras='["cam_left_head"]' \
-  --steps 15000
-
-# Exclude camera joints and pressure sensors
-python lerobot/scripts/train.py \
-  --dataset.repo_id kuehnrobin/g1_cubes_box_no_hover \
-  --policy.type=act \
-  --feature_selection.exclude_joint_groups='["camera"]' \
-  --feature_selection.use_pressure_sensors=false \
-  --steps 15000
+# Run complete ablation study (15 configurations)
+python experiments/scripts/run_ablation_study.py \
+  --config_file=experiments/configs/paper_ablation.yaml \
+  --dataset_repo=your_username/master_dataset \
+  --wandb_project=ral_reproduction
 ```
 
-## 3.1 🔬 Feature Ablation Studies
-
-You can run systematic ablation studies to understand which features are most important for your policy using the ablation study script:
+### Evaluate on Real Robot
 
 ```bash
-cd unitree_lerobot
-
-# Run ablation study with custom configuration
-python scripts/run_ablation_study.py \
-  --config_file examples/custom_ablation.yaml \
-  --dataset_repo kuehnrobin/g1_cubes_box_no_hover \
-  --wandb_project feature_ablation \
-  --steps 10000
-```
-
-The `custom_ablation.yaml` file defines different feature combinations to test:
-- Baseline with all features
-- No joint velocities and torques
-- Different camera configurations
-- Pressure sensor ablation
-- Joint group filtering
-
-Edit `examples/custom_ablation.yaml` to define your own experiments.
-
-#### Phase 1: Conservative Adaptation
-
-  python lerobot/scripts/train.py \
-    --dataset.repo_id kuehnrobin/g1_pour_can_left_hand \
-    --policy.path=outputs/train/pouring_unitree_2025-05-09/10-08-45_act/checkpoints/last/pretrained_model/ \
-    --optimizer.lr 1e-5 \
-    --optimizer.weight_decay 5e-5 \
-    --steps 8000 \
-    --eval_freq 500 \
-    --save_freq 1000 \
-    --log_freq 50 \
-    --batch_size 8 \
-    --wandb.enable true \
-    --wandb.project pour_can \
-    --job_name conservative_adaptation
-
-#### Phase 2: If Phase 1 works, increase learning rate
-
-  python lerobot/scripts/train.py \
-    --dataset.repo_id kuehnrobot/g1_pour_can_left_hand \
-    --policy.path=outputs/from_phase1/checkpoints/last/pretrained_model/ \
-    --optimizer.lr 3e-5 \
-    --optimizer.weight_decay 1e-4 \
-    --steps 10000 \
-    --eval_freq 500 \
-    --save_freq 1000 \
-    --batch_size 12 \
-    --wandb.enable true \
-    --wandb.project pour_can \
-    --job_name aggressive_adaptation
-## 3. Parameter Rationale
-
-**Learning Rate (`5e-6`)**: 
-- Much lower than training from scratch (typically 1e-4 to 1e-5)
-- Prevents catastrophic forgetting of the pouring skills
-- Allows gradual adaptation to left hand + can
-
-**Steps (`15000`)**:
-- Fewer than full training since you're fine-tuning
-- Should be enough to adapt to the new hand/object combination
-- Monitor loss curves to adjust if needed
-
-**Batch Size (`16`)**:
-- Smaller batch size can help with stability during fine-tuning
-- Adjust based on your GPU memory
-
-**Evaluation Frequency (`1000`)**:
-- More frequent evaluation to monitor adaptation progress
-- Important to catch overfitting early
-
-## 4. Additional Considerations
-
-**Data Augmentation**: Consider if your dataset has enough diversity in:
-- Grasping poses for the left hand
-- Can orientations and positions
-- Pouring trajectories
-
-**Monitoring**: Watch for:
-- Loss plateauing (might need longer training)
-- Evaluation performance degrading (overfitting)
-- Gradual improvement in success rate
-
-**Alternative Approach**: If the above doesn't work well, you might also try:
-
-```bash
-# Even more conservative fine-tuning
-python lerobot/scripts/train.py \
-  --dataset.repo_id your_username/g1_pour_can_left_hand \
-  --policy.path=outputs/train/pouring_unitree_2025-05-09/10-08-45_act/checkpoints/last/pretrained_model/ \
-  --optimizer.lr 1e-6 \
-  --steps 100000 \
-  --wandb.enable True \
-  --wandb.project pour_can_domain_adaptation
-```
-
-The key is starting conservative and increasing learning rate/steps if the model isn't adapting fast enough.
-
-```
-
-- `Train Diffusion Policy`
-
-```bash
-cd unitree_lerobot/lerobot
-
-python lerobot/scripts/train.py \
-  --dataset.repo_id=unitreerobotics/G1_ToastedBread_Dataset \
-  --policy.type=diffusion \
-  --use_wandb=True
-
-```
-
-- `Train Pi0 Policy`
-
-```bash
-cd unitree_lerobot/lerobot
-
-python lerobot/scripts/train.py \
-  --dataset.repo_id=unitreerobotics/G1_ToastedBread_Dataset \
-  --policy.type=pi0 \
-  --use_wandb=True
-
-```
-
-# 4. 🤖 Real-World Testing
-
-To test your trained model on a real robot, you can use the eval_g1.py script located in the eval_robot/eval_g1 folder. Here’s how to run it:
-
-[To open the image_server, follow these steps](https://github.com/unitreerobotics/avp_teleoperate?tab=readme-ov-file#31-%EF%B8%8F-image-server)
-
-```bash
-# --policy.path Path to the trained model checkpoint
-# --repo_id     Dataset repository ID (Why use it? The first frame state of the dataset is loaded as the initial state)
-python unitree_lerobot/eval_robot/eval_g1/eval_g1.py  \
-    --policy.path=unitree_lerobot/lerobot/outputs/train/pour_can_2025-05-25/19-48-48_act/checkpoints/last/pretrained_model/     --repo_id=kuehnrobin/g1_pour_can_left_hand \
-    --arm_speed 10.0 \
-    --no_gradual_speed=true \
-    --cyclonedds_uri enxa0cec8616f27
-
-# For DINOv2 models trained with custom feature selection (from ablation studies)
-# IMPORTANT: Use the same feature selection parameters that were used during training
-python unitree_lerobot/eval_robot/eval_g1/eval_g1.py  \
-    --policy.path=outputs/train/2025-07-20/16-44-06_dinov2_backbone/checkpoints/last/pretrained_model/ \
-    --repo_id=kuehnrobin/g1_cubes_no_hover_fixed \
-    --arm_speed 10.0 \
-    --no_gradual_speed=true \
-    --cyclonedds_uri enxa0cec8616f27 \
-    #--feature_selection.exclude_cameras='["cam_left_active", "cam_right_active"]' \
-    --feature_selection.use_joint_velocities=false \
-    --feature_selection.use_joint_torques=false
-
-
-python unitree_lerobot/eval_robot/eval_g1/eval_g1.py  \
-    --policy.path=unitree_lerobot/lerobot/outputs/train/2025-05-27/13-53-10_pour_can_mark_3/checkpoints/015000/pretrained_model/ \
-    --repo_id=kuehnrobin/g1_pour_can_left_hand \
-    --arm_speed 10.0 \
-    --no_gradual_speed=true \
-    --cyclonedds_uri enxa0cec8616f27 \
-    --record true
-    --force true
-    Optional:
-    --pressure false
-
-
-# If you want to evaluate the model's performance on the dataset, use the command below for testing
-python unitree_lerobot/eval_robot/eval_g1/eval_g1_dataset.py  \
-    --policy.path=unitree_lerobot/lerobot/outputs/train/2025-03-25/22-11-16_diffusion/checkpoints/100000/pretrained_model \
-    --repo_id=unitreerobotics/G1_ToastedBread_Dataset
-```
- python unitree_lerobot/eval_robot/eval_g1/eval_g1_dataset.py --policy.path=unitree_lerobot/lerobot/outputs/train/2025-05-26/14-57-19_left_hand_can_adaptation/checkpoints/last/pretrained_model/ --repo_id=kuehnrobin/pour_can_left_hand
-
-
-# 5. 🤔 Troubleshooting
-
-| Problem | Solution |
-|---------|----------|
-| **Why use `LeRobot v2.0`?** | [Explanation](https://github.com/huggingface/lerobot/pull/461) |
-| **401 Client Error: Unauthorized** (`huggingface_hub.errors.HfHubHTTPError`) | Run `huggingface-cli login` to authenticate. |
-| **FFmpeg-related errors:**  <br> Q1: `Unknown encoder 'libsvtav1'` <br> Q2: `FileNotFoundError: No such file or directory: 'ffmpeg'` <br> Q3: `RuntimeError: Could not load libtorchcodec. Likely causes: FFmpeg is not properly installed.` | Install FFmpeg: <br> `conda install -c conda-forge ffmpeg` |
-| **Access to model `google/paligemma-3b-pt-224` is restricted.** | Run `huggingface-cli login` and request access if needed. |
-| **Missing policy type error** <br> `Expected a dict with a 'type' key for PreTrainedConfig` | Add `"type": "act"` to the beginning of your model's `config.json` file. |
-
-# 6. 📤 Sharing Your Trained Policies
-
-After training your robot policy, you can share it with the community by uploading it to the Hugging Face Hub. This allows others to use your trained models and helps advance the field of robot learning.
-
-## 6.1 🚀 Push Policy to Hugging Face Hub
-
-Once you have trained a policy with our training script (lerobot/scripts/train.py), use this script to push it
-to the hub.
-
-Example:
-
-```bash
-python lerobot/scripts/push_pretrained.py \
-    --pretrained_path=outputs/train/act_aloha_sim_transfer_cube_human/checkpoints/last/pretrained_model \
-    --repo_id=lerobot/act_aloha_sim_transfer_cube_human
-```
-### Using Uploaded Policies
-
-Once uploaded, others can use your policy:
-
-```python
-# Loading from Hub
-from lerobot.common.policies.act.modeling_act import ACTPolicy
-policy = ACTPolicy.from_pretrained("your_username/g1_pour_can_act_policy")
-
-# Or in evaluation script
 python unitree_lerobot/eval_robot/eval_g1/eval_g1.py \
-    --policy.path=your_username/g1_pour_can_act_policy \
-    --repo_id=original_training_dataset \
-    --arm_speed 10.0
+  --policy.path=outputs/train/R-A/checkpoints/last/pretrained_model/ \
+  --repo_id=your_username/master_dataset
 ```
 
-## 6.2 📝 Best Practices
+## 📁 Repository Structure
 
-1. **Descriptive Names**: Use clear, descriptive repository names
-2. **Documentation**: Add a good README to your model repository describing the task, training data, and performance
-3. **Versioning**: Use branches or separate repositories for different versions
-4. **Testing**: Test your uploaded model before sharing publicly
-5. **Licensing**: Consider adding appropriate licenses to your model repositories
+```
+UAF_unitree_g1/
+├── analysis/                    # Scripts to reproduce paper figures
+│   ├── plot_wandb/             # Pareto plots (Fig. 3 & 4) and analysis
+│   └── README.md               # Guide to regenerating figures
+├── experiments/                 # Reproducibility configs
+│   ├── configs/                # Paper ablation study YAML
+│   ├── scripts/                # Training and evaluation scripts
+│   └── README.md               # Detailed reproduction guide
+├── unitree_lerobot/
+│   ├── UAF_lerobot/            # Fork of LeRobot with ablation framework
+│   ├── utils/                  # Data conversion (JSON → LeRobot)
+│   ├── eval_robot/             # Real robot evaluation
+│   ├── FEATURE_SELECTION_README.md  # Unified Ablation Framework docs
+│   └── AUGMENTATION_README.md  # Data augmentation guide
+├── docs/                        # Additional documentation
+├── test/                        # Unit tests
+└── CITATION.bib                # BibTeX for citation
+```
 
-# 7. 🙏 Acknowledgement
+## 🎯 Reproducing Paper Results
 
-This code builds upon following open-source code-bases. Please visit the URLs to see the respective LICENSES:
+### Step 1: Prepare Master Dataset
 
-1. https://github.com/huggingface/lerobot
-2. https://github.com/unitreerobotics/unitree_sdk2_python
+Collect demonstrations with **all** sensor modalities:
+- Active stereo camera
+- Static wide-angle cameras
+- Wrist cameras
+- Joint positions, velocities, torques
+- Fingertip pressure sensors
+
+```bash
+# Convert your teleoperation data
+python unitree_lerobot/utils/convert_unitree_json_to_lerobot.py \
+  --raw-dir=/path/to/json_dataset \
+  --repo-id=your_username/master_dataset \
+  --robot_type=Unitree_G1_Dex3
+```
+
+### Step 2: Run Ablation Study
+
+```bash
+python experiments/scripts/run_ablation_study.py \
+  --config_file=experiments/configs/paper_ablation.yaml \
+  --dataset_repo=your_username/master_dataset \
+  --steps=50000 \
+  --eval_freq=10000
+```
+
+This trains all 15 sensor configurations on **identical demonstration sequences** using runtime sensor masking.
+
+### Step 3: Generate Paper Figures
+
+```bash
+# Pareto plots (Fig. 3 & 4)
+python analysis/plot_wandb/pareto_plots.py \
+  --data=analysis/plot_wandb/can_policies.csv \
+  --output=figures/pareto_can_sorting.pdf
+
+python analysis/plot_wandb/pareto_plots.py \
+  --data=analysis/plot_wandb/cubes_policies.csv \
+  --output=figures/pareto_cube_in_box.pdf
+```
+
+See [analysis/README.md](analysis/README.md) for detailed instructions.
+
+## 🛠️ Unified Ablation Framework
+
+Our key methodological contribution: train multiple sensor configurations from a single master dataset.
+
+<p align="center">
+<img src="media/methods/ablation_framework.png" alt="Unified Ablation Framework" width="70%"/>
+</p>
+<p align="center"><em>Runtime sensor masking enables training 15 policies on identical demonstrations, eliminating human variance.</em></p>
+
+**Traditional Approach** ❌:
+- Collect Dataset A (cameras only)
+- Collect Dataset B (cameras + pressure)
+- Human variance confounds results
+
+**UAF Approach** ✅:
+- Collect once (all sensors)
+- Runtime masking selects features
+- All policies train on identical demos
+
+**Usage:**
+
+```python
+# Define feature selection
+from lerobot.configs.train import FeatureSelectionConfig
+
+config = FeatureSelectionConfig(
+    cameras=["cam_head_active"],  # Only active camera
+    use_joint_velocities=False,    # Disable velocities
+    use_pressure_sensors=False     # Disable pressure
+)
+
+# Apply during training
+python lerobot/scripts/train.py \
+  --feature_selection.cameras='["cam_head_active"]' \
+  --feature_selection.use_pressure_sensors=false
+```
+
+See [unitree_lerobot/FEATURE_SELECTION_README.md](unitree_lerobot/FEATURE_SELECTION_README.md) for complete API.
+
+## 📦 Datasets
+
+### Training Datasets
+
+Available on HuggingFace:
+
+- **Can Sorting**: `kuehnrobin/g1_sort_cans_master` (TBD)
+- **Cube Grasping**: `kuehnrobin/g1_grasp_cubes_master` (TBD)
+
+### Benchmark Dataset (OpenTelevision)
+
+We compare against the OpenTelevision baseline using their published can sorting task.
+& Teleoperation Setup
+
+<p align="center">
+<img src="media/methods/teleop_setup.png" alt="Teleoperation Setup" width="65%"/>
+</p>
+<p align="center"><em>VR-based teleoperation system enabling active perception data collection. Operator's head movements are synchronized with the robot's camera system.</em></p>
+
+**Required Hardware**:## 🤖 Hardware Requirements
+
+- **Robot**: Unitree G1 humanoid with Dex3-1 hands
+- **Cameras**:
+  - Active: OAK-D stereo camera (mounted on pan-tilt head)
+  - Static: Wide-angle RGB cameras (head-mounted)
+  - Wrist: Optional close-up cameras
+- **Sensors**: Optional fingertip pressure sensors (12 per hand)
+- **Teleoperation**: Meta Quest 3 VR headset
+
+## 📈 Comparison to State-of-the-Art
+
+| Method | Backbone | Success (Can Task) | Hardware | Dataset Size |
+|--------|----------|-------------------|----------|--------------|
+| OpenTelevision (ResNet18) | ResNet18 | 83% pick, 50% place | Active Camera | 50 episodes |
+| **R-A (Ours)** | ResNet18 | **94.4%** overall | Active Camera | 80 episodes |
+| **R-WA-P (Ours)** | ResNet18 | **97.6%** overall | Active + Wrist + Pressure | 80 episodes |
+
+*Note: Direct comparison is approximate due to different evaluation protocols*
+
+## 💡 Design Guidelines
+
+Based on our findings, we recommend:
+
+1. **Start with Active Vision**: Single active stereo camera ($R-A$) as baseline
+2. **Avoid Co-Located Redundancy**: Don't combine active + static cameras on same link
+3. **Add Tactile Carefully**: Pressure sensors require supporting visual context (wrist cameras)
+4. **Prioritize Data Quality**: 80 high-quality episodes > 200 noisy episodes
+
+## 🔬 Limitations
+
+- Results specific to ACT architecture (not tested with Diffusion Policy)
+- Data-limited regime (<100 episodes); benefits may differ at scale
+- Tabletop manipulation only; dynamic tasks may require different sensors
+- VR teleoperation latency (0.5-1.0s) may introduce artifacts
+
+## 📝 Citation
+
+If you use this work, please cite:
+
+```bibtex
+@article{kuehn2026more,
+  title={More Is Not Always Better: Active Stereo Camera Setup Outperforms 
+         Multi-Sensor Setup in ACT Imitation Learning for Humanoid Manipulation Task},
+  author={K{\"u}hn, Robin and Bank, Dennis and Schappler, Moritz and Seel, Thomas},
+  journal={IEEE Robotics and Automation Letters},
+  year={2026}
+}
+```
+
+## 🙏 Acknowledgments
+
+This work builds upon:
+- [LeRobot](https://github.com/huggingface/lerobot) - Hugging Face robotics library
+- [OpenTelevision](https://github.com/OpenTeleVision/TeleVision) - Active perception framework
+- [Unitree SDK](https://github.com/unitreerobotics/unitree_sdk2_python) - Robot communication
+
+## 📄 License
+
+MIT License - See [LICENSE](LICENSE) file for details.
+
+## 🤝 Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](unitree_lerobot/UAF_lerobot/CONTRIBUTING.md) for guidelines.
+
+## 📧 Contact
+
+- Robin Kühn: robin.kuehn@imes.uni-hannover.de
+- Institute Website: https://www.imes.uni-hannover.de
+
+---
+
+**Related Repositories:**
+- [UAF_lerobot](https://github.com/kuehnrobin/UAF_lerobot) - Our LeRobot fork with ablation framework
+- [Unitree Datasets](https://huggingface.co/unitreerobotics) - Official Unitree datasets
+- [AVP Teleoperate](https://github.com/unitreerobotics/avp_teleoperate) - VR teleoperation system
