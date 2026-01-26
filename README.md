@@ -42,15 +42,15 @@
 
 ## 🔬 Abstract
 
-While Action Chunking with Transformers (ACT) enables rapid task acquisition for humanoid robots, there is no consensus on optimal sensor configuration. We benchmark **14 sensor combinations** on the Unitree G1, evaluating visual, proprioceptive, and tactile modalities across two manipulation tasks.
+While Action Chunking with Transformers (ACT) enables rapid task acquisition for humanoid robots, there is no consensus yet on optimal sensory hardware for manipulation tasks. We benchmark **14 sensor combinations** on the Unitree G1 humanoid robot equipped with three-finger hands, evaluating visual, proprioceptive, and tactile modalities across two manipulation tasks.
 
-**Key Finding**: Strategic sensor selection outperforms complex configurations for small datasets. A minimal active stereo camera ($R-A$) achieved 87.5% success in spatial generalization, while adding pressure sensors to this setup reduced performance from 94% to 67% due to introduced noise.
+**Key Finding**: Strategic sensor selection outperforms complex configurations in data-limited regimes. A minimal active stereo camera (A) achieved 87.5% success in spatial generalization with the fastest execution times. Conversely, adding pressure sensors reduced success from 94% to 67% due to low signal-to-noise ratio.
 
 ## 🏆 Main Contributions
 
-1. **Unified Ablation Framework**: Open-source toolchain using runtime sensor masking on a master dataset, eliminating human demonstration variance
-2. **Tactile Integration Study**: First systematic evaluation of finger-tip pressure sensors with ACT-based policies
-3. **Design Guidelines**: Empirical evidence that active vision often suffices, enabling cost-effective system design
+1. **Unified Ablation Framework (UAF)**: Open-source toolchain building upon [LeRobot](https://github.com/huggingface/lerobot), utilizing sensor masking to guarantee identical training sequences → **[UAF_lerobot](https://github.com/kuehnrobin/UAF_lerobot)**
+2. **Extensive Evaluation of Sensor Modalities**: Comprehensive evaluation of sensory combinations with **232 training episodes** made open-source
+3. **Minimalist Design Guidelines**: We validate that a single active stereo camera is often sufficient for designing an efficient learning process
 
 ## 📊 Key Results
 
@@ -64,23 +64,23 @@ While Action Chunking with Transformers (ACT) enables rapid task acquisition for
 
 | Configuration | Success Rate | Execution Time | Hardware Complexity |
 |--------------|--------------|----------------|---------------------|
-| **A** | 94.4% | 3.57 min | ✅ Minimal |
+| **A** (Ours) | 94.4% | 3.57 min | ⭐ Minimal |
 | WA-P | **97.6%** | **3.17 min** | ⚠️ High |
-| A-P | 67.3% ❌ | - | ⭐ Medium |
+| A-P | 67.3% ❌ | - | Medium |
 
-*Adding pressure sensors without visual support (R-A-P) caused 27% performance drop*
+*Adding pressure sensors without visual support (A-P) caused 27% performance drop due to low SNR*
 
 ### Task 2: Grasp Cubes (Spatial Generalization)
 
 | Configuration | Success Rate | Execution Time | Generalization |
 |--------------|--------------|----------------|----------------|
-| **R-A** | **87.5%** | **0.38 min** | ✅ Excellent |
+| **A** (Ours) | **87.5%** | **0.38 min** | ✅ Excellent |
 | WA-P | 68.1% | 0.34 min | ⚠️ Moderate |
 | S | 10.0% ❌ | - | ❌ Failed |
 
-*Static cameras exhibited "hovering behavior" due to feature interference*
+*Static cameras exhibited "hovering behavior" due to conflicting depth cues between active stereo and static wide-angle views*
 
-**Legend**: A=Active Camera, S=Static Camera, W=Wrist Cameras, P=Pressure Sensors
+**Legend**: A=Active Camera, S=Static Camera, W=Wrist Cameras, P=Pressure Sensors, V=Velocities, T=Torques
 
 ## 🚀 Quick Start
 
@@ -263,29 +263,30 @@ We compare against the OpenTelevision baseline using their published can sorting
 
 ## 📈 Comparison to State-of-the-Art
 
-| Method | Backbone | Success (Can Task) | Hardware | Dataset Size |
-|--------|----------|-------------------|----------|--------------|
-| OpenTelevision (ResNet18) | ResNet18 | 83% pick, 50% place | Active Camera | 50 episodes |
-| **A (Ours)** | ResNet18 | **94.4%** overall | Active Camera | 80 episodes |
-| **WA-P (Ours)** | ResNet18 | **97.6%** overall | Active + Wrist + Pressure | 80 episodes |
+| Method | Backbone | Success (Can Task) | Hardware | Dataset Size | Trials |
+|--------|----------|-------------------|----------|--------------|--------|
+| OpenTelevision (ResNet18) | ResNet18 | 83% pick, 50% place | Active Camera | 50 episodes | N=5 |
+| **A (Ours)** | ResNet18 | **94.4%** overall | Active Camera | ~80 episodes | N=10 |
+| **WA-P (Ours)** | ResNet18 | **97.6%** overall | Active + Wrist + Pressure | ~80 episodes | N=10 |
 
-*Note: Direct comparison is approximate due to different evaluation protocols*
+*Our evaluation provides more robust characterization with larger N and longer task sequences*
 
 ## 💡 Design Guidelines
 
-Based on our findings, we recommend:
+Based on our findings with **232 total episodes** across both tasks, we recommend:
 
-1. **Start with Active Vision**: Single active stereo camera ($R-A$) as baseline
-2. **Avoid Co-Located Redundancy**: Don't combine active + static cameras on same link
-3. **Add Tactile Carefully**: Pressure sensors require supporting visual context (wrist cameras)
-4. **Prioritize Data Quality**: 80 high-quality episodes > 200 noisy episodes
+1. **Active Vision is Key**: Single active stereo camera (A) provides fastest execution and excellent generalization
+2. **Avoid Co-Located Visual Redundancy**: Combining active + static cameras on the same kinematic link causes destructive interference
+3. **Beware Low SNR Sensors**: In data-limited regimes, tactile data requires supporting visual context (wrist cameras) to be interpretable
+4. **Prioritize Data Quality**: Strategic sensor selection > sensor quantity
 
 ## 🔬 Limitations
 
 - Results specific to ACT architecture (not tested with Diffusion Policy)
-- Data-limited regime (<100 episodes); benefits may differ at scale
+- Data-limited regime (232 episodes total); tactile sensing may benefit from larger datasets
 - Tabletop manipulation only; dynamic tasks may require different sensors
 - VR teleoperation latency (0.5-1.0s) may introduce artifacts
+- Evaluation trials varied per policy due to execution time constraints
 
 ## 📝 Citation
 
@@ -307,6 +308,8 @@ This work builds upon:
 - [LeRobot](https://github.com/huggingface/lerobot) - Hugging Face robotics library
 - [OpenTelevision](https://github.com/OpenTeleVision/TeleVision) - Active perception framework
 - [Unitree SDK](https://github.com/unitreerobotics/unitree_sdk2_python) - Robot communication
+- [Unitree XR Teleoperate](https://github.com/unitreerobotics/xr_teleoperate) - VR teleoperation base
+- [Unitree IL LeRobot](https://github.com/unitreerobotics/unitree_IL_lerobot) - Unitree's LeRobot integration
 
 ## 📄 License
 
@@ -324,6 +327,7 @@ We welcome contributions! Please see [CONTRIBUTING.md](unitree_lerobot/UAF_lerob
 ---
 
 **Related Repositories:**
-- [UAF_lerobot](https://github.com/kuehnrobin/UAF_lerobot) - Our LeRobot fork with ablation framework
+- [UAF_lerobot](https://github.com/kuehnrobin/UAF_lerobot) - Our LeRobot fork with Unified Ablation Framework
+- [UAF_unitree_G1_teleop](https://github.com/kuehnrobin/UAF_unitree_G1_teleop) - VR teleoperation system for Unitree G1
 - [Unitree Datasets](https://huggingface.co/unitreerobotics) - Official Unitree datasets
-- [AVP Teleoperate](https://github.com/unitreerobotics/avp_teleoperate) - VR teleoperation system
+- [AVP Teleoperate](https://github.com/unitreerobotics/avp_teleoperate) - Unitree's teleoperation project
