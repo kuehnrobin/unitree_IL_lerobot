@@ -1,0 +1,127 @@
+# Paper Ablation Study Configuration
+# Reproduces the 15 sensor configurations from:
+# "More Is Not Always Better: Active Stereo Camera Setup Outperforms 
+#  Multi-Sensor Setup in ACT Imitation Learning"
+
+experiments:
+  # Baseline - Minimal Active Vision (Best Overall)
+  - name: R-A
+    config:
+      cameras: ["cam_head_active"]
+      use_joint_velocities: false
+      use_joint_torques: false
+      use_pressure_sensors: false
+    description: "Minimal active stereo camera setup - best generalization"
+
+  # Static Wide-Angle Baseline
+  - name: R-S
+    config:
+      cameras: ["cam_head_static_left", "cam_head_static_right"]
+      use_joint_velocities: false
+      use_joint_torques: false
+      use_pressure_sensors: false
+    description: "Static wide-angle cameras - exhibits hovering behavior"
+
+  # Wrist + Active (Strong Performer)
+  - name: R-WA
+    config:
+      cameras: ["cam_wrist_left", "cam_wrist_right", "cam_head_active"]
+      use_joint_velocities: false
+      use_joint_torques: false
+      use_pressure_sensors: false
+    description: "Wrist cameras + active vision"
+
+  # Static + Wrist
+  - name: R-SW
+    config:
+      cameras: ["cam_head_static_left", "cam_head_static_right", "cam_wrist_left", "cam_wrist_right"]
+      use_joint_velocities: false
+      use_joint_torques: false
+      use_pressure_sensors: false
+    description: "Static wide-angle + wrist cameras"
+
+  # Active + Pressure (Demonstrates Interference)
+  - name: R-A-P
+    config:
+      cameras: ["cam_head_active"]
+      use_joint_velocities: false
+      use_joint_torques: false
+      use_pressure_sensors: true
+    description: "Active + pressure - shows tactile interference without visual support"
+
+  # Wrist + Active + Pressure (Best for Structured Tasks)
+  - name: R-WA-P
+    config:
+      cameras: ["cam_wrist_left", "cam_wrist_right", "cam_head_active"]
+      use_joint_velocities: false
+      use_joint_torques: false
+      use_pressure_sensors: true
+    description: "Full sensor suite - best for can sorting (97.6% success)"
+
+  # Static Left Wrist Active + Pressure
+  - name: R-S_LWA-P
+    config:
+      cameras: ["cam_head_static_left", "cam_head_static_right", "cam_wrist_left", "cam_head_active"]
+      use_joint_velocities: false
+      use_joint_torques: false
+      use_pressure_sensors: true
+    description: "Static + left wrist + active + pressure"
+
+  # Complex Proprioceptive Config
+  - name: R-WA-PV_AT_A
+    config:
+      cameras: ["cam_wrist_left", "cam_wrist_right", "cam_head_active"]
+      use_joint_velocities: true
+      use_arm_joint_torques: true
+      use_pressure_sensors: true
+    description: "Wrist + active + pressure + velocities + arm torques"
+
+  # Static Left Wrist Active + Full Proprioception
+  - name: R-S_LWA-PV_AT_A
+    config:
+      cameras: ["cam_head_static_left", "cam_head_static_right", "cam_wrist_left", "cam_head_active"]
+      use_joint_velocities: true
+      use_arm_joint_torques: true
+      use_pressure_sensors: true
+    description: "Static + left wrist + active + full proprioceptive suite"
+
+  # Wrist Right Active
+  - name: R-W_RA
+    config:
+      cameras: ["cam_wrist_right", "cam_head_active"]
+      use_joint_velocities: false
+      use_joint_torques: false
+      use_pressure_sensors: false
+    description: "Right wrist + active camera"
+
+  # Additional tested configurations
+  - name: R-S_LWA
+    config:
+      cameras: ["cam_head_static_left", "cam_head_static_right", "cam_wrist_left", "cam_head_active"]
+      use_joint_velocities: false
+      use_joint_torques: false
+      use_pressure_sensors: false
+    description: "Static + left wrist + active (no tactile)"
+
+# Training parameters (matching paper)
+training:
+  steps: 50000
+  eval_freq: 10000
+  save_freq: 10000
+  log_freq: 1000
+  batch_size: 12
+  policy_type: act
+  vision_backbone: resnet18
+  optimizer_lr: 1e-5
+  
+# Hardware specifications
+robot:
+  type: unitree_g1
+  hands: dex3_1
+  
+# Dataset information
+dataset:
+  # Replace with your master dataset containing all modalities
+  repo_id: "your_username/master_dataset"
+  episodes_train: 80  # Adjust based on your data
+  episodes_eval: 20
