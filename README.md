@@ -238,8 +238,10 @@ See [unitree_lerobot/FEATURE_SELECTION_README.md](unitree_lerobot/FEATURE_SELECT
 
 Available on HuggingFace:
 
-- **Can Sorting**: `kuehnrobin/g1_sort_cans_master` (TBD)
-- **Cube Grasping**: `kuehnrobin/g1_grasp_cubes_master` (TBD)
+- **Sort Cans**: [kuehnrobin/uaf_g1_sort_cans](https://huggingface.co/datasets/kuehnrobin/uaf_g1_sort_cans)  
+  DOI: [10.57967/hf/7650](https://doi.org/10.57967/hf/7650)
+- **Put Cubes in Box**: [kuehnrobin/uaf_g1_cubes_in_box](https://huggingface.co/datasets/kuehnrobin/uaf_g1_cubes_in_box)  
+  DOI: [10.57967/hf/7649](https://doi.org/10.57967/hf/7649)
 
 ### Benchmark Dataset (OpenTelevision)
 
@@ -299,6 +301,28 @@ If you use this work, please cite:
   author={K{\"u}hn, Robin and Bank, Dennis and Schappler, Moritz and Seel, Thomas},
   journal={IEEE Robotics and Automation Letters},
   year={2026}
+}
+```
+
+```bibtex
+@misc{robin_kühn_2026,
+    author       = { Robin Kühn },
+    title        = { uaf_g1_sort_cans (Revision eefeb43) },
+    year         = 2026,
+    url          = { https://huggingface.co/datasets/kuehnrobin/uaf_g1_sort_cans },
+    doi          = { 10.57967/hf/7650 },
+    publisher    = { Hugging Face }
+}
+```
+
+```bibtex
+@misc{robin_kühn_2026,
+    author       = { Robin Kühn },
+    title        = { uaf_g1_cubes_in_box (Revision ba5d998) },
+    year         = 2026,
+    url          = { https://huggingface.co/datasets/kuehnrobin/uaf_g1_cubes_in_box },
+    doi          = { 10.57967/hf/7649 },
+    publisher    = { Hugging Face }
 }
 ```
 
