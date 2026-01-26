@@ -42,7 +42,7 @@
 
 ## 🔬 Abstract
 
-While Action Chunking with Transformers (ACT) enables rapid task acquisition for humanoid robots, there is no consensus on optimal sensor configuration. We benchmark **15 sensor combinations** on the Unitree G1, evaluating visual, proprioceptive, and tactile modalities across two manipulation tasks.
+While Action Chunking with Transformers (ACT) enables rapid task acquisition for humanoid robots, there is no consensus on optimal sensor configuration. We benchmark **14 sensor combinations** on the Unitree G1, evaluating visual, proprioceptive, and tactile modalities across two manipulation tasks.
 
 **Key Finding**: Strategic sensor selection outperforms complex configurations for small datasets. A minimal active stereo camera ($R-A$) achieved 87.5% success in spatial generalization, while adding pressure sensors to this setup reduced performance from 94% to 67% due to introduced noise.
 
@@ -64,9 +64,9 @@ While Action Chunking with Transformers (ACT) enables rapid task acquisition for
 
 | Configuration | Success Rate | Execution Time | Hardware Complexity |
 |--------------|--------------|----------------|---------------------|
-| **R-A** (Ours) | 94.4% | 3.57 min | ⭐ Minimal |
-| R-WA-P | **97.6%** | **3.17 min** | ⚠️ High |
-| R-A-P | 67.3% ❌ | - | Medium |
+| **A** | 94.4% | 3.57 min | ✅ Minimal |
+| WA-P | **97.6%** | **3.17 min** | ⚠️ High |
+| A-P | 67.3% ❌ | - | ⭐ Medium |
 
 *Adding pressure sensors without visual support (R-A-P) caused 27% performance drop*
 
@@ -74,13 +74,13 @@ While Action Chunking with Transformers (ACT) enables rapid task acquisition for
 
 | Configuration | Success Rate | Execution Time | Generalization |
 |--------------|--------------|----------------|----------------|
-| **R-A** (Ours) | **87.5%** | **0.38 min** | ✅ Excellent |
-| R-WA-P | 68.1% | 0.34 min | ⚠️ Moderate |
-| R-S | 10.0% ❌ | - | ❌ Failed |
+| **R-A** | **87.5%** | **0.38 min** | ✅ Excellent |
+| WA-P | 68.1% | 0.34 min | ⚠️ Moderate |
+| S | 10.0% ❌ | - | ❌ Failed |
 
 *Static cameras exhibited "hovering behavior" due to feature interference*
 
-**Legend**: R=ResNet18, A=Active Camera, S=Static Camera, W=Wrist Cameras, P=Pressure Sensors
+**Legend**: A=Active Camera, S=Static Camera, W=Wrist Cameras, P=Pressure Sensors
 
 ## 🚀 Quick Start
 
@@ -266,8 +266,8 @@ We compare against the OpenTelevision baseline using their published can sorting
 | Method | Backbone | Success (Can Task) | Hardware | Dataset Size |
 |--------|----------|-------------------|----------|--------------|
 | OpenTelevision (ResNet18) | ResNet18 | 83% pick, 50% place | Active Camera | 50 episodes |
-| **R-A (Ours)** | ResNet18 | **94.4%** overall | Active Camera | 80 episodes |
-| **R-WA-P (Ours)** | ResNet18 | **97.6%** overall | Active + Wrist + Pressure | 80 episodes |
+| **A (Ours)** | ResNet18 | **94.4%** overall | Active Camera | 80 episodes |
+| **WA-P (Ours)** | ResNet18 | **97.6%** overall | Active + Wrist + Pressure | 80 episodes |
 
 *Note: Direct comparison is approximate due to different evaluation protocols*
 
