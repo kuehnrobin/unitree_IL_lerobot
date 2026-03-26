@@ -1,4 +1,4 @@
-# More Is Not Always Better: Active Stereo Camera Setup Outperforms Multi-Sensor Setup in ACT Imitation Learning
+# Active Stereo Camera Setup Outperforms Multi-Sensor Setup in ACT Imitation Learning
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Paper](https://img.shields.io/badge/Paper-RAL%202026-blue)]()
@@ -15,7 +15,7 @@
 ## 📰 News
 
 - **[Jan 2026]** Repository released with reproduction code
-- **[Jan 2026]** Paper submitted to IEEE RA-L
+- **[March 2026]** Paper submitted to IEEE RA-L
 
 ## 🎬 Demo Videos
 
